@@ -31,11 +31,11 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Install trippy
+      - name: Install trippy and cargo-dist
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: trippy
+          args: trippy cargo-dist
 
       - name: Run Clippy
         uses: actions-rs/cargo@v1
@@ -59,16 +59,34 @@ jobs:
         run: |
           cargo run --package xtask -- dist
 
+      - name: Create MSI installer
+        run: |
+          cargo dist build --target=x86_64-pc-windows-msvc --installer=msi
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: windows-mtr
-          path: dist/
+          path: |
+            dist/
+            target/dist/
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/*
+          files: |
+            dist/*
+            target/dist/*.msi
+          name: Windows MTR v${{ github.ref_name }}
+          body: |
+            Windows MTR v${{ github.ref_name }} - A Windows-native clone of Linux MTR
+            
+            ## Installation
+            - **ZIP Package**: Extract and run `mtr.exe`
+            - **MSI Installer**: Run the installer for a system-wide installation
+            
+            See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/main/USAGE.md) for detailed usage instructions.
           draft: false
           prerelease: false
         env:

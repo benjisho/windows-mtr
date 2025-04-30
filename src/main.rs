@@ -1,9 +1,12 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 use clap::Parser;
 use std::env;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
+
+mod error;
+use error::{MtrError, Result};
 
 /// Windows-native clone of Linux mtr - a CLI that delivers ICMP/TCP/UDP traceroute & ping
 #[derive(Parser)]
@@ -61,7 +64,7 @@ fn validate_target(host: &str) -> Result<String> {
             // Maybe it's an IP without a port, try parsing as IpAddr
             match host.parse::<IpAddr>() {
                 Ok(_) => Ok(host.to_string()),
-                Err(_) => Err(anyhow::anyhow!("Failed to resolve host '{}': {}", host, e))
+                Err(_) => Err(MtrError::HostResolutionError(host.to_string()))
             }
         }
     }
@@ -87,9 +90,9 @@ fn find_trippy_binary() -> Result<PathBuf> {
     
     // Check if we're running from a bundled binary that has trippy embedded
     let exe_dir = env::current_exe()
-        .context("Failed to get current executable path")?
+        .map_err(|e| MtrError::IoError(e))?
         .parent()
-        .context("Failed to get executable directory")?
+        .ok_or_else(|| MtrError::Other("Failed to get executable directory".to_string()))?
         .to_path_buf();
     
     let local_trippy = exe_dir.join(if cfg!(windows) { "trippy.exe" } else { "trippy" });
@@ -104,7 +107,7 @@ fn find_trippy_binary() -> Result<PathBuf> {
     let cargo_install_status = Command::new("cargo")
         .args(["install", "trippy"])
         .status()
-        .context("Failed to run cargo install")?;
+        .map_err(|e| MtrError::TrippyInstallFailed(e.to_string()))?;
         
     if cargo_install_status.success() {
         // Try again with the newly installed trippy
@@ -118,20 +121,35 @@ fn find_trippy_binary() -> Result<PathBuf> {
         }
     }
     
-    Err(anyhow::anyhow!("Could not find or install the trippy binary. Please install it manually using 'cargo install trippy'."))
+    Err(MtrError::TrippyNotFound)
 }
 
-fn main() -> Result<()> {
+fn verify_options(args: &Cli) -> Result<()> {
+    // Verify port is provided for TCP and UDP modes
+    if (args.tcp || args.udp) && args.port.is_none() {
+        let protocol = if args.tcp { "TCP" } else { "UDP" };
+        return Err(MtrError::PortRequired(protocol.to_string()));
+    }
+    
+    Ok(())
+}
+
+fn main() -> anyhow::Result<()> {
     print_banner();
     
     // Parse command-line arguments
     let args = Cli::parse();
     
+    // Verify options
+    verify_options(&args).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    
     // Validate target
-    let host = validate_target(&args.host)?;
+    let host = validate_target(&args.host)
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     
     // Find the trippy binary
-    let trippy_path = find_trippy_binary()?;
+    let trippy_path = find_trippy_binary()
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     
     // Start building the trippy command
     let mut cmd = Command::new(trippy_path);
@@ -180,6 +198,8 @@ fn main() -> Result<()> {
     }
     
     // Execute trippy with our arguments and forward its exit status
-    let status = cmd.status()?;
+    let status = cmd.status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute trippy: {}", e))?;
+        
     process::exit(status.code().unwrap_or(2));
 }

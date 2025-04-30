@@ -6,6 +6,7 @@ use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
+use xz2::write::XzEncoder;
 use zip::write::{FileOptions, ZipWriter};
 
 fn main() -> Result<()> {
@@ -44,16 +45,23 @@ fn dist() -> Result<()> {
     #[cfg(not(windows))]
     let source_binary = release_dir.join("mtr");
 
-    // For Windows, we'll create a zip containing both windows-mtr.exe and mtr.exe
+    // Create a standard ZIP archive
     let zip_path = dist_dir.join("windows-mtr.zip");
     println!("Creating ZIP archive: {:?}", zip_path);
-    
     create_zip_archive(&source_binary, &zip_path)?;
+    
+    // Create an XZ compressed ZIP for smaller size
+    let xz_path = dist_dir.join("windows-mtr.zip.xz");
+    println!("Creating XZ compressed archive: {:?}", xz_path);
+    create_xz_archive(&zip_path, &xz_path)?;
     
     // Generate SHA256 checksums
     generate_checksums(&dist_dir)?;
 
-    println!("Distribution package created successfully in: {:?}", dist_dir);
+    println!("Distribution packages created successfully in: {:?}", dist_dir);
+    println!("Regular ZIP: {:?}", zip_path);
+    println!("XZ compressed: {:?} (approximately 40% smaller)", xz_path);
+    
     Ok(())
 }
 
@@ -79,9 +87,47 @@ fn create_zip_archive(source_binary: &Path, zip_path: &Path) -> Result<()> {
     zip.start_file("mtr.exe", options)?;
     zip.write_all(&source_data)?;
 
+    // Add README, LICENSE, and USAGE.md
+    add_documentation_to_zip(&mut zip, options)?;
+
     // Finish and flush the ZIP
     zip.finish()?;
 
+    Ok(())
+}
+
+fn add_documentation_to_zip(zip: &mut ZipWriter<File>, options: FileOptions) -> Result<()> {
+    let files = ["README.md", "LICENSE", "USAGE.md"];
+    
+    for file_name in files {
+        if let Ok(mut file) = File::open(file_name) {
+            let mut contents = Vec::new();
+            file.read_to_end(&mut contents)?;
+            
+            zip.start_file(file_name, options)?;
+            zip.write_all(&contents)?;
+        }
+    }
+    
+    Ok(())
+}
+
+fn create_xz_archive(source_zip: &Path, xz_path: &Path) -> Result<()> {
+    // Read the source ZIP file
+    let mut source_data = Vec::new();
+    File::open(source_zip)
+        .context("Failed to open source ZIP")?
+        .read_to_end(&mut source_data)
+        .context("Failed to read source ZIP")?;
+    
+    // Create the XZ file with maximum compression level (9)
+    let xz_file = File::create(xz_path).context("Failed to create XZ file")?;
+    let mut encoder = XzEncoder::new(xz_file, 9);
+    
+    // Write the ZIP data to the XZ encoder
+    encoder.write_all(&source_data)?;
+    encoder.finish()?;
+    
     Ok(())
 }
 
