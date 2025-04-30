@@ -4,9 +4,8 @@ A Windows-native clone of Linux MTR — cross-platform Rust CLI that delivers IC
 
 ![Windows MTR Banner](https://via.placeholder.com/800x200.png?text=Windows+MTR)
 
-# CI status
-
 ![CI](.github.com/benjisho/windows-mtr/workflows/CI/badge.svg)
+
 ![Release](https://img.shields.io/github/v/release/benjisho/windows-mtr?label=release)
 
 ## Features
