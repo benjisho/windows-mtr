@@ -2,7 +2,7 @@
 
 ## Basic Usage
 
-```
+```bash
 mtr [options] <hostname or IP>
 ```
 
@@ -41,44 +41,52 @@ mtr [options] <hostname or IP>
 ## Example Commands
 
 ### Basic ICMP Trace
-```
+
+```bash
 mtr 8.8.8.8
 ```
 
 ### TCP Trace to a Web Server
-```
+
+```bash
 mtr -T -P 443 example.com
 ```
 
 ### UDP Trace to DNS Server
-```
+
+```bash
 mtr -U -P 53 1.1.1.1
 ```
 
 ### Generate Static Report
-```
+
+```bash
 mtr -c 10 -r 8.8.8.8
 ```
 
 ### Faster Trace (No DNS Lookups)
-```
+
+```bash
 mtr -n 8.8.8.8
 ```
 
 ### Custom Timing Parameters
-```
+
+```bash
 mtr -i 0.5 -w 3 8.8.8.8
 ```
 
 ## Output Format
 
 ### Live Mode
+
 In the default live mode, Windows MTR will continuously update the traceroute results in real-time using a TUI (terminal user interface).
 
 ### Report Mode (-r)
+
 When using report mode (`-r`), the output format will match Linux MTR's report format:
 
-```
+```bash
 HOST: <hostname>                  Loss%   Snt   Last   Avg  Best  Wrst StDev
   1.|-- <hop1>                     0.0%    10    1.2   1.5   1.0   2.2   0.3
   2.|-- <hop2>                     0.0%    10   10.3  11.2  10.0  14.9   1.8

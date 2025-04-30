@@ -5,6 +5,7 @@ A Windows-native clone of Linux MTR — cross-platform Rust CLI that delivers IC
 ![Windows MTR Banner](assets/banner.png)
 
 ![CI](https://github.com/benjisho/windows-mtr/workflows/CI/badge.svg)
+
 ![Release](https://img.shields.io/github/v/release/benjisho/windows-mtr?label=release)
 
 ## Features
@@ -148,7 +149,7 @@ mtr -T -P 25 mailserver.example.com
 
 In report mode (`-r`), Windows MTR produces output like:
 
-```
+```bash
 HOST: laptop                      Loss%   Snt   Last   Avg  Best  Wrst StDev
   1.|-- router.local               0.0%    10    1.8   1.9   1.7   2.1   0.1
   2.|-- isp-gateway.example.com    0.0%    10   10.2  12.3   9.8  20.1   3.2
@@ -159,6 +160,7 @@ HOST: laptop                      Loss%   Snt   Last   Avg  Best  Wrst StDev
 ```
 
 Column explanations:
+
 - **Loss%**: Percentage of packet loss at this hop
 - **Snt**: Number of packets sent
 - **Last**: Latency of the last packet (ms)
@@ -203,6 +205,7 @@ While Windows MTR doesn't require administrator rights, you may encounter permis
 2. You're running in a restricted environment
 
 Solutions:
+
 - Add an exception in your firewall for `mtr.exe`
 - Try running from a command prompt launched with "Run as administrator"
 
@@ -257,6 +260,7 @@ Yes, we've taken great care to ensure that the output format, especially in repo
 ### Why do I see "???" in the results?
 
 Hops showing "???" with 100% packet loss typically indicate:
+
 1. A firewall or router configured to not respond to ICMP
 2. A network device that's dropping or deprioritizing probe packets
 3. A hop that's actually failing or experiencing issues

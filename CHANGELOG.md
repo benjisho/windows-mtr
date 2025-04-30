@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2025-04-30
 
-### Added
+### Added --> [1.0.0]
+
 - MSI installer for system-wide installation
 - Improved GitHub Actions release workflow with cargo-dist integration
 - Enhanced documentation with detailed installation instructions
@@ -29,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2025-04-29
 
-### Added
+### Added -> [0.1.0]
 
 - Initial release of Windows MTR
 - ICMP, TCP, and UDP probe support
