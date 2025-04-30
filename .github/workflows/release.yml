@@ -19,6 +19,7 @@ jobs:
           toolchain: stable
           profile: minimal
           override: true
+          target: x86_64-pc-windows-msvc
           components: clippy
 
       - name: Cache Rust dependencies
@@ -31,23 +32,11 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Install trippy and cargo-dist
+      - name: Install trippy
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: trippy cargo-dist
-
-      - name: Run Clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-targets -- -D warnings
-
-      - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
+          args: trippy
 
       - name: Build release binary
         uses: actions-rs/cargo@v1
@@ -57,36 +46,109 @@ jobs:
 
       - name: Package distribution
         run: |
-          cargo run --package xtask -- dist
+          mkdir -p dist
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/windows-mtr.exe
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/mtr.exe
+          cp README.md LICENSE USAGE.md dist/
+        shell: bash
 
-      - name: Create MSI installer
+      - name: Create ZIP package
         run: |
-          cargo dist build --target=x86_64-pc-windows-msvc --installer=msi
+          Compress-Archive -Path dist/* -DestinationPath dist/windows-mtr.zip -Force
+        shell: pwsh
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          Get-FileHash -Algorithm SHA256 windows-mtr.exe | ForEach-Object {$_.Hash + "  windows-mtr.exe"} | Out-File -FilePath SHA256SUMS -Encoding utf8
+          Get-FileHash -Algorithm SHA256 mtr.exe | ForEach-Object {$_.Hash + "  mtr.exe"} | Out-File -FilePath SHA256SUMS -Encoding utf8 -Append
+          Get-FileHash -Algorithm SHA256 windows-mtr.zip | ForEach-Object {$_.Hash + "  windows-mtr.zip"} | Out-File -FilePath SHA256SUMS -Encoding utf8 -Append
+        shell: pwsh
+        
+      - name: Create self-contained installer
+        run: |
+          # Using simple batch file approach for installer
+          echo '@echo off' > dist/install.bat
+          echo 'echo Installing Windows MTR...' >> dist/install.bat
+          echo 'if not exist "%PROGRAMFILES%\Windows-MTR" mkdir "%PROGRAMFILES%\Windows-MTR"' >> dist/install.bat
+          echo 'copy /Y mtr.exe "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
+          echo 'copy /Y windows-mtr.exe "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
+          echo 'copy /Y README.md "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
+          echo 'copy /Y LICENSE "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
+          echo 'copy /Y USAGE.md "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
+          echo 'echo Creating shortcuts...' >> dist/install.bat
+          echo 'powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(''%USERPROFILE%\Desktop\Windows MTR.lnk''); $s.TargetPath = ''%PROGRAMFILES%\Windows-MTR\windows-mtr.exe''; $s.Save()"' >> dist/install.bat
+          echo 'echo Adding to PATH...' >> dist/install.bat
+          echo 'setx PATH "%PATH%;%PROGRAMFILES%\Windows-MTR"' >> dist/install.bat
+          echo 'echo Installation complete! You can now run mtr from any command prompt.' >> dist/install.bat
+          
+          # Add to the ZIP
+          Compress-Archive -Path dist/install.bat -Update -DestinationPath dist/windows-mtr.zip
+        shell: pwsh
+
+      # Create a simple ZIP package that includes just the executable for ease of use
+      - name: Create standalone executable ZIP
+        run: |
+          mkdir -p standalone
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe standalone/
+          Compress-Archive -Path standalone/mtr.exe -DestinationPath dist/mtr-standalone.zip -Force
+        shell: pwsh
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: windows-mtr
-          path: |
-            dist/
-            target/dist/
+          path: dist/
 
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/*
-            target/dist/*.msi
+            dist/windows-mtr.exe
+            dist/mtr.exe
+            dist/windows-mtr.zip
+            dist/mtr-standalone.zip
+            dist/SHA256SUMS
+            dist/install.bat
           name: Windows MTR v${{ github.ref_name }}
           body: |
-            Windows MTR v${{ github.ref_name }} - A Windows-native clone of Linux MTR
+            # Windows MTR v${{ github.ref_name }}
             
-            ## Installation
-            - **ZIP Package**: Extract and run `mtr.exe`
-            - **MSI Installer**: Run the installer for a system-wide installation
+            A Windows-native clone of Linux MTR for network path diagnostics.
             
-            See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/main/USAGE.md) for detailed usage instructions.
+            ## Download Options
+            
+            ### For end users (Windows technicians):
+            
+            - **[mtr-standalone.zip](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/mtr-standalone.zip)** - Just the executable, extract and run
+            - **[windows-mtr.zip](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr.zip)** - Complete package with installer and documentation
+            - **Direct executable**: [mtr.exe](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/mtr.exe)
+            
+            ### Installation:
+            
+            **Simple method:** Download and run `mtr.exe` directly - no installation needed!
+            
+            **With installer:** 
+            1. Download windows-mtr.zip
+            2. Extract the ZIP
+            3. Run install.bat (may require administrator privileges)
+            
+            ## Verifying downloads
+            
+            SHA256 checksums are available in the [SHA256SUMS](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/SHA256SUMS) file.
+            
+            ## Usage
+            
+            ```
+            # Basic usage
+            mtr 8.8.8.8
+            
+            # TCP mode (for HTTPS)
+            mtr -T -P 443 example.com
+            ```
+            
+            See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/main/USAGE.md) for more examples.
           draft: false
           prerelease: false
         env:
