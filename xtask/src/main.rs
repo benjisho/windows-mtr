@@ -100,12 +100,18 @@ fn add_documentation_to_zip(zip: &mut ZipWriter<File>, options: FileOptions) -> 
     let files = ["README.md", "LICENSE", "USAGE.md"];
     
     for file_name in files {
-        if let Ok(mut file) = File::open(file_name) {
-            let mut contents = Vec::new();
-            file.read_to_end(&mut contents)?;
-            
-            zip.start_file(file_name, options)?;
-            zip.write_all(&contents)?;
+        match File::open(file_name) {
+            Ok(mut file) => {
+                let mut contents = Vec::new();
+                file.read_to_end(&mut contents)?;
+                
+                zip.start_file(file_name, options)?;
+                zip.write_all(&contents)?;
+            },
+            Err(e) => {
+                eprintln!("Warning: Could not open documentation file '{}': {}", file_name, e);
+                eprintln!("The file will be missing from the package.");
+            }
         }
     }
     
@@ -146,7 +152,7 @@ fn generate_checksums(dist_dir: &Path) -> Result<()> {
 
         let mut file = File::open(path)?;
         let mut hasher = Sha256::new();
-        let mut buffer = [0; 1024];
+        let mut buffer = [0; 8192];  // Increased from 1024 to 8192 bytes for better performance
 
         loop {
             let bytes_read = file.read(&mut buffer)?;

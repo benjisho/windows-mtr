@@ -71,21 +71,9 @@ fn validate_target(host: &str) -> Result<String> {
 }
 
 fn find_trippy_binary() -> Result<PathBuf> {
-    // First try to use trippy from PATH
-    if let Ok(status) = Command::new("trippy").arg("--version").output() {
-        if status.status.success() {
-            return Ok(PathBuf::from("trippy"));
-        }
-    }
-    
-    // Try to find trippy in the cargo bin directory
-    if let Some(home_dir) = dirs::home_dir() {
-        let cargo_bin = home_dir.join(".cargo").join("bin");
-        let trippy_path = cargo_bin.join(if cfg!(windows) { "trippy.exe" } else { "trippy" });
-        
-        if trippy_path.exists() {
-            return Ok(trippy_path);
-        }
+    // First use the 'which' crate to locate the trippy binary in PATH
+    if let Ok(path) = which::which("trippy") {
+        return Ok(path);
     }
     
     // Check if we're running from a bundled binary that has trippy embedded
@@ -110,14 +98,9 @@ fn find_trippy_binary() -> Result<PathBuf> {
         .map_err(|e| MtrError::TrippyInstallFailed(e.to_string()))?;
         
     if cargo_install_status.success() {
-        // Try again with the newly installed trippy
-        if let Some(home_dir) = dirs::home_dir() {
-            let cargo_bin = home_dir.join(".cargo").join("bin");
-            let trippy_path = cargo_bin.join(if cfg!(windows) { "trippy.exe" } else { "trippy" });
-            
-            if trippy_path.exists() {
-                return Ok(trippy_path);
-            }
+        // Try again with the 'which' crate to locate the newly installed trippy
+        if let Ok(path) = which::which("trippy") {
+            return Ok(path);
         }
     }
     
