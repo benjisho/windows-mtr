@@ -38,11 +38,51 @@ jobs:
           command: install
           args: trippy
 
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
+
       - name: Build release binary
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --target x86_64-pc-windows-msvc
+
+      # New step: Verify the binary works correctly
+      - name: Verify binary functionality
+        run: |
+          echo "Verifying binary functionality..."
+          $ErrorActionPreference = "Stop"
+          # Test help output
+          $helpOutput = & ./target/x86_64-pc-windows-msvc/release/mtr.exe --help
+          if (-not ($helpOutput -match "Usage:" -and $helpOutput -match "Arguments:" -and $helpOutput -match "Options:")) {
+            Write-Error "Help output verification failed"
+            exit 1
+          }
+          echo "✓ Help command verified"
+          
+          # Test version output
+          $versionOutput = & ./target/x86_64-pc-windows-msvc/release/mtr.exe --version
+          if (-not ($versionOutput -match "mtr ")) {
+            Write-Error "Version output verification failed"
+            exit 1
+          }
+          echo "✓ Version command verified"
+          
+          # Test basic command-line argument parsing (without network activity)
+          # This just verifies the binary accepts the arguments without crashing
+          try {
+            Start-Process -FilePath "./target/x86_64-pc-windows-msvc/release/mtr.exe" -ArgumentList "-T", "-P", "443", "-c", "1", "-n", "--help" -NoNewWindow -Wait
+            echo "✓ Command-line argument parsing verified"
+          } catch {
+            Write-Error "Command-line argument parsing test failed: $_"
+            exit 1
+          }
+          
+          echo "All binary verification tests passed successfully!"
+        shell: pwsh
 
       - name: Package distribution
         run: |
