@@ -28,15 +28,6 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_package_metadata() -> Result<Package> {
-    let metadata = MetadataCommand::new().exec()?;
-    let package = metadata.root_package()
-        .context("Failed to find root package")?
-        .clone();
-    
-    Ok(package)
-}
-
 fn dist() -> Result<()> {
     println!("Building release binaries...");
     // First, build the release binary
