@@ -308,21 +308,8 @@ fn package_win_manually() -> Result<()> {
     let dummy_exe = dist_dir.join("mtr.exe");
     if !dummy_exe.exists() {
         println!("Creating placeholder Windows executable...");
-        let mut file = File::create(&dummy_exe)
+        create_placeholder_exe(&dummy_exe)
             .context("Failed to create dummy Windows executable")?;
-        
-        // Write a minimal PE header to make it a valid Windows executable
-        // This is just for packaging demonstration - it won't run
-        let pe_header = b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xFF\xFF\x00\x00\
-                         \xB8\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
-                         \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80\x00\x00\x00\
-                         \x0E\x1F\xBA\x0E\x00\xB4\x09\xCD\x21\xB8\x01\x4C\xCD\x21\x54\x68\
-                         \x69\x73\x20\x70\x72\x6F\x67\x72\x61\x6D\x20\x63\x61\x6E\x6E\x6F\
-                         \x74\x20\x62\x65\x20\x72\x75\x6E\x20\x69\x6E\x20\x44\x4F\x53\x20\
-                         \x6D\x6F\x64\x65\x2E\x0D\x0D\x0A\x24\x00\x00\x00\x00\x00\x00\x00";
-        
-        file.write_all(pe_header)?;
         println!("Created placeholder Windows executable at: {}", dummy_exe.display());
     }
 
