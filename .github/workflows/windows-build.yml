@@ -33,7 +33,7 @@ jobs:
         run: cargo test
       
       - name: Create dist directory
-        run: mkdir -p dist
+        run: powershell -command "New-Item -ItemType Directory -Path 'dist' -Force"
       
       - name: Package binaries
         run: |
