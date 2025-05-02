@@ -50,7 +50,7 @@ jobs:
           powershell -command "Compress-Archive -Path 'mtr.exe', 'windows-mtr.exe', '..\README.md', '..\LICENSE', '..\USAGE.md' -DestinationPath 'windows-mtr-full.zip' -Force"
           
           # Generate SHA-256 checksums
-          powershell -command "$files = Get-ChildItem -Filter '*.zip'; foreach ($file in $files) { $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256; Add-Content -Path 'SHA256SUMS' -Value `"$($hash.Hash)  $($file.Name)`" }"
+          powershell -command "$files = Get-ChildItem -Filter '*.zip'; foreach ($file in $files) { $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256; Add-Content -Path 'SHA256SUMS' -Value \"$($hash.Hash)  $($file.Name)\" }"
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
