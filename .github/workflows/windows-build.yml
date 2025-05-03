@@ -68,7 +68,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # This permission is required for creating releases
+      contents: write  # Required for creating releases and uploading assets
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
