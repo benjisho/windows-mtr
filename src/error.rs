@@ -3,6 +3,7 @@ use thiserror::Error;
 
 /// Custom error types for Windows MTR
 #[derive(Error, Debug)]
+#[allow(dead_code)]  // Some variants are planned for future use
 pub enum MtrError {
     /// Error resolving hostname
     #[error("Failed to resolve hostname: {0}")]

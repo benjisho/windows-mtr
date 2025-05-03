@@ -2,13 +2,12 @@ use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use walkdir::WalkDir;
 use xz2::write::XzEncoder;
 use zip::write::{FileOptions, ZipWriter};
-use cargo_metadata::{MetadataCommand, Package};
 
 fn main() -> Result<()> {
     let task = env::args().nth(1);
@@ -36,7 +35,7 @@ fn dist() -> Result<()> {
         .status()
         .context("Failed to run cargo build")?;
 
-    if !status.success() {
+    if (!status.success()) {
         anyhow::bail!("cargo build failed");
     }
 
