@@ -82,12 +82,42 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
 
-      # Build the release binary
+      # Build the release binary with explicit binary name
       - name: Build release binary
-        run: cargo build --release --target x86_64-pc-windows-msvc
+        run: cargo build --release --bin mtr --target x86_64-pc-windows-msvc
         env:
           CARGO_INCREMENTAL: 0
           RUSTFLAGS: "-C target-feature=+crt-static"
+
+      # Check build output and list files in target directory for debugging
+      - name: Check build output
+        run: |
+          echo "Checking for binary in target directories..."
+          
+          # Check standard target directory
+          if (Test-Path "target/release") {
+            echo "Contents of target/release:"
+            Get-ChildItem -Path "target/release" -Filter "*.exe"
+          }
+          
+          # Check target-specific directory
+          if (Test-Path "target/x86_64-pc-windows-msvc/release") {
+            echo "Contents of target/x86_64-pc-windows-msvc/release:"
+            Get-ChildItem -Path "target/x86_64-pc-windows-msvc/release" -Filter "*.exe"
+          }
+          
+          # Also check with slashes in other direction
+          if (Test-Path "target\release") {
+            echo "Contents of target\release:"
+            Get-ChildItem -Path "target\release" -Filter "*.exe"
+          }
+          
+          # Check target-specific directory with backslashes
+          if (Test-Path "target\x86_64-pc-windows-msvc\release") {
+            echo "Contents of target\x86_64-pc-windows-msvc\release:"
+            Get-ChildItem -Path "target\x86_64-pc-windows-msvc\release" -Filter "*.exe"
+          }
+        shell: pwsh
 
       # New step: Verify the binary works correctly
       - name: Verify binary functionality
@@ -224,20 +254,60 @@ jobs:
       # Create a standalone executable ZIP
       - name: Create official distribution package
         run: |
-          # Copy just the essentials - the MTR executable and trippy
-          # First check if the target-specific path exists, otherwise use standard path
-          if (Test-Path "target/x86_64-pc-windows-msvc/release/mtr.exe") {
-            $mtrPath = "target/x86_64-pc-windows-msvc/release/mtr.exe"
-          } else {
-            $mtrPath = "target/release/mtr.exe"
+          # Build the release binary explicitly first
+          cargo build --release --bin mtr --target x86_64-pc-windows-msvc
+          
+          # Check for binary in different locations and list them for debugging
+          Write-Host "Searching for the MTR executable..."
+          
+          $possiblePaths = @(
+            "target/x86_64-pc-windows-msvc/release/mtr.exe",
+            "target/release/mtr.exe",
+            "target\x86_64-pc-windows-msvc\release\mtr.exe", 
+            "target\release\mtr.exe"
+          )
+          
+          $mtrPath = $null
+          foreach ($path in $possiblePaths) {
+            if (Test-Path $path) {
+              Write-Host "Found MTR binary at: $path"
+              $mtrPath = $path
+              break
+            }
           }
           
-          # Show which path we're using
-          echo "Using MTR executable at: $mtrPath"
+          # If binary not found, look more broadly
+          if ($null -eq $mtrPath) {
+            Write-Host "Binary not found in expected paths, searching in target directories..."
+            
+            # Look for any .exe files in target/release or target/x86_64-pc-windows-msvc/release
+            $exeFiles = @()
+            $exeFiles += Get-ChildItem -Path "target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
+            $exeFiles += Get-ChildItem -Path "target/x86_64-pc-windows-msvc/release" -Filter "*.exe" -ErrorAction SilentlyContinue
+            $exeFiles += Get-ChildItem -Path "target\release" -Filter "*.exe" -ErrorAction SilentlyContinue
+            $exeFiles += Get-ChildItem -Path "target\x86_64-pc-windows-msvc\release" -Filter "*.exe" -ErrorAction SilentlyContinue
+            
+            foreach ($file in $exeFiles) {
+              Write-Host "Found executable: $($file.FullName)"
+            }
+            
+            # If we found any .exe files, use the first one
+            if ($exeFiles.Count -gt 0) {
+              $mtrPath = $exeFiles[0].FullName
+              Write-Host "Using: $mtrPath"
+            } else {
+              Write-Error "No MTR executable found after build"
+              exit 1
+            }
+          }
+          
+          # Create directories
+          New-Item -ItemType Directory -Path 'dist' -Force
+          New-Item -ItemType Directory -Path 'windows-mtr-official' -Force
           
           # Copy the executable
-          cp $mtrPath windows-mtr-official/windows-mtr.exe
-          cp "${{ env.TRIPPY_PATH }}" windows-mtr-official/trippy.exe
+          Copy-Item $mtrPath windows-mtr-official/windows-mtr.exe
+          Copy-Item "${{ env.TRIPPY_PATH }}" windows-mtr-official/trippy.exe
           
           # Add a simple README
           @"

@@ -37,20 +37,51 @@ jobs:
       
       - name: Package binaries
         run: |
-          copy target\release\mtr.exe dist\windows-mtr.exe
+          # First check if binary exists in target-specific or standard path
+          if (Test-Path "target\x86_64-pc-windows-msvc\release\mtr.exe") {
+            $mtrPath = "target\x86_64-pc-windows-msvc\release\mtr.exe"
+          } elseif (Test-Path "target\release\mtr.exe") {
+            $mtrPath = "target\release\mtr.exe" 
+          } else {
+            # Run cargo build again to make sure we have a binary
+            cargo build --release
+            
+            # Check again for the binary
+            if (Test-Path "target\release\mtr.exe") {
+              $mtrPath = "target\release\mtr.exe"
+            } else {
+              Write-Error "Could not find MTR executable after build"
+              exit 1
+            }
+          }
+          
+          # Print the path we found
+          Write-Host "Found MTR binary at: $mtrPath"
+          
+          # Create dist directory if it doesn't exist
+          New-Item -ItemType Directory -Path 'dist' -Force
+          
+          # Copy the binary to dist
+          Copy-Item $mtrPath dist\windows-mtr.exe
           
           # Create the ZIP package
-          cd dist
+          Push-Location dist
           
           # Use PowerShell to create a ZIP file
-          powershell -command "Compress-Archive -Path 'windows-mtr.exe' -DestinationPath 'windows-mtr.zip' -Force"
+          Compress-Archive -Path 'windows-mtr.exe' -DestinationPath 'windows-mtr.zip' -Force
           
           # Also create a copy with the original name for convenience
-          copy windows-mtr.exe mtr.exe
-          powershell -command "Compress-Archive -Path 'mtr.exe', 'windows-mtr.exe', '..\README.md', '..\LICENSE', '..\USAGE.md' -DestinationPath 'windows-mtr-full.zip' -Force"
+          Copy-Item windows-mtr.exe mtr.exe
+          Compress-Archive -Path @('mtr.exe', 'windows-mtr.exe', '..\README.md', '..\LICENSE', '..\USAGE.md') -DestinationPath 'windows-mtr-full.zip' -Force
           
           # Generate SHA-256 checksums
-          powershell -command "$files = Get-ChildItem -Filter '*.zip'; foreach ($file in $files) { $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256; Add-Content -Path 'SHA256SUMS' -Value \"$($hash.Hash)  $($file.Name)\" }"
+          $files = Get-ChildItem -Filter '*.zip'
+          foreach ($file in $files) { 
+            $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256
+            Add-Content -Path 'SHA256SUMS' -Value "$($hash.Hash)  $($file.Name)"
+          }
+          
+          Pop-Location
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
