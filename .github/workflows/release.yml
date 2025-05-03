@@ -41,7 +41,32 @@ jobs:
 
       # Install trippy for use in our package
       - name: Install trippy
-        run: cargo install trippy
+        run: |
+          echo "Installing trippy..."
+          cargo install trippy
+          
+          # Verify installation and find location
+          $trippyPath = "$env:USERPROFILE\.cargo\bin\trippy.exe"
+          
+          if (Test-Path $trippyPath) {
+            echo "Trippy successfully installed at: $trippyPath"
+            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
+          } else {
+            # Try to find it using where command as fallback
+            try {
+              $whereResult = where.exe trippy
+              if ($whereResult) {
+                echo "Found trippy via where command at: $whereResult"
+                echo "TRIPPY_PATH=$whereResult" >> $env:GITHUB_ENV
+              } else {
+                throw "Trippy not found via where command"
+              }
+            } catch {
+              Write-Error "Could not find trippy executable after installation. Please check PATH variables and cargo installation."
+              exit 1
+            }
+          }
+        shell: pwsh
         env:
           CARGO_INCREMENTAL: 0
           
@@ -199,7 +224,32 @@ jobs:
 
       # Install trippy for packaging
       - name: Install trippy
-        run: cargo install trippy
+        run: |
+          echo "Installing trippy..."
+          cargo install trippy
+          
+          # Verify installation and find location
+          $trippyPath = "$env:USERPROFILE\.cargo\bin\trippy.exe"
+          
+          if (Test-Path $trippyPath) {
+            echo "Trippy successfully installed at: $trippyPath"
+            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
+          } else {
+            # Try to find it using where command as fallback
+            try {
+              $whereResult = where.exe trippy
+              if ($whereResult) {
+                echo "Found trippy via where command at: $whereResult"
+                echo "TRIPPY_PATH=$whereResult" >> $env:GITHUB_ENV
+              } else {
+                throw "Trippy not found via where command"
+              }
+            } catch {
+              Write-Error "Could not find trippy executable after installation. Please check PATH variables and cargo installation."
+              exit 1
+            }
+          }
+        shell: pwsh
         env:
           CARGO_INCREMENTAL: 0
       
