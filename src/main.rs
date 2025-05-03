@@ -75,6 +75,12 @@ fn find_trippy_binary() -> Result<PathBuf> {
         return Ok(path);
     }
     
+    // On Windows, also try looking for trip.exe (the trippy executable name on Windows)
+    #[cfg(windows)]
+    if let Ok(path) = which::which("trip") {
+        return Ok(path);
+    }
+    
     // Check if we're running from a bundled binary that has trippy embedded
     let exe_dir = env::current_exe()
         .map_err(|e| MtrError::IoError(e))?
@@ -82,10 +88,19 @@ fn find_trippy_binary() -> Result<PathBuf> {
         .ok_or_else(|| MtrError::Other("Failed to get executable directory".to_string()))?
         .to_path_buf();
     
+    // Check for trippy.exe first (fallback name)
     let local_trippy = exe_dir.join(if cfg!(windows) { "trippy.exe" } else { "trippy" });
-    
     if local_trippy.exists() {
         return Ok(local_trippy);
+    }
+    
+    // On Windows, also check for trip.exe (the actual name)
+    #[cfg(windows)]
+    {
+        let local_trip = exe_dir.join("trip.exe");
+        if local_trip.exists() {
+            return Ok(local_trip);
+        }
     }
     
     // Try common program files directory (Windows)
@@ -93,10 +108,17 @@ fn find_trippy_binary() -> Result<PathBuf> {
     {
         let program_files = env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
         let windows_mtr_dir = PathBuf::from(program_files).join("Windows-MTR");
+        
+        // Check for both possible filenames (trippy.exe and trip.exe)
         let program_files_trippy = windows_mtr_dir.join("trippy.exe");
+        let program_files_trip = windows_mtr_dir.join("trip.exe");
         
         if program_files_trippy.exists() {
             return Ok(program_files_trippy);
+        }
+        
+        if program_files_trip.exists() {
+            return Ok(program_files_trip);
         }
     }
     
@@ -111,6 +133,12 @@ fn find_trippy_binary() -> Result<PathBuf> {
             
         if cargo_install_status.success() {
             // Try again with the 'which' crate to locate the newly installed trippy
+            #[cfg(windows)]
+            if let Ok(path) = which::which("trip") {
+                return Ok(path);
+            }
+            
+            #[cfg(not(windows))]
             if let Ok(path) = which::which("trippy") {
                 return Ok(path);
             }

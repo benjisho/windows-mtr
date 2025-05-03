@@ -45,24 +45,24 @@ jobs:
           echo "Installing trippy..."
           cargo install trippy
           
-          # Verify installation and find location
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trippy.exe"
+          # Verify installation and find location (trippy installs as trip.exe on Windows)
+          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
           
           if (Test-Path $trippyPath) {
-            echo "Trippy successfully installed at: $trippyPath"
+            echo "Trippy successfully installed as trip.exe at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
           } else {
             # Try to find it using where command as fallback
             try {
-              $whereResult = where.exe trippy
+              $whereResult = where.exe trip
               if ($whereResult) {
-                echo "Found trippy via where command at: $whereResult"
+                echo "Found trip.exe via where command at: $whereResult"
                 echo "TRIPPY_PATH=$whereResult" >> $env:GITHUB_ENV
               } else {
-                throw "Trippy not found via where command"
+                throw "trip.exe not found via where command"
               }
             } catch {
-              Write-Error "Could not find trippy executable after installation. Please check PATH variables and cargo installation."
+              Write-Error "Could not find trip.exe executable after installation. Please check PATH variables and cargo installation."
               exit 1
             }
           }
@@ -120,7 +120,7 @@ jobs:
       - name: Find trippy executable for bundling
         id: find_trippy
         run: |
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trippy.exe"
+          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
           
           if (Test-Path $trippyPath) {
             echo "Found trippy at: $trippyPath"
@@ -228,24 +228,24 @@ jobs:
           echo "Installing trippy..."
           cargo install trippy
           
-          # Verify installation and find location
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trippy.exe"
+          # Verify installation and find location (trippy installs as trip.exe on Windows)
+          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
           
           if (Test-Path $trippyPath) {
-            echo "Trippy successfully installed at: $trippyPath"
+            echo "Trippy successfully installed as trip.exe at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
           } else {
             # Try to find it using where command as fallback
             try {
-              $whereResult = where.exe trippy
+              $whereResult = where.exe trip
               if ($whereResult) {
-                echo "Found trippy via where command at: $whereResult"
+                echo "Found trip.exe via where command at: $whereResult"
                 echo "TRIPPY_PATH=$whereResult" >> $env:GITHUB_ENV
               } else {
-                throw "Trippy not found via where command"
+                throw "trip.exe not found via where command"
               }
             } catch {
-              Write-Error "Could not find trippy executable after installation. Please check PATH variables and cargo installation."
+              Write-Error "Could not find trip.exe executable after installation. Please check PATH variables and cargo installation."
               exit 1
             }
           }
@@ -257,7 +257,7 @@ jobs:
       - name: Find trippy executable
         id: find_trippy
         run: |
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trippy.exe"
+          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
           
           if (Test-Path $trippyPath) {
             echo "Found trippy at: $trippyPath"
