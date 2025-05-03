@@ -1,13 +1,21 @@
 name: Release
 
 on:
+  # Trigger on push to master branch
   push:
+    branches:
+      - master
     tags:
       - 'v*.*.*'
+  
+  # Trigger on pull requests targeting master branch
+  pull_request:
+    branches:
+      - master
 
 jobs:
   build:
-    name: Build and Release
+    name: Build and Test
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -84,6 +92,48 @@ jobs:
           echo "All binary verification tests passed successfully!"
         shell: pwsh
 
+      # For PRs and normal pushes, only upload artifacts for testing
+      - name: Package test artifacts
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+        run: |
+          mkdir -p dist
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/windows-mtr.exe
+          cp README.md LICENSE USAGE.md dist/
+        shell: bash
+
+      - name: Upload test artifacts
+        if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-mtr-test-build
+          path: dist/
+          retention-days: 7
+
+  # Only run for tag pushes (real releases)
+  release:
+    name: Create Release
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: x86_64-pc-windows-msvc
+          components: clippy
+
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target x86_64-pc-windows-msvc
+
       - name: Package distribution
         run: |
           mkdir -p dist
@@ -134,10 +184,10 @@ jobs:
           Compress-Archive -Path standalone/mtr.exe -DestinationPath dist/mtr-standalone.zip -Force
         shell: pwsh
 
-      - name: Upload artifacts
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: windows-mtr
+          name: windows-mtr-release
           path: dist/
 
       - name: Create GitHub Release
