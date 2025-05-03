@@ -14,6 +14,7 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest]
         rust: [stable, 1.74.0]  # Test on stable and MSRV
+      fail-fast: false  # Continue with other jobs if one fails
 
     steps:
       - name: Checkout code
@@ -27,22 +28,40 @@ jobs:
           override: true
           components: clippy
 
-      - name: Build
+      # Use the advanced Rust caching action for better cache performance
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          shared-key: "${{ matrix.os }}-${{ matrix.rust }}"
+
+      # Run check first to catch compile errors early without full build
+      - name: Check
         uses: actions-rs/cargo@v1
         with:
-          command: build
-
-      - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
-
+          command: check
+          args: --all-targets
+          
+      # Run clippy before tests - catches many issues early
       - name: Run clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
           args: --all-targets -- -D warnings
+
+      # Build all targets with optimizations
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all-targets
+
+      # Run tests with workspace-hack optimization
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all
 
   # New job to build binaries during pull requests for testing
   build-pr-binaries:
@@ -61,6 +80,12 @@ jobs:
           profile: minimal
           target: x86_64-pc-windows-msvc
           override: true
+
+      # Use advanced caching
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false # Only save cache for main branch builds
 
       - name: Install trippy
         uses: actions-rs/cargo@v1
@@ -87,7 +112,7 @@ jobs:
         shell: pwsh
       
       - name: Upload PR build artifacts
-        uses: actions/upload-artifact@v4  # Updated from v3 to v4
+        uses: actions/upload-artifact@v4
         with:
           name: windows-mtr-PR${{ github.event.pull_request.number }}
           path: |

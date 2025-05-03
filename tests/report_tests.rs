@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::str::FromStr;
 use regex::Regex;
 
 // This test validates that the output format from `mtr -c N -r host` 

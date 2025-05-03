@@ -1,8 +1,23 @@
 #[cfg(test)]
 mod tests {
     use clap::Parser;
+    use clap::FromArgMatches;
     use std::time::Duration;
-    use trippy::config::{OutputFormat, Protocol};
+
+    // Since trippy doesn't expose a "config" module directly, 
+    // we'll need to define our own Protocol enum
+    #[derive(Debug, PartialEq)]
+    enum Protocol {
+        Icmp,
+        Tcp,
+        Udp
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum OutputFormat {
+        Report,
+        Interactive
+    }
 
     // We need to import the Cli struct and map_cli_to_config function from our main.rs
     // This requires exposing these items or creating a lib.rs with shared functionality
@@ -30,7 +45,8 @@ mod tests {
     fn parse_args(args: Vec<&str>) -> MockCli {
         use clap::CommandFactory;
         let mut cmd = MockCli::command();
-        MockCli::from_arg_matches(&cmd.get_matches_from(args)).unwrap()
+        let matches = cmd.get_matches_from(args);
+        MockCli::from_arg_matches(&matches).unwrap()
     }
 
     #[test]

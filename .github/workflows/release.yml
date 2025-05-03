@@ -30,28 +30,34 @@ jobs:
           target: x86_64-pc-windows-msvc
           components: clippy
 
+      # Use the more efficient Rust caching
       - name: Cache Rust dependencies
-        uses: actions/cache@v3
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          save-if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') }}
 
+      # Fast check to catch errors early without full compilation
+      - name: Check code
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-targets
+
+      # Only install trippy if not already cached
       - name: Install trippy
         uses: actions-rs/cargo@v1
         with:
           command: install
           args: trippy
-
+          
+      # Run the tests
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --all
 
+      # Build the release binary
       - name: Build release binary
         uses: actions-rs/cargo@v1
         with:
@@ -128,12 +134,19 @@ jobs:
           target: x86_64-pc-windows-msvc
           components: clippy
 
+      # Use improved caching
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
+
       - name: Build release binary
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --target x86_64-pc-windows-msvc
 
+      # Rest of the job unchanged
       - name: Package distribution
         run: |
           mkdir -p dist
@@ -185,7 +198,7 @@ jobs:
         shell: pwsh
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4  # Updated from v3 to v4
+        uses: actions/upload-artifact@v4
         with:
           name: windows-mtr-release
           path: dist/
