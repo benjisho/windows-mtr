@@ -185,7 +185,11 @@ jobs:
         shell: pwsh
 
       - name: Upload artifacts
+<<<<<<< HEAD
         uses: actions/upload-artifact@v4
+=======
+        uses: actions/upload-artifact@v4  # Updated from v3 to v4
+>>>>>>> origin/master
         with:
           name: windows-mtr-release
           path: dist/
