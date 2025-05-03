@@ -1,6 +1,6 @@
 [package]
 name = "windows-mtr"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["Benji Shohet <benjisho>"]
 description = "Windows-native clone of Linux mtr — cross-platform Rust CLI for ICMP/TCP/UDP traceroute & ping"
