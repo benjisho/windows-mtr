@@ -225,7 +225,18 @@ jobs:
       - name: Create official distribution package
         run: |
           # Copy just the essentials - the MTR executable and trippy
-          cp target/x86_64-pc-windows-msvc/release/mtr.exe windows-mtr-official/windows-mtr.exe
+          # First check if the target-specific path exists, otherwise use standard path
+          if (Test-Path "target/x86_64-pc-windows-msvc/release/mtr.exe") {
+            $mtrPath = "target/x86_64-pc-windows-msvc/release/mtr.exe"
+          } else {
+            $mtrPath = "target/release/mtr.exe"
+          }
+          
+          # Show which path we're using
+          echo "Using MTR executable at: $mtrPath"
+          
+          # Copy the executable
+          cp $mtrPath windows-mtr-official/windows-mtr.exe
           cp "${{ env.TRIPPY_PATH }}" windows-mtr-official/trippy.exe
           
           # Add a simple README
