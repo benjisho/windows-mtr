@@ -35,7 +35,7 @@ fn dist() -> Result<()> {
         .status()
         .context("Failed to run cargo build")?;
 
-    if (!status.success()) {
+    if !status.success() {
         anyhow::bail!("cargo build failed");
     }
 

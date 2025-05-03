@@ -21,12 +21,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust }}
-          profile: minimal
-          override: true
           components: clippy
+          targets: x86_64-pc-windows-msvc
 
       # Use the advanced Rust caching action for better cache performance
       - name: Cache Rust dependencies
@@ -37,31 +36,27 @@ jobs:
 
       # Run check first to catch compile errors early without full build
       - name: Check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-targets
+        run: cargo check --all-targets
+        env:
+          CARGO_INCREMENTAL: 0
           
       # Run clippy before tests - catches many issues early
       - name: Run clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
+        env:
+          CARGO_INCREMENTAL: 0
 
       # Build all targets with optimizations
       - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --all-targets
+        run: cargo build --all-targets
+        env:
+          CARGO_INCREMENTAL: 0
 
       # Run tests with workspace-hack optimization
       - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
+        run: cargo test --all
+        env:
+          CARGO_INCREMENTAL: 0
 
   # New job to build binaries during pull requests for testing
   build-pr-binaries:
@@ -74,12 +69,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
-          target: x86_64-pc-windows-msvc
-          override: true
+          components: clippy
+          targets: x86_64-pc-windows-msvc
 
       # Use advanced caching
       - name: Cache Rust dependencies
@@ -88,16 +81,14 @@ jobs:
           save-if: false # Only save cache for main branch builds
 
       - name: Install trippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: trippy
+        run: cargo install trippy
+        env:
+          CARGO_INCREMENTAL: 0
 
       - name: Build release binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target x86_64-pc-windows-msvc
+        run: cargo build --release --target x86_64-pc-windows-msvc
+        env:
+          CARGO_INCREMENTAL: 0
 
       - name: Create test build directory
         run: |

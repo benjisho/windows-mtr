@@ -22,13 +22,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
-          target: x86_64-pc-windows-msvc
           components: clippy
+          targets: x86_64-pc-windows-msvc
 
       # Use the more efficient Rust caching
       - name: Cache Rust dependencies
@@ -38,31 +35,28 @@ jobs:
 
       # Fast check to catch errors early without full compilation
       - name: Check code
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all-targets
+        run: cargo check --all-targets
+        env:
+          CARGO_INCREMENTAL: 0
 
-      # Only install trippy if not already cached
+      # Install trippy for use in our package
       - name: Install trippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: trippy
+        run: cargo install trippy
+        env:
+          CARGO_INCREMENTAL: 0
           
       # Run the tests
       - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all
+        run: cargo test --all
+        env:
+          CARGO_INCREMENTAL: 0
 
       # Build the release binary
       - name: Build release binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target x86_64-pc-windows-msvc
+        run: cargo build --release --target x86_64-pc-windows-msvc
+        env:
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C target-feature=+crt-static"
 
       # New step: Verify the binary works correctly
       - name: Verify binary functionality
@@ -86,7 +80,6 @@ jobs:
           echo "✓ Version command verified"
           
           # Test basic command-line argument parsing (without network activity)
-          # This just verifies the binary accepts the arguments without crashing
           try {
             Start-Process -FilePath "./target/x86_64-pc-windows-msvc/release/mtr.exe" -ArgumentList "-T", "-P", "443", "-c", "1", "-n", "--help" -NoNewWindow -Wait
             echo "✓ Command-line argument parsing verified"
@@ -98,14 +91,78 @@ jobs:
           echo "All binary verification tests passed successfully!"
         shell: pwsh
 
+      # Find and copy trippy executable for bundling 
+      - name: Find trippy executable for bundling
+        id: find_trippy
+        run: |
+          $trippyPath = "$env:USERPROFILE\.cargo\bin\trippy.exe"
+          
+          if (Test-Path $trippyPath) {
+            echo "Found trippy at: $trippyPath"
+            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
+          } else {
+            Write-Error "Could not find trippy executable to bundle"
+            exit 1
+          }
+        shell: pwsh
+
       # For PRs and normal pushes, only upload artifacts for testing
       - name: Package test artifacts
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
         run: |
           mkdir -p dist
           cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/windows-mtr.exe
+          cp "${{ env.TRIPPY_PATH }}" dist/trippy.exe
           cp README.md LICENSE USAGE.md dist/
-        shell: bash
+          
+          # Create a simple batch file to install both binaries
+          @"
+          @echo off
+          echo Installing Windows MTR...
+          if not exist "%PROGRAMFILES%\Windows-MTR" mkdir "%PROGRAMFILES%\Windows-MTR"
+          copy /Y windows-mtr.exe "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y trippy.exe "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y README.md "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y LICENSE "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y USAGE.md "%PROGRAMFILES%\Windows-MTR\"
+          
+          echo Creating shortcuts...
+          powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%USERPROFILE%\Desktop\Windows MTR.lnk'); $s.TargetPath = '%PROGRAMFILES%\Windows-MTR\windows-mtr.exe'; $s.Save()"
+          
+          echo Adding to PATH...
+          setx PATH "%PATH%;%PROGRAMFILES%\Windows-MTR"
+          
+          echo Installation complete! You can now run windows-mtr from any command prompt.
+          "@ > dist/install.bat
+          
+          # Create a simple verification script
+          @"
+          @echo off
+          echo Windows MTR Verification
+          echo =======================
+          echo.
+          cd /d "%~dp0"
+          
+          echo Testing if trippy is accessible...
+          if exist trippy.exe (
+            echo ✓ Trippy executable found
+          ) else (
+            echo ✗ Trippy executable missing
+            exit /b 1
+          )
+          
+          echo Testing if windows-mtr is accessible...
+          if exist windows-mtr.exe (
+            echo ✓ Windows MTR executable found
+          ) else (
+            echo ✗ Windows MTR executable missing
+            exit /b 1
+          )
+          
+          echo.
+          echo All verification tests passed!
+          "@ > dist/verify.bat
+        shell: pwsh
 
       - name: Upload test artifacts
         if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
@@ -113,7 +170,10 @@ jobs:
         with:
           name: windows-mtr-test-build
           path: dist/
-          retention-days: 7
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 9
+          overwrite: true
 
   # Only run for tag pushes (real releases)
   release:

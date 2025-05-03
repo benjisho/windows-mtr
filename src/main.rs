@@ -88,21 +88,38 @@ fn find_trippy_binary() -> Result<PathBuf> {
         return Ok(local_trippy);
     }
     
-    // If we can't find trippy, try installing it via cargo
-    eprintln!("Trippy binary not found. Trying to install it with cargo...");
-    
-    let cargo_install_status = Command::new("cargo")
-        .args(["install", "trippy"])
-        .status()
-        .map_err(|e| MtrError::TrippyInstallFailed(e.to_string()))?;
+    // Try common program files directory (Windows)
+    #[cfg(windows)]
+    {
+        let program_files = env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
+        let windows_mtr_dir = PathBuf::from(program_files).join("Windows-MTR");
+        let program_files_trippy = windows_mtr_dir.join("trippy.exe");
         
-    if cargo_install_status.success() {
-        // Try again with the 'which' crate to locate the newly installed trippy
-        if let Ok(path) = which::which("trippy") {
-            return Ok(path);
+        if program_files_trippy.exists() {
+            return Ok(program_files_trippy);
         }
     }
     
+    // If we can't find trippy, try installing it via cargo
+    if Command::new("cargo").arg("--version").output().is_ok() {
+        eprintln!("Trippy binary not found. Trying to install it with cargo...");
+        
+        let cargo_install_status = Command::new("cargo")
+            .args(["install", "trippy"])
+            .status()
+            .map_err(|e| MtrError::TrippyInstallFailed(e.to_string()))?;
+            
+        if cargo_install_status.success() {
+            // Try again with the 'which' crate to locate the newly installed trippy
+            if let Ok(path) = which::which("trippy") {
+                return Ok(path);
+            }
+        }
+    } else {
+        eprintln!("Cargo not found. Cannot automatically install trippy.");
+    }
+    
+    // If we reach here, we couldn't find or install trippy
     Err(MtrError::TrippyNotFound)
 }
 
@@ -130,8 +147,18 @@ fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     
     // Find the trippy binary
-    let trippy_path = find_trippy_binary()
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let trippy_path = match find_trippy_binary() {
+        Ok(path) => path,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            eprintln!("\nTo fix this issue, please try one of the following:");
+            eprintln!("1. Place 'trippy.exe' in the same directory as this executable");
+            eprintln!("2. Install trippy manually: cargo install trippy");
+            eprintln!("3. Download the full release package from GitHub which includes trippy");
+            eprintln!("   https://github.com/benjisho/windows-mtr/releases");
+            return Err(anyhow::anyhow!("Trippy binary required"));
+        }
+    };
     
     // Start building the trippy command
     let mut cmd = Command::new(trippy_path);
