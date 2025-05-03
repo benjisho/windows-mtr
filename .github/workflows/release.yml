@@ -184,8 +184,8 @@ jobs:
           Compress-Archive -Path standalone/mtr.exe -DestinationPath dist/mtr-standalone.zip -Force
         shell: pwsh
 
-      - name: Upload release artifacts
-        uses: actions/upload-artifact@v3
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: windows-mtr-release
           path: dist/
