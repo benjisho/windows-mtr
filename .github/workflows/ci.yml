@@ -32,7 +32,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-          shared-key: "${{ matrix.os }}-${{ matrix.rust }}"
+          shared-key: "rust-${{ matrix.os }}-${{ matrix.rust }}"
+          cache-directories: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+          cache-on-failure: true
 
       # Run check first to catch compile errors early without full build
       - name: Check
@@ -79,6 +84,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           save-if: false # Only save cache for main branch builds
+          shared-key: "rust-${{ matrix.os }}-${{ matrix.rust }}"
+          cache-directories: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+          cache-on-failure: true
 
       - name: Install trippy
         run: |
@@ -119,8 +130,15 @@ jobs:
         run: |
           mkdir -p pr-build
           cp target/x86_64-pc-windows-msvc/release/mtr.exe pr-build/windows-mtr.exe
-          cp README.md LICENSE USAGE.md pr-build/
-        shell: bash
+          
+          # Copy documentation files individually to avoid PowerShell parameter issues
+          cp README.md pr-build/
+          cp LICENSE pr-build/
+          if (Test-Path USAGE.md) { cp USAGE.md pr-build/ }
+          
+          # Copy trippy executable
+          cp "${{ env.TRIPPY_PATH }}" pr-build/trip.exe
+        shell: pwsh
 
       - name: Create ZIP package
         run: |

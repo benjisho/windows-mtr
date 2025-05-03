@@ -138,7 +138,11 @@ jobs:
           mkdir -p dist
           cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/windows-mtr.exe
           cp "${{ env.TRIPPY_PATH }}" dist/trippy.exe
-          cp README.md LICENSE USAGE.md dist/
+          
+          # Copy documentation files one by one to avoid PowerShell positional parameter issues
+          cp README.md dist/
+          cp LICENSE dist/
+          if (Test-Path USAGE.md) { cp USAGE.md dist/ }
           
           # Create a simple batch file to install both binaries
           @"
@@ -149,7 +153,7 @@ jobs:
           copy /Y trippy.exe "%PROGRAMFILES%\Windows-MTR\"
           copy /Y README.md "%PROGRAMFILES%\Windows-MTR\"
           copy /Y LICENSE "%PROGRAMFILES%\Windows-MTR\"
-          copy /Y USAGE.md "%PROGRAMFILES%\Windows-MTR\"
+          if exist USAGE.md copy /Y USAGE.md "%PROGRAMFILES%\Windows-MTR\"
           
           echo Creating shortcuts...
           powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%USERPROFILE%\Desktop\Windows MTR.lnk'); $s.TargetPath = '%PROGRAMFILES%\Windows-MTR\windows-mtr.exe'; $s.Save()"
@@ -282,7 +286,11 @@ jobs:
           cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/windows-mtr.exe
           cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/mtr.exe
           cp "${{ env.TRIPPY_PATH }}" dist/trippy.exe
-          cp README.md LICENSE USAGE.md dist/
+          
+          # Copy documentation files individually
+          cp README.md dist/
+          cp LICENSE dist/
+          if [ -f USAGE.md ]; then cp USAGE.md dist/; fi
         shell: bash
 
       # Create a comprehensive ZIP package with everything
