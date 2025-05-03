@@ -32,6 +32,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') }}
+          shared-key: "rust-windows-release"
+          cache-directories: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+          cache-on-failure: true
 
       # Fast check to catch errors early without full compilation
       - name: Check code
@@ -220,11 +226,17 @@ jobs:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
-      # Use improved caching
+      # Use the more efficient Rust caching
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
+          save-if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') }}
+          shared-key: "rust-windows-release"
+          cache-directories: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+          cache-on-failure: true
 
       # Install trippy for packaging
       - name: Install trippy
