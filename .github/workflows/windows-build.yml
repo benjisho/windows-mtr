@@ -1,0 +1,86 @@
+name: Windows Build and Release
+
+on:
+  # Manually triggered from GitHub UI
+  workflow_dispatch:
+  
+  # On release tag push
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    name: Build Windows Binary
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        
+      - name: Build
+        run: cargo build --release
+        
+      - name: Test
+        run: cargo test
+      
+      - name: Create dist directory
+        run: powershell -command "New-Item -ItemType Directory -Path 'dist' -Force"
+      
+      - name: Package binaries
+        run: |
+          copy target\release\mtr.exe dist\windows-mtr.exe
+          
+          # Create the ZIP package
+          cd dist
+          
+          # Use PowerShell to create a ZIP file
+          powershell -command "Compress-Archive -Path 'windows-mtr.exe' -DestinationPath 'windows-mtr.zip' -Force"
+          
+          # Also create a copy with the original name for convenience
+          copy windows-mtr.exe mtr.exe
+          powershell -command "Compress-Archive -Path 'mtr.exe', 'windows-mtr.exe', '..\README.md', '..\LICENSE', '..\USAGE.md' -DestinationPath 'windows-mtr-full.zip' -Force"
+          
+          # Generate SHA-256 checksums
+          powershell -command "$files = Get-ChildItem -Filter '*.zip'; foreach ($file in $files) { $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256; Add-Content -Path 'SHA256SUMS' -Value \"$($hash.Hash)  $($file.Name)\" }"
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-binaries
+          path: |
+            dist/windows-mtr.exe
+            dist/mtr.exe
+            dist/*.zip
+            dist/SHA256SUMS
+          
+  # Only run on tag push
+  release:
+    needs: build-windows
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        
+      - name: Display structure of downloaded files
+        run: ls -R
+        
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            windows-binaries/windows-mtr.exe
+            windows-binaries/*.zip
+            windows-binaries/SHA256SUMS
+          draft: true
+          generate_release_notes: true
