@@ -1,13 +1,10 @@
 name: CI
 
 on:
-  # Trigger on push to master branch
   push:
-    branches: [ master ]
-  
-  # Trigger on pull requests targeting master branch
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   test:
@@ -46,3 +43,76 @@ jobs:
         with:
           command: clippy
           args: --all-targets -- -D warnings
+
+  # New job to build binaries during pull requests for testing
+  build-pr-binaries:
+    name: Build PR Binaries
+    runs-on: windows-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          target: x86_64-pc-windows-msvc
+          override: true
+
+      - name: Install trippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: trippy
+
+      - name: Build release binary
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --target x86_64-pc-windows-msvc
+
+      - name: Create test build directory
+        run: |
+          mkdir -p pr-build
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe pr-build/windows-mtr.exe
+          cp README.md LICENSE USAGE.md pr-build/
+        shell: bash
+
+      - name: Create ZIP package
+        run: |
+          Compress-Archive -Path pr-build/* -DestinationPath pr-build/windows-mtr-PR${{ github.event.pull_request.number }}.zip -Force
+        shell: pwsh
+      
+      - name: Upload PR build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-mtr-PR${{ github.event.pull_request.number }}
+          path: |
+            pr-build/*.exe
+            pr-build/*.zip
+          retention-days: 14
+          
+      - name: Comment on PR with download link
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const artifactName = `windows-mtr-PR${context.issue.number}`;
+            const workflowRunId = context.runId;
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+            
+            const downloadUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${workflowRunId}/artifacts`;
+            const comment = `### 🚀 PR Build Ready for Testing\n\n` +
+                           `Binary artifacts for this PR have been built and are available for testing.\n\n` +
+                           `[Download Windows MTR PR Build](${downloadUrl})`;
+                           
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
