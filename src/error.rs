@@ -1,5 +1,4 @@
 use std::net::AddrParseError;
-use std::path::PathBuf;
 use thiserror::Error;
 
 /// Custom error types for Windows MTR

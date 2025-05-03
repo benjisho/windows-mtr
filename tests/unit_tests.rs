@@ -2,10 +2,11 @@
 mod tests {
     use clap::Parser;
     use clap::FromArgMatches;
-    use std::time::Duration;
+    // Removed unused Duration import
 
-    // Since trippy doesn't expose a "config" module directly, 
-    // we'll need to define our own Protocol enum
+    // Since we're not using these enums, we can remove them
+    // or keep them with #[allow(dead_code)] for future use
+    #[allow(dead_code)]
     #[derive(Debug, PartialEq)]
     enum Protocol {
         Icmp,
@@ -13,15 +14,12 @@ mod tests {
         Udp
     }
 
+    #[allow(dead_code)]
     #[derive(Debug, PartialEq)]
     enum OutputFormat {
         Report,
         Interactive
     }
-
-    // We need to import the Cli struct and map_cli_to_config function from our main.rs
-    // This requires exposing these items or creating a lib.rs with shared functionality
-    // For now, we'll mock the structures to test the logic
 
     #[derive(Parser, Debug)]
     struct MockCli {
@@ -44,7 +42,7 @@ mod tests {
 
     fn parse_args(args: Vec<&str>) -> MockCli {
         use clap::CommandFactory;
-        let mut cmd = MockCli::command();
+        let cmd = MockCli::command(); // Removed 'mut' as it's not needed
         let matches = cmd.get_matches_from(args);
         MockCli::from_arg_matches(&matches).unwrap()
     }

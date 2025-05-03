@@ -1,8 +1,7 @@
-use anyhow::Context;
 use clap::Parser;
 use std::env;
 use std::net::{IpAddr, ToSocketAddrs};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{self, Command};
 
 mod error;
@@ -60,7 +59,7 @@ fn validate_target(host: &str) -> Result<String> {
     // Try to resolve the hostname to check if it's valid
     match (host, 0).to_socket_addrs() {
         Ok(_) => Ok(host.to_string()),
-        Err(e) => {
+        Err(_) => {
             // Maybe it's an IP without a port, try parsing as IpAddr
             match host.parse::<IpAddr>() {
                 Ok(_) => Ok(host.to_string()),
