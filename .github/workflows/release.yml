@@ -214,19 +214,16 @@ jobs:
           }
         shell: pwsh
 
-      # Build the release binary with static linking
-      - name: Build release binary
-        run: cargo build --release --target x86_64-pc-windows-msvc
-        env:
-          CARGO_INCREMENTAL: 0
-          RUSTFLAGS: "-C target-feature=+crt-static"
+      # Create package directory structure and dist directory
+      - name: Create directories
+        run: |
+          mkdir -p dist
+          mkdir -p windows-mtr-official
+        shell: pwsh
 
       # Create a standalone executable ZIP
       - name: Create official distribution package
         run: |
-          # Create a directory for the official package
-          mkdir -p windows-mtr-official
-          
           # Copy just the essentials - the MTR executable and trippy
           cp target/x86_64-pc-windows-msvc/release/mtr.exe windows-mtr-official/windows-mtr.exe
           cp "${{ env.TRIPPY_PATH }}" windows-mtr-official/trippy.exe
@@ -251,7 +248,11 @@ jobs:
           "@ > windows-mtr-official/README.txt
           
           # Create the official ZIP package
-          Compress-Archive -Path windows-mtr-official/* -DestinationPath dist/windows-mtr-official.zip -Force
+          Compress-Archive -Path "windows-mtr-official\*" -DestinationPath "dist\windows-mtr-official.zip" -Force
+          
+          # Generate SHA256 checksums for the zip file
+          $hash = Get-FileHash -Path "dist\windows-mtr-official.zip" -Algorithm SHA256
+          Set-Content -Path "dist\SHA256SUM" -Value "$($hash.Hash)  windows-mtr-official.zip"
         shell: pwsh
 
       # Upload all artifacts to GitHub
