@@ -186,13 +186,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          profile: minimal
-          override: true
-          target: x86_64-pc-windows-msvc
           components: clippy
+          targets: x86_64-pc-windows-msvc
 
       # Use improved caching
       - name: Cache Rust dependencies
@@ -200,69 +197,200 @@ jobs:
         with:
           save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
 
-      - name: Build release binary
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target x86_64-pc-windows-msvc
+      # Install trippy for packaging
+      - name: Install trippy
+        run: cargo install trippy
+        env:
+          CARGO_INCREMENTAL: 0
+      
+      # Find the trippy executable
+      - name: Find trippy executable
+        id: find_trippy
+        run: |
+          $trippyPath = "$env:USERPROFILE\.cargo\bin\trippy.exe"
+          
+          if (Test-Path $trippyPath) {
+            echo "Found trippy at: $trippyPath"
+            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
+          } else {
+            Write-Error "Could not find trippy executable to bundle"
+            exit 1
+          }
+        shell: pwsh
 
-      # Rest of the job unchanged
+      # Build the release binary with static linking
+      - name: Build release binary
+        run: cargo build --release --target x86_64-pc-windows-msvc
+        env:
+          CARGO_INCREMENTAL: 0
+          RUSTFLAGS: "-C target-feature=+crt-static"
+
+      # Create package directory structure
       - name: Package distribution
         run: |
           mkdir -p dist
           cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/windows-mtr.exe
           cp target/x86_64-pc-windows-msvc/release/mtr.exe dist/mtr.exe
+          cp "${{ env.TRIPPY_PATH }}" dist/trippy.exe
           cp README.md LICENSE USAGE.md dist/
         shell: bash
 
+      # Create a comprehensive ZIP package with everything
       - name: Create ZIP package
         run: |
-          Compress-Archive -Path dist/* -DestinationPath dist/windows-mtr.zip -Force
+          Compress-Archive -Path dist/* -DestinationPath dist/windows-mtr-full.zip -Force
         shell: pwsh
 
+      # Create a legacy ZIP for backward compatibility
+      - name: Create legacy ZIP package
+        run: |
+          Compress-Archive -Path dist/windows-mtr.exe, dist/mtr.exe, dist/README.md, dist/LICENSE, dist/USAGE.md -DestinationPath dist/windows-mtr.zip -Force
+        shell: pwsh
+
+      # Generate checksums for all files
       - name: Generate checksums
         run: |
           cd dist
           Get-FileHash -Algorithm SHA256 windows-mtr.exe | ForEach-Object {$_.Hash + "  windows-mtr.exe"} | Out-File -FilePath SHA256SUMS -Encoding utf8
           Get-FileHash -Algorithm SHA256 mtr.exe | ForEach-Object {$_.Hash + "  mtr.exe"} | Out-File -FilePath SHA256SUMS -Encoding utf8 -Append
+          Get-FileHash -Algorithm SHA256 trippy.exe | ForEach-Object {$_.Hash + "  trippy.exe"} | Out-File -FilePath SHA256SUMS -Encoding utf8 -Append
           Get-FileHash -Algorithm SHA256 windows-mtr.zip | ForEach-Object {$_.Hash + "  windows-mtr.zip"} | Out-File -FilePath SHA256SUMS -Encoding utf8 -Append
+          Get-FileHash -Algorithm SHA256 windows-mtr-full.zip | ForEach-Object {$_.Hash + "  windows-mtr-full.zip"} | Out-File -FilePath SHA256SUMS -Encoding utf8 -Append
         shell: pwsh
         
+      # Create a complete installer that handles trippy dependency
       - name: Create self-contained installer
         run: |
-          # Using simple batch file approach for installer
-          echo '@echo off' > dist/install.bat
-          echo 'echo Installing Windows MTR...' >> dist/install.bat
-          echo 'if not exist "%PROGRAMFILES%\Windows-MTR" mkdir "%PROGRAMFILES%\Windows-MTR"' >> dist/install.bat
-          echo 'copy /Y mtr.exe "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
-          echo 'copy /Y windows-mtr.exe "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
-          echo 'copy /Y README.md "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
-          echo 'copy /Y LICENSE "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
-          echo 'copy /Y USAGE.md "%PROGRAMFILES%\Windows-MTR\"' >> dist/install.bat
-          echo 'echo Creating shortcuts...' >> dist/install.bat
-          echo 'powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut(''%USERPROFILE%\Desktop\Windows MTR.lnk''); $s.TargetPath = ''%PROGRAMFILES%\Windows-MTR\windows-mtr.exe''; $s.Save()"' >> dist/install.bat
-          echo 'echo Adding to PATH...' >> dist/install.bat
-          echo 'setx PATH "%PATH%;%PROGRAMFILES%\Windows-MTR"' >> dist/install.bat
-          echo 'echo Installation complete! You can now run mtr from any command prompt.' >> dist/install.bat
+          @"
+          @echo off
+          echo ========================================
+          echo Windows MTR Installer
+          echo ========================================
+          echo.
           
-          # Add to the ZIP
-          Compress-Archive -Path dist/install.bat -Update -DestinationPath dist/windows-mtr.zip
+          echo Installing Windows MTR...
+          if not exist "%PROGRAMFILES%\Windows-MTR" mkdir "%PROGRAMFILES%\Windows-MTR"
+          copy /Y windows-mtr.exe "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y trippy.exe "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y mtr.exe "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y README.md "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y LICENSE "%PROGRAMFILES%\Windows-MTR\"
+          copy /Y USAGE.md "%PROGRAMFILES%\Windows-MTR\"
+          
+          echo Creating desktop shortcut...
+          powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%USERPROFILE%\Desktop\Windows MTR.lnk'); $s.TargetPath = '%PROGRAMFILES%\Windows-MTR\windows-mtr.exe'; $s.Description = 'Windows MTR Network Diagnostics Tool'; $s.Save()"
+          
+          echo Adding to PATH (this may require administrative privileges)...
+          setx PATH "%PATH%;%PROGRAMFILES%\Windows-MTR" /M
+          
+          echo.
+          echo Installation complete!
+          echo You can now run 'mtr' or 'windows-mtr' from any command prompt.
+          echo.
+          echo Press any key to exit...
+          pause > nul
+          "@ > dist/install.bat
+          
+          # Create a verification script
+          @"
+          @echo off
+          echo Windows MTR Verification
+          echo =======================
+          echo.
+          
+          cd /d "%~dp0"
+          
+          echo Testing executable files:
+          if exist windows-mtr.exe (
+            echo  - windows-mtr.exe ... OK
+          ) else (
+            echo  - windows-mtr.exe ... MISSING
+            set ERRORS=1
+          )
+          
+          if exist trippy.exe (
+            echo  - trippy.exe ... OK
+          ) else (
+            echo  - trippy.exe ... MISSING
+            set ERRORS=1
+          )
+          
+          if exist mtr.exe (
+            echo  - mtr.exe ... OK
+          ) else (
+            echo  - mtr.exe ... MISSING
+            set ERRORS=1
+          )
+          
+          echo.
+          echo Testing documentation files:
+          if exist README.md (
+            echo  - README.md ... OK
+          ) else (
+            echo  - README.md ... MISSING
+            set ERRORS=1
+          )
+          
+          if exist LICENSE (
+            echo  - LICENSE ... OK
+          ) else (
+            echo  - LICENSE ... MISSING
+            set ERRORS=1
+          )
+          
+          if exist USAGE.md (
+            echo  - USAGE.md ... OK
+          ) else (
+            echo  - USAGE.md ... MISSING
+            set ERRORS=1
+          )
+          
+          echo.
+          if defined ERRORS (
+            echo Some files are missing! Please download a new package.
+            exit /b 1
+          ) else (
+            echo All files verified successfully!
+          )
+          "@ > dist/verify.bat
+          
+          # Add to the ZIP packages
+          Compress-Archive -Path dist/install.bat, dist/verify.bat -Update -DestinationPath dist/windows-mtr-full.zip
+          Compress-Archive -Path dist/install.bat, dist/verify.bat -Update -DestinationPath dist/windows-mtr.zip
         shell: pwsh
 
-      # Create a simple ZIP package that includes just the executable for ease of use
-      - name: Create standalone executable ZIP
+      # Create a standalone executable ZIP
+      - name: Create standalone executable packages
         run: |
-          mkdir -p standalone
-          cp target/x86_64-pc-windows-msvc/release/mtr.exe standalone/
-          Compress-Archive -Path standalone/mtr.exe -DestinationPath dist/mtr-standalone.zip -Force
+          # Create a directory for the standalone MTR
+          mkdir -p standalone-mtr
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe standalone-mtr/
+          
+          # Create a directory for standalone MTR + trippy
+          mkdir -p standalone-mtr-complete
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe standalone-mtr-complete/
+          cp "${{ env.TRIPPY_PATH }}" standalone-mtr-complete/
+          
+          # Create ZIPs
+          Compress-Archive -Path standalone-mtr/mtr.exe -DestinationPath dist/mtr-standalone.zip -Force
+          Compress-Archive -Path standalone-mtr-complete/* -DestinationPath dist/mtr-with-trippy.zip -Force
+          
+          # Add these files to the checksums
+          cd dist
+          Get-FileHash -Algorithm SHA256 mtr-standalone.zip | ForEach-Object {$_.Hash + "  mtr-standalone.zip"} | Out-File -FilePath SHA256SUMS -Encoding utf8 -Append
+          Get-FileHash -Algorithm SHA256 mtr-with-trippy.zip | ForEach-Object {$_.Hash + "  mtr-with-trippy.zip"} | Out-File -FilePath SHA256SUMS -Encoding utf8 -Append
         shell: pwsh
 
+      # Upload all artifacts to GitHub
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-mtr-release
           path: dist/
+          if-no-files-found: error
+          compression-level: 9
 
+      # Create the GitHub release with all files
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v1
@@ -270,10 +398,14 @@ jobs:
           files: |
             dist/windows-mtr.exe
             dist/mtr.exe
+            dist/trippy.exe
             dist/windows-mtr.zip
+            dist/windows-mtr-full.zip
             dist/mtr-standalone.zip
+            dist/mtr-with-trippy.zip
             dist/SHA256SUMS
             dist/install.bat
+            dist/verify.bat
           name: Windows MTR v${{ github.ref_name }}
           body: |
             # Windows MTR v${{ github.ref_name }}
@@ -282,20 +414,33 @@ jobs:
             
             ## Download Options
             
-            ### For end users (Windows technicians):
+            ### Complete Packages (Recommended):
             
-            - **[mtr-standalone.zip](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/mtr-standalone.zip)** - Just the executable, extract and run
-            - **[windows-mtr.zip](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr.zip)** - Complete package with installer and documentation
-            - **Direct executable**: [mtr.exe](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/mtr.exe)
+            - **[windows-mtr-full.zip](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr-full.zip)** - Complete package with MTR, trippy, installer and documentation
+            
+            ### Standalone Options:
+            
+            - **[mtr-with-trippy.zip](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/mtr-with-trippy.zip)** - Just the executables (MTR + trippy), no installation needed
+            - **[mtr-standalone.zip](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/mtr-standalone.zip)** - Just the MTR executable (requires trippy to be installed separately)
+            
+            ### Individual Files:
+            
+            - [windows-mtr.exe](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr.exe) - Main executable
+            - [trippy.exe](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/trippy.exe) - Required dependency
+            - [install.bat](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/install.bat) - Installation script
+            - [verify.bat](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/verify.bat) - Verify your installation
             
             ### Installation:
             
-            **Simple method:** Download and run `mtr.exe` directly - no installation needed!
+            **Recommended method:** 
+            1. Download [windows-mtr-full.zip](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr-full.zip)
+            2. Extract all files
+            3. Run verify.bat to confirm all files are present
+            4. Run install.bat (requires administrator privileges)
             
-            **With installer:** 
-            1. Download windows-mtr.zip
-            2. Extract the ZIP
-            3. Run install.bat (may require administrator privileges)
+            **Manual installation:**
+            1. Place windows-mtr.exe and trippy.exe in the same directory
+            2. Run windows-mtr.exe from that directory
             
             ## Verifying downloads
             
@@ -309,9 +454,12 @@ jobs:
             
             # TCP mode (for HTTPS)
             mtr -T -P 443 example.com
+            
+            # Report mode (no live updates)
+            mtr -r -c 10 google.com
             ```
             
-            See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/main/USAGE.md) for more examples.
+            See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/main/USAGE.md) for complete documentation.
           draft: false
           prerelease: false
         env:
