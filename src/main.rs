@@ -235,8 +235,23 @@ fn main() -> anyhow::Result<()> {
     }
     
     // Execute trippy with our arguments and forward its exit status
-    let status = cmd.status()
+    let output = cmd.output()
         .map_err(|e| anyhow::anyhow!("Failed to execute trippy: {}", e))?;
         
-    process::exit(status.code().unwrap_or(2));
+    // Check if the error is related to privileges
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        
+        // Check for privilege errors in trippy's output
+        if stderr.contains("privileges are required") || stderr.contains("permission denied") {
+            return Err(anyhow::anyhow!(MtrError::InsufficientPrivileges.to_string()));
+        }
+        
+        // For other errors, just print stderr and return the status code
+        if !stderr.is_empty() {
+            eprintln!("{}", stderr);
+        }
+    }
+        
+    process::exit(output.status.code().unwrap_or(2));
 }

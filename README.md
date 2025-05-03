@@ -30,7 +30,7 @@ Windows MTR is an enterprise-grade network diagnostics tool that brings the powe
       <li>Report mode for static output generation</li>
       <li>IPv4 and IPv6 support</li>
       <li>Cross-platform compatibility</li>
-      <li>No admin rights required on Windows</li>
+      <li>Simple, clean command-line interface</li>
     </ul>
   </td>
   <td width="33%">
@@ -96,7 +96,7 @@ Windows MTR is built with enterprise-level security practices:
 
 - Windows 7/Server 2012 R2 or later
 - 50MB disk space
-- No elevated privileges required
+- Administrator privileges required for network operations
 
 ### Docker
 
@@ -117,6 +117,14 @@ cargo build --release
 ```
 
 ## 🚀 Quick Start
+
+### Administrator Privileges Required
+
+Windows MTR requires administrator privileges to run properly, as it needs to send and receive network packets at a low level:
+
+1. Right-click on Command Prompt or PowerShell and select "Run as administrator"
+2. Navigate to your Windows MTR directory or add it to your PATH
+3. Run your MTR commands with elevated privileges
 
 ### Basic ICMP Trace (Default)
 
