@@ -203,24 +203,19 @@ fn main() -> anyhow::Result<()> {
     // Start building the trippy command
     let mut cmd = Command::new(trippy_path);
     
-    // In newer trippy versions, TCP/UDP port is specified as part of the protocol argument
+    // Protocol options - pass them correctly to the trippy binary
     if args.tcp {
-        if let Some(port) = args.port {
-            // Use the format: --protocol tcp:<port>
-            cmd.arg("--protocol").arg(format!("tcp:{}", port));
-        } else {
-            cmd.arg("--tcp");
-        }
+        cmd.arg("--protocol").arg("tcp");
     } else if args.udp {
-        if let Some(port) = args.port {
-            // Use the format: --protocol udp:<port>
-            cmd.arg("--protocol").arg(format!("udp:{}", port));
-        } else {
-            cmd.arg("--udp");
-        }
+        cmd.arg("--protocol").arg("udp");
     }
     
-    // Add the target host last
+    // Port - pass it as a separate argument
+    if let Some(port) = args.port {
+        cmd.arg("--port").arg(port.to_string());
+    }
+    
+    // Add the target host
     cmd.arg(host);
     
     // Report mode
