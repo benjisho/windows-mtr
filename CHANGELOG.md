@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-05-04
+
+### Added
+- Enhanced command-line argument handling for better user experience
+- Improved compatibility with trippy 0.12.2 protocol specification
+- Better error detection and messaging for administrator privileges
+
+### Fixed
+- Fixed TCP/UDP mode with port specifications
+- Updated protocol parameter handling to use the new format required by trippy
+- Corrected documentation to accurately reflect administrator requirements
+- Fixed port validation and parameter checking
+
+## [1.0.5] - 2025-05-04
+
+### Added
+- Clearer error message for administrator privilege requirements
+- Detailed CLI help with usage examples
+- Improved error handling for command-line arguments
+
+### Fixed
+- Fixed command-line argument translation for TCP/UDP with port numbers
+- Updated protocol parameter handling for compatibility with trippy 0.12.2
+- Improved error detection for privilege-related errors
+- Fixed documentation to correctly indicate administrator privileges are required
+
 ## [1.0.0] - 2025-04-30
 
 ### Added --> [1.0.0]

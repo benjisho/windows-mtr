@@ -10,6 +10,11 @@ use error::{MtrError, Result};
 /// Windows-native clone of Linux mtr - a CLI that delivers ICMP/TCP/UDP traceroute & ping
 #[derive(Parser)]
 #[command(author = "Benji Shohet (benjisho)", version, about, long_about = None)]
+#[command(after_help = "Examples:
+  windows-mtr 8.8.8.8                    # Basic ICMP trace to Google DNS
+  windows-mtr -T -P 443 github.com       # TCP trace to GitHub on port 443 (HTTPS)
+  windows-mtr -U -P 53 1.1.1.1           # UDP trace to Cloudflare DNS on port 53
+  windows-mtr -r -c 10 example.com       # Report mode with 10 pings per hop")]
 struct Cli {
     /// Target host to trace (hostname or IP)
     host: String,
@@ -22,8 +27,8 @@ struct Cli {
     #[arg(short = 'U', conflicts_with = "tcp")]
     udp: bool,
 
-    /// Target port for TCP/UDP modes
-    #[arg(short = 'P')]
+    /// Target port for TCP/UDP modes (required when using -T or -U)
+    #[arg(short = 'P', value_name = "PORT")]
     port: Option<u16>,
 
     /// Report mode (no continuous updates)
@@ -154,8 +159,15 @@ fn find_trippy_binary() -> Result<PathBuf> {
 fn verify_options(args: &Cli) -> Result<()> {
     // Verify port is provided for TCP and UDP modes
     if (args.tcp || args.udp) && args.port.is_none() {
-        let protocol = if args.tcp { "TCP" } else { "UDP" };
-        return Err(MtrError::PortRequired(protocol.to_string()));
+        let (protocol, flag) = if args.tcp { ("TCP", 'T') } else { ("UDP", 'U') };
+        return Err(MtrError::PortRequired(protocol.to_string(), flag));
+    }
+    
+    // Add more informative documentation for port parameter
+    if let Some(port) = args.port {
+        if port > 65535 {
+            return Err(MtrError::InvalidOption(format!("Port number {} is out of range (must be 1-65535)", port)));
+        }
     }
     
     Ok(())
@@ -190,19 +202,26 @@ fn main() -> anyhow::Result<()> {
     
     // Start building the trippy command
     let mut cmd = Command::new(trippy_path);
-    cmd.arg(host);
     
-    // Protocol options
+    // In newer trippy versions, TCP/UDP port is specified as part of the protocol argument
     if args.tcp {
-        cmd.arg("--tcp");
+        if let Some(port) = args.port {
+            // Use the format: --protocol tcp:<port>
+            cmd.arg("--protocol").arg(format!("tcp:{}", port));
+        } else {
+            cmd.arg("--tcp");
+        }
     } else if args.udp {
-        cmd.arg("--udp");
+        if let Some(port) = args.port {
+            // Use the format: --protocol udp:<port>
+            cmd.arg("--protocol").arg(format!("udp:{}", port));
+        } else {
+            cmd.arg("--udp");
+        }
     }
     
-    // Port
-    if let Some(port) = args.port {
-        cmd.arg("--port").arg(port.to_string());
-    }
+    // Add the target host last
+    cmd.arg(host);
     
     // Report mode
     if args.report {

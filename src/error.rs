@@ -34,8 +34,8 @@ pub enum MtrError {
     InvalidOption(String),
     
     /// Invalid port for protocol
-    #[error("Port option required for {0} protocol")]
-    PortRequired(String),
+    #[error("Port option required for {0} protocol\n\nExample: windows-mtr.exe -{1} -P 443 8.8.8.8")]
+    PortRequired(String, char),
     
     /// IO error
     #[error("I/O error: {0}")]
