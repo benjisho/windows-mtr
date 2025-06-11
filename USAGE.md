@@ -17,6 +17,8 @@ mtr [options] <hostname or IP>
 | `-U` | Use UDP packets instead of ICMP echo (default is ICMP) |
 | `-P <port>` | Specify target port for TCP/UDP modes (default: 80 for TCP, 33434 for UDP) |
 
+> **Note:** When using `-T` (TCP) or `-U` (UDP), the `-P` option is required to specify the destination port.
+
 ### Output Control Options
 
 | Option | Description |
