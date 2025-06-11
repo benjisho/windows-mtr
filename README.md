@@ -115,23 +115,32 @@ Follow these steps to compile the Windows MTR executable:
 1. Install [Rust](https://www.rust-lang.org/tools/install) with **rustup**.
 2. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) and select the **Desktop development with C++** workload.
 3. Install the `trippy` binary so it is available in your `PATH`:
+   
    ```bash
    cargo install trippy
    ```
+   
    *(Alternatively download `trip.exe` from GitHub Releases.)*
+
 4. Clone this repository and change into the project directory:
+
    ```bash
    git clone https://github.com/benjisho/windows-mtr.git
    cd windows-mtr
    ```
+
 5. *(Optional)* Generate a lockfile if you need to build offline:
+
    ```bash
    cargo generate-lockfile
    ```
+
 6. Compile in release mode:
+
    ```bash
    cargo build --release
    ```
+
 7. After a successful build the binary is located at `target\release\mtr.exe`. Run it from an elevated command prompt as shown below.
 
 ## 🚀 Quick Start
