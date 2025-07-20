@@ -80,4 +80,17 @@ mod tests {
         assert!(args.report);
         assert_eq!(args.count, Some(10));
     }
+
+    #[test]
+    fn test_port_validation_valid() {
+        // Test that valid ports are accepted
+        let args = parse_args(vec!["mtr", "8.8.8.8", "-T", "-P", "443"]);
+        assert_eq!(args.port, Some(443));
+        
+        let args = parse_args(vec!["mtr", "8.8.8.8", "-T", "-P", "1"]);
+        assert_eq!(args.port, Some(1));
+        
+        let args = parse_args(vec!["mtr", "8.8.8.8", "-T", "-P", "65535"]);
+        assert_eq!(args.port, Some(65535));
+    }
 }
