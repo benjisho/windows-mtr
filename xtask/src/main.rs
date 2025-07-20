@@ -45,7 +45,7 @@ fn dist() -> Result<()> {
 
     // Paths to binaries
     let release_dir = PathBuf::from("target/release");
-    
+
     #[cfg(windows)]
     let source_binary = release_dir.join("mtr.exe");
     #[cfg(not(windows))]
@@ -55,19 +55,22 @@ fn dist() -> Result<()> {
     let zip_path = dist_dir.join("windows-mtr.zip");
     println!("Creating ZIP archive: {:?}", zip_path);
     create_zip_archive(&source_binary, &zip_path)?;
-    
+
     // Create an XZ compressed ZIP for smaller size
     let xz_path = dist_dir.join("windows-mtr.zip.xz");
     println!("Creating XZ compressed archive: {:?}", xz_path);
     create_xz_archive(&zip_path, &xz_path)?;
-    
+
     // Generate SHA256 checksums
     generate_checksums(&dist_dir)?;
 
-    println!("Distribution packages created successfully in: {:?}", dist_dir);
+    println!(
+        "Distribution packages created successfully in: {:?}",
+        dist_dir
+    );
     println!("Regular ZIP: {:?}", zip_path);
     println!("XZ compressed: {:?} (approximately 40% smaller)", xz_path);
-    
+
     Ok(())
 }
 
@@ -147,7 +150,7 @@ fn dist_windows() -> Result<()> {
         PathBuf::from(format!("target/{}/release", target)),
         PathBuf::from("target/release"),
     ];
-    
+
     // Try to find the Windows executable in possible locations
     let mut found_binary = None;
     for dir in &release_dirs {
@@ -158,7 +161,7 @@ fn dist_windows() -> Result<()> {
             break;
         }
     }
-    
+
     let source_binary = match found_binary {
         Some(path) => path,
         None => {
@@ -174,38 +177,41 @@ fn dist_windows() -> Result<()> {
     let zip_path = dist_dir.join("windows-mtr.zip");
     println!("Creating ZIP archive: {:?}", zip_path);
     create_zip_archive(&source_binary, &zip_path)?;
-    
+
     // Create an XZ compressed ZIP for smaller size
     let xz_path = dist_dir.join("windows-mtr.zip.xz");
     println!("Creating XZ compressed archive: {:?}", xz_path);
     create_xz_archive(&zip_path, &xz_path)?;
-    
+
     // Generate SHA256 checksums
     generate_checksums(&dist_dir)?;
 
-    println!("Windows distribution packages created successfully in: {:?}", dist_dir);
-    
+    println!(
+        "Windows distribution packages created successfully in: {:?}",
+        dist_dir
+    );
+
     Ok(())
 }
 
 fn test_windows() -> Result<()> {
     println!("Testing Windows executable using Docker...");
-    
+
     // Check if we have Windows executable
     let windows_exe = "dist/windows-mtr.exe";
     if !Path::new(windows_exe).exists() {
         println!("Windows executable not found. Building it first...");
         dist_windows()?;
     }
-    
+
     // Prepare a temporary directory for Windows testing
     let test_dir = PathBuf::from("target/windows-test");
     fs::create_dir_all(&test_dir).context("Failed to create test directory")?;
-    
+
     // Copy the executable and test files
     fs::copy("dist/windows-mtr.exe", test_dir.join("mtr.exe"))
         .context("Failed to copy Windows executable")?;
-    
+
     // Create a simple batch test script
     let test_script = r#"@echo off
 echo Running Windows MTR tests...
@@ -228,43 +234,41 @@ echo.
 
 echo All tests completed!
 "#;
-    
-    fs::write(test_dir.join("test.bat"), test_script)
-        .context("Failed to create test script")?;
-    
+
+    fs::write(test_dir.join("test.bat"), test_script).context("Failed to create test script")?;
+
     // Create Dockerfile for Windows container
     let dockerfile = r#"FROM mcr.microsoft.com/windows/servercore:ltsc2022
 WORKDIR C:\\app
 COPY . .
 CMD ["cmd", "/c", "test.bat"]
 "#;
-    
-    fs::write(test_dir.join("Dockerfile"), dockerfile)
-        .context("Failed to create Dockerfile")?;
-    
+
+    fs::write(test_dir.join("Dockerfile"), dockerfile).context("Failed to create Dockerfile")?;
+
     // Check if Docker is installed
-    let docker_status = Command::new("docker")
-        .args(["--version"])
-        .status();
-    
+    let docker_status = Command::new("docker").args(["--version"]).status();
+
     if docker_status.is_err() || !docker_status.unwrap().success() {
-        println!("Docker not found or not running. Please install Docker to test Windows binaries.");
+        println!(
+            "Docker not found or not running. Please install Docker to test Windows binaries."
+        );
         println!("Alternatively, you can manually test the Windows binary on a Windows machine.");
         println!("Test files prepared in: {:?}", test_dir);
         return Ok(());
     }
-    
+
     // Build and run Windows container (requires Windows containers enabled in Docker)
     println!("Building Windows test container...");
     println!("Note: This requires Docker with Windows containers support.");
     println!("If you're on Linux, this will likely fail unless you have special configuration.");
-    
+
     let build_cmd = Command::new("docker")
         .current_dir(&test_dir)
         .args(["build", "-t", "windows-mtr-test", "."])
         .status()
         .context("Failed to build Docker container")?;
-    
+
     if !build_cmd.success() {
         println!("Failed to build Windows container.");
         println!("This is expected on Linux without specialized Docker configuration.");
@@ -272,47 +276,49 @@ CMD ["cmd", "/c", "test.bat"]
         println!("Test files prepared in: {:?}", test_dir);
         return Ok(());
     }
-    
+
     println!("Running tests in Windows container...");
     let run_cmd = Command::new("docker")
         .args(["run", "--rm", "windows-mtr-test"])
         .status()
         .context("Failed to run Docker container")?;
-    
+
     if !run_cmd.success() {
         anyhow::bail!("Windows tests failed");
     }
-    
+
     println!("Windows tests completed successfully!");
     Ok(())
 }
 
 fn package_win_manually() -> Result<()> {
     println!("Creating Windows package manually...");
-    
+
     // Create dist directory if it doesn't exist
     let dist_dir = PathBuf::from("dist");
     fs::create_dir_all(&dist_dir).context("Failed to create dist directory")?;
-    
+
     // Create a dummy Windows executable if not cross-compiling
     let dummy_exe = dist_dir.join("mtr.exe");
     if !dummy_exe.exists() {
         println!("Creating placeholder Windows executable...");
-        create_placeholder_exe(&dummy_exe)
-            .context("Failed to create dummy Windows executable")?;
-        println!("Created placeholder Windows executable at: {}", dummy_exe.display());
+        create_placeholder_exe(&dummy_exe).context("Failed to create dummy Windows executable")?;
+        println!(
+            "Created placeholder Windows executable at: {}",
+            dummy_exe.display()
+        );
     }
 
     // Create a standard ZIP archive
     let zip_path = dist_dir.join("windows-mtr.zip");
     println!("Creating ZIP archive: {:?}", zip_path);
     create_zip_archive(&dummy_exe, &zip_path)?;
-    
+
     // Create an XZ compressed ZIP for smaller size
     let xz_path = dist_dir.join("windows-mtr.zip.xz");
     println!("Creating XZ compressed archive: {:?}", xz_path);
     create_xz_archive(&zip_path, &xz_path)?;
-    
+
     // Generate SHA256 checksums
     generate_checksums(&dist_dir)?;
 
@@ -320,7 +326,7 @@ fn package_win_manually() -> Result<()> {
     println!("Note: This is a demonstration package with a placeholder executable.");
     println!("For a real Windows binary, you would need to build on a Windows machine or");
     println!("configure a proper cross-compilation environment.");
-    
+
     Ok(())
 }
 
@@ -357,23 +363,26 @@ fn create_zip_archive(source_binary: &Path, zip_path: &Path) -> Result<()> {
 
 fn add_documentation_to_zip(zip: &mut ZipWriter<File>, options: FileOptions) -> Result<()> {
     let files = ["README.md", "LICENSE", "USAGE.md"];
-    
+
     for file_name in files {
         match File::open(file_name) {
             Ok(mut file) => {
                 let mut contents = Vec::new();
                 file.read_to_end(&mut contents)?;
-                
+
                 zip.start_file(file_name, options)?;
                 zip.write_all(&contents)?;
-            },
+            }
             Err(e) => {
-                eprintln!("Warning: Could not open documentation file '{}': {}", file_name, e);
+                eprintln!(
+                    "Warning: Could not open documentation file '{}': {}",
+                    file_name, e
+                );
                 eprintln!("The file will be missing from the package.");
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -384,26 +393,27 @@ fn create_xz_archive(source_zip: &Path, xz_path: &Path) -> Result<()> {
         .context("Failed to open source ZIP")?
         .read_to_end(&mut source_data)
         .context("Failed to read source ZIP")?;
-    
+
     // Create the XZ file with maximum compression level (9)
     let xz_file = File::create(xz_path).context("Failed to create XZ file")?;
     let mut encoder = XzEncoder::new(xz_file, 9);
-    
+
     // Write the ZIP data to the XZ encoder
     encoder.write_all(&source_data)?;
     encoder.finish()?;
-    
+
     Ok(())
 }
 
 fn generate_checksums(dist_dir: &Path) -> Result<()> {
     let checksum_path = dist_dir.join("SHA256SUMS");
-    let mut checksum_file = File::create(&checksum_path).context("Failed to create checksum file")?;
+    let mut checksum_file =
+        File::create(&checksum_path).context("Failed to create checksum file")?;
 
     for entry in WalkDir::new(dist_dir) {
         let entry = entry?;
         let path = entry.path();
-        
+
         // Skip directories and the checksum file itself
         if path.is_dir() || path.file_name() == Some("SHA256SUMS".as_ref()) {
             continue;
@@ -411,7 +421,7 @@ fn generate_checksums(dist_dir: &Path) -> Result<()> {
 
         let mut file = File::open(path)?;
         let mut hasher = Sha256::new();
-        let mut buffer = [0; 8192];  // Increased from 1024 to 8192 bytes for better performance
+        let mut buffer = [0; 8192]; // Increased from 1024 to 8192 bytes for better performance
 
         loop {
             let bytes_read = file.read(&mut buffer)?;
@@ -423,7 +433,7 @@ fn generate_checksums(dist_dir: &Path) -> Result<()> {
 
         let hash = hasher.finalize();
         let hex_hash = hex::encode(hash);
-        
+
         // Write hash and filename (relative to dist dir) to checksum file
         let rel_path = path.strip_prefix(dist_dir)?;
         writeln!(checksum_file, "{}  {}", hex_hash, rel_path.display())?;
@@ -436,9 +446,8 @@ fn generate_checksums(dist_dir: &Path) -> Result<()> {
 // Helper function to create a placeholder Windows executable
 fn create_placeholder_exe(path: &Path) -> Result<()> {
     println!("Creating placeholder Windows executable...");
-    let mut file = File::create(path)
-        .context("Failed to create dummy Windows executable")?;
-    
+    let mut file = File::create(path).context("Failed to create dummy Windows executable")?;
+
     // Write a minimal PE header to make it a valid Windows executable
     // This is just for packaging demonstration - it won't run
     let pe_header = b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xFF\xFF\x00\x00\
@@ -449,8 +458,11 @@ fn create_placeholder_exe(path: &Path) -> Result<()> {
                      \x69\x73\x20\x70\x72\x6F\x67\x72\x61\x6D\x20\x63\x61\x6E\x6E\x6F\
                      \x74\x20\x62\x65\x20\x72\x75\x6E\x20\x69\x6E\x20\x44\x4F\x53\x20\
                      \x6D\x6F\x64\x65\x2E\x0D\x0D\x0A\x24\x00\x00\x00\x00\x00\x00\x00";
-    
+
     file.write_all(pe_header)?;
-    println!("Created placeholder Windows executable at: {}", path.display());
+    println!(
+        "Created placeholder Windows executable at: {}",
+        path.display()
+    );
     Ok(())
 }

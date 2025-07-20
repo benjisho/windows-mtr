@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use clap::Parser;
     use clap::FromArgMatches;
+    use clap::Parser;
     // Removed unused Duration import
 
     // Since we're not using these enums, we can remove them
@@ -11,14 +11,14 @@ mod tests {
     enum Protocol {
         Icmp,
         Tcp,
-        Udp
+        Udp,
     }
 
     #[allow(dead_code)]
     #[derive(Debug, PartialEq)]
     enum OutputFormat {
         Report,
-        Interactive
+        Interactive,
     }
 
     #[derive(Parser, Debug)]

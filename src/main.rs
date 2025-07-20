@@ -46,11 +46,11 @@ struct Cli {
     /// Maximum time in seconds to keep a probe alive
     #[arg(short = 'w')]
     timeout: Option<f32>,
-    
+
     /// Don't perform reverse DNS lookups (faster)
     #[arg(short = 'n')]
     no_dns: bool,
-    
+
     /// Maximum number of hops to trace
     #[arg(short = 'm')]
     max_hops: Option<u8>,
@@ -60,6 +60,13 @@ fn print_banner() {
     println!("windows-mtr by Benji Shohet (benjisho) — https://github.com/benjisho/windows-mtr");
 }
 
+/// Validates that the target host is resolvable or a valid IP address.
+///
+/// This function attempts to validate the target in two ways:
+/// 1. Try to resolve it as a hostname (with dummy port 0)
+/// 2. Try to parse it as a direct IP address
+///
+/// Returns the validated host string or an error if neither approach succeeds.
 fn validate_target(host: &str) -> Result<String> {
     // Try to resolve the hostname to check if it's valid
     match (host, 0).to_socket_addrs() {
@@ -68,37 +75,50 @@ fn validate_target(host: &str) -> Result<String> {
             // Maybe it's an IP without a port, try parsing as IpAddr
             match host.parse::<IpAddr>() {
                 Ok(_) => Ok(host.to_string()),
-                Err(_) => Err(MtrError::HostResolutionError(host.to_string()))
+                Err(_) => Err(MtrError::HostResolutionError(host.to_string())),
             }
         }
     }
 }
 
+/// Locates the trippy binary executable in various standard locations.
+///
+/// This function searches for the trippy binary in the following order:
+/// 1. In the system PATH (as "trippy" or "trip" on Windows)
+/// 2. In the same directory as the current executable
+/// 3. In Program Files\Windows-MTR on Windows
+/// 4. Attempts to install via cargo if available
+///
+/// Returns the path to the trippy binary or an error if not found.
 fn find_trippy_binary() -> Result<PathBuf> {
     // First use the 'which' crate to locate the trippy binary in PATH
     if let Ok(path) = which::which("trippy") {
         return Ok(path);
     }
-    
+
     // On Windows, also try looking for trip.exe (the trippy executable name on Windows)
     #[cfg(windows)]
     if let Ok(path) = which::which("trip") {
         return Ok(path);
     }
-    
+
     // Check if we're running from a bundled binary that has trippy embedded
     let exe_dir = env::current_exe()
-        .map_err(|e| MtrError::IoError(e))?
+        .map_err(MtrError::IoError)?
         .parent()
         .ok_or_else(|| MtrError::Other("Failed to get executable directory".to_string()))?
         .to_path_buf();
-    
+
     // Check for trippy.exe first (fallback name)
-    let local_trippy = exe_dir.join(if cfg!(windows) { "trippy.exe" } else { "trippy" });
+    let local_trippy = exe_dir.join(if cfg!(windows) {
+        "trippy.exe"
+    } else {
+        "trippy"
+    });
     if local_trippy.exists() {
         return Ok(local_trippy);
     }
-    
+
     // On Windows, also check for trip.exe (the actual name)
     #[cfg(windows)]
     {
@@ -107,42 +127,43 @@ fn find_trippy_binary() -> Result<PathBuf> {
             return Ok(local_trip);
         }
     }
-    
+
     // Try common program files directory (Windows)
     #[cfg(windows)]
     {
-        let program_files = env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
+        let program_files =
+            env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
         let windows_mtr_dir = PathBuf::from(program_files).join("Windows-MTR");
-        
+
         // Check for both possible filenames (trippy.exe and trip.exe)
         let program_files_trippy = windows_mtr_dir.join("trippy.exe");
         let program_files_trip = windows_mtr_dir.join("trip.exe");
-        
+
         if program_files_trippy.exists() {
             return Ok(program_files_trippy);
         }
-        
+
         if program_files_trip.exists() {
             return Ok(program_files_trip);
         }
     }
-    
+
     // If we can't find trippy, try installing it via cargo
     if Command::new("cargo").arg("--version").output().is_ok() {
         eprintln!("Trippy binary not found. Trying to install it with cargo...");
-        
+
         let cargo_install_status = Command::new("cargo")
             .args(["install", "trippy"])
             .status()
             .map_err(|e| MtrError::TrippyInstallFailed(e.to_string()))?;
-            
+
         if cargo_install_status.success() {
             // Try again with the 'which' crate to locate the newly installed trippy
             #[cfg(windows)]
             if let Ok(path) = which::which("trip") {
                 return Ok(path);
             }
-            
+
             #[cfg(not(windows))]
             if let Ok(path) = which::which("trippy") {
                 return Ok(path);
@@ -151,46 +172,55 @@ fn find_trippy_binary() -> Result<PathBuf> {
     } else {
         eprintln!("Cargo not found. Cannot automatically install trippy.");
     }
-    
+
     // If we reach here, we couldn't find or install trippy
     Err(MtrError::TrippyNotFound)
 }
 
+/// Validates command-line options for consistency and correctness.
+///
+/// This function performs the following validations:
+/// - Ensures port is specified when using TCP (-T) or UDP (-U) modes
+/// - Validates that port numbers are in the valid range (1-65535)
+/// - Checks for other option conflicts or invalid combinations
+///
+/// Returns Ok(()) if all options are valid, or an appropriate error.
 fn verify_options(args: &Cli) -> Result<()> {
     // Verify port is provided for TCP and UDP modes
     if (args.tcp || args.udp) && args.port.is_none() {
         let (protocol, flag) = if args.tcp { ("TCP", 'T') } else { ("UDP", 'U') };
         return Err(MtrError::PortRequired(protocol.to_string(), flag));
     }
-    
-    // Add more informative documentation for port parameter
+
+    // Validate port parameter - u16 range is already enforced by type system
     if let Some(port) = args.port {
-        if port > 65535 {
-            return Err(MtrError::InvalidOption(format!("Port number {} is out of range (must be 1-65535)", port)));
+        if port == 0 {
+            return Err(MtrError::InvalidOption(format!(
+                "Port number {port} is invalid (must be 1-65535)"
+            )));
         }
     }
-    
+
     Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
     print_banner();
-    
+
     // Parse command-line arguments
     let args = Cli::parse();
-    
+
     // Verify options
     verify_options(&args).map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    
+
     // Validate target
-    let host = validate_target(&args.host)
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    
+    let host = validate_target(&args.host).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
     // Find the trippy binary
     let trippy_path = match find_trippy_binary() {
         Ok(path) => path,
         Err(e) => {
-            eprintln!("Error: {}", e);
+            eprintln!("Error: {e}");
             eprintln!("\nTo fix this issue, please try one of the following:");
             eprintln!("1. Place 'trippy.exe' in the same directory as this executable");
             eprintln!("2. Install trippy manually: cargo install trippy");
@@ -199,73 +229,74 @@ fn main() -> anyhow::Result<()> {
             return Err(anyhow::anyhow!("Trippy binary required"));
         }
     };
-    
+
     // Start building the trippy command
     let mut cmd = Command::new(trippy_path);
-    
+
     // Protocol options - pass them correctly to the trippy binary
     if args.tcp {
         cmd.arg("--protocol").arg("tcp");
     } else if args.udp {
         cmd.arg("--protocol").arg("udp");
     }
-    
+
     // Port - pass it as a separate argument
     if let Some(port) = args.port {
         cmd.arg("--port").arg(port.to_string());
     }
-    
+
     // Add the target host
     cmd.arg(host);
-    
+
     // Report mode
     if args.report {
         cmd.arg("--report");
     }
-    
+
     // Max pings
     if let Some(count) = args.count {
         cmd.arg("--max-rounds").arg(count.to_string());
     }
-    
+
     // Interval
     if let Some(interval) = args.interval {
         cmd.arg("--interval").arg(interval.to_string());
     }
-    
+
     // Timeout
     if let Some(timeout) = args.timeout {
         cmd.arg("--grace-duration").arg(timeout.to_string());
     }
-    
+
     // DNS lookups
     if args.no_dns {
         cmd.arg("--no-dns");
     }
-    
+
     // Max hops
     if let Some(max_hops) = args.max_hops {
         cmd.arg("--max-ttl").arg(max_hops.to_string());
     }
-    
+
     // Execute trippy with our arguments and forward its exit status
-    let output = cmd.output()
+    let output = cmd
+        .output()
         .map_err(|e| anyhow::anyhow!("Failed to execute trippy: {}", e))?;
-        
+
     // Check if the error is related to privileges
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        
+
         // Check for privilege errors in trippy's output
         if stderr.contains("privileges are required") || stderr.contains("permission denied") {
             return Err(anyhow::anyhow!(MtrError::InsufficientPrivileges.to_string()));
         }
-        
+
         // For other errors, just print stderr and return the status code
         if !stderr.is_empty() {
-            eprintln!("{}", stderr);
+            eprintln!("{stderr}");
         }
     }
-        
+
     process::exit(output.status.code().unwrap_or(2));
 }
