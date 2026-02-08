@@ -6,7 +6,7 @@ fn main() {
     println!("- trippy::packet");
     println!("- trippy::privilege");
     println!("- trippy::tui");
-    
+
     // Print version if available
     println!("\nTrippy version: {}", env!("CARGO_PKG_VERSION"));
 }
