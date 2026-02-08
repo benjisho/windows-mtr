@@ -7,13 +7,13 @@ fn main() {
         "trippy::dns",
         "trippy::packet",
         "trippy::privilege",
-        "trippy::tui"
+        "trippy::tui",
     ];
-    
+
     for module in modules {
         println!("- {}", module);
     }
-    
+
     // Print some information about the trippy version
     println!("\nUsing trippy version: {}", env!("CARGO_PKG_VERSION"));
 }
