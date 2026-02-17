@@ -147,6 +147,57 @@ fn verify_options(args: &Cli) -> Result<()> {
     Ok(())
 }
 
+fn build_trippy_args(args: &Cli, host: &str) -> Vec<String> {
+    let mut trippy_args = Vec::new();
+
+    // Protocol options - pass them correctly to the trippy binary
+    if args.tcp {
+        trippy_args.extend(["--protocol".to_string(), "tcp".to_string()]);
+    } else if args.udp {
+        trippy_args.extend(["--protocol".to_string(), "udp".to_string()]);
+    }
+
+    // Port - pass it as a separate argument
+    if let Some(port) = args.port {
+        trippy_args.extend(["--port".to_string(), port.to_string()]);
+    }
+
+    // Add the target host
+    trippy_args.push(host.to_string());
+
+    // Report mode
+    if args.report {
+        trippy_args.push("--report".to_string());
+    }
+
+    // Max pings
+    if let Some(count) = args.count {
+        trippy_args.extend(["--max-rounds".to_string(), count.to_string()]);
+    }
+
+    // Interval
+    if let Some(interval) = args.interval {
+        trippy_args.extend(["--interval".to_string(), interval.to_string()]);
+    }
+
+    // Timeout
+    if let Some(timeout) = args.timeout {
+        trippy_args.extend(["--grace-duration".to_string(), timeout.to_string()]);
+    }
+
+    // DNS lookups
+    if args.no_dns {
+        trippy_args.push("--no-dns".to_string());
+    }
+
+    // Max hops
+    if let Some(max_hops) = args.max_hops {
+        trippy_args.extend(["--max-ttl".to_string(), max_hops.to_string()]);
+    }
+
+    trippy_args
+}
+
 fn main() -> anyhow::Result<()> {
     print_banner();
 
@@ -180,50 +231,8 @@ fn main() -> anyhow::Result<()> {
     // Start building the trippy command
     let mut cmd = Command::new(trippy_path);
 
-    // Protocol options - pass them correctly to the trippy binary
-    if args.tcp {
-        cmd.arg("--protocol").arg("tcp");
-    } else if args.udp {
-        cmd.arg("--protocol").arg("udp");
-    }
-
-    // Port - pass it as a separate argument
-    if let Some(port) = args.port {
-        cmd.arg("--port").arg(port.to_string());
-    }
-
-    // Add the target host
-    cmd.arg(host);
-
-    // Report mode
-    if args.report {
-        cmd.arg("--report");
-    }
-
-    // Max pings
-    if let Some(count) = args.count {
-        cmd.arg("--max-rounds").arg(count.to_string());
-    }
-
-    // Interval
-    if let Some(interval) = args.interval {
-        cmd.arg("--interval").arg(interval.to_string());
-    }
-
-    // Timeout
-    if let Some(timeout) = args.timeout {
-        cmd.arg("--grace-duration").arg(timeout.to_string());
-    }
-
-    // DNS lookups
-    if args.no_dns {
-        cmd.arg("--no-dns");
-    }
-
-    // Max hops
-    if let Some(max_hops) = args.max_hops {
-        cmd.arg("--max-ttl").arg(max_hops.to_string());
-    }
+    let trippy_args = build_trippy_args(&args, &host);
+    cmd.args(&trippy_args);
 
     // Execute trippy with our arguments and forward its exit status
     let output = cmd.output().with_context(|| {
@@ -306,5 +315,50 @@ mod tests {
     #[test]
     fn validate_target_rejects_invalid_target() {
         assert!(validate_target("invalid host with spaces").is_err());
+    }
+
+    #[test]
+    fn build_trippy_args_maps_cli_flags_to_expected_trippy_args() {
+        let args = Cli {
+            host: "example.com".to_string(),
+            tcp: true,
+            udp: false,
+            port: Some(443),
+            report: true,
+            count: Some(10),
+            interval: Some(0.5),
+            timeout: Some(3.0),
+            no_dns: true,
+            max_hops: Some(20),
+        };
+
+        let trippy_args = build_trippy_args(&args, "example.com");
+        assert_eq!(
+            trippy_args,
+            vec![
+                "--protocol",
+                "tcp",
+                "--port",
+                "443",
+                "example.com",
+                "--report",
+                "--max-rounds",
+                "10",
+                "--interval",
+                "0.5",
+                "--grace-duration",
+                "3",
+                "--no-dns",
+                "--max-ttl",
+                "20"
+            ]
+        );
+    }
+
+    #[test]
+    fn build_trippy_args_keeps_default_icmp_behavior_without_port() {
+        let args = base_cli();
+        let trippy_args = build_trippy_args(&args, "8.8.8.8");
+        assert_eq!(trippy_args, vec!["8.8.8.8"]);
     }
 }
