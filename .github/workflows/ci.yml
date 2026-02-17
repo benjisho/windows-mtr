@@ -84,7 +84,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           save-if: false # Only save cache for master branch builds
-          shared-key: "rust-${{ matrix.os }}-${{ matrix.rust }}"
+          shared-key: "rust-windows-pr"
           cache-directories: |
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
@@ -94,7 +94,7 @@ jobs:
       - name: Install trippy
         run: |
           echo "Installing trippy..."
-          cargo install trippy
+          cargo install --locked trippy
           
           # Verify installation and find location (trippy installs as trip.exe on Windows)
           $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
