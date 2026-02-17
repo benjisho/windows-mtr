@@ -7,7 +7,7 @@ description = "Windows-native clone of Linux mtr — cross-platform Rust CLI for
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/benjisho/windows-mtr"
-rust-version = "1.74.0"
+rust-version = "1.88.0"
 
 [workspace]
 members = ["xtask"]
