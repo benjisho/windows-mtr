@@ -88,7 +88,7 @@ fn find_trippy_binary() -> Result<PathBuf> {
     
     // Check if we're running from a bundled binary that has trippy embedded
     let exe_dir = env::current_exe()
-        .map_err(|e| MtrError::IoError(e))?
+        .map_err(MtrError::IoError)?
         .parent()
         .ok_or_else(|| MtrError::Other("Failed to get executable directory".to_string()))?
         .to_path_buf();
@@ -163,12 +163,6 @@ fn verify_options(args: &Cli) -> Result<()> {
         return Err(MtrError::PortRequired(protocol.to_string(), flag));
     }
     
-    // Add more informative documentation for port parameter
-    if let Some(port) = args.port {
-        if port > 65535 {
-            return Err(MtrError::InvalidOption(format!("Port number {} is out of range (must be 1-65535)", port)));
-        }
-    }
     
     Ok(())
 }
@@ -190,7 +184,7 @@ fn main() -> anyhow::Result<()> {
     let trippy_path = match find_trippy_binary() {
         Ok(path) => path,
         Err(e) => {
-            eprintln!("Error: {}", e);
+            eprintln!("Error: {e}");
             eprintln!("\nTo fix this issue, please try one of the following:");
             eprintln!("1. Place 'trippy.exe' in the same directory as this executable");
             eprintln!("2. Install trippy manually: cargo install trippy");
@@ -250,7 +244,7 @@ fn main() -> anyhow::Result<()> {
     
     // Execute trippy with our arguments and forward its exit status
     let output = cmd.output()
-        .map_err(|e| anyhow::anyhow!("Failed to execute trippy: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to execute trippy: {e}"))?;
         
     // Check if the error is related to privileges
     if !output.status.success() {
@@ -263,7 +257,7 @@ fn main() -> anyhow::Result<()> {
         
         // For other errors, just print stderr and return the status code
         if !stderr.is_empty() {
-            eprintln!("{}", stderr);
+            eprintln!("{stderr}");
         }
     }
         
