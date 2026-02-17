@@ -14,7 +14,7 @@ members = ["xtask"]
 
 [dependencies]
 trippy = "0.12.2"
-clap = { version = "4.5.37", features = ["derive"] }
+clap = { version = "4.5.41", features = ["derive"] }
 anyhow = "1.0.98"
 thiserror = "2.0.12"
 dirs = "5.0.1"

@@ -15,7 +15,7 @@ mtr [options] <hostname or IP>
 | `<hostname or IP>` | Target host to trace (required) |
 | `-T` | Use TCP SYN packets instead of ICMP echo (default is ICMP) |
 | `-U` | Use UDP packets instead of ICMP echo (default is ICMP) |
-| `-P <port>` | Specify target port for TCP/UDP modes (default: 80 for TCP, 33434 for UDP) |
+| `-P <port>` | Specify target port for TCP/UDP modes (required with `-T` or `-U`) |
 
 > **Note:** When using `-T` (TCP) or `-U` (UDP), the `-P` option is required to specify the destination port.
 
