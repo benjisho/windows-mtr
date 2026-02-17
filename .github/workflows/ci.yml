@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
-        rust: [stable, 1.88.0]  # Test on stable and MSRV
+        rust: [1.88.0]  # Pin to MSRV until stable >= 1.88.0
       fail-fast: false  # Continue with other jobs if one fails
 
     steps:
@@ -76,6 +76,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.88.0
           components: clippy
           targets: x86_64-pc-windows-msvc
 
