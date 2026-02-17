@@ -6,12 +6,10 @@
 
   ![CI](https://github.com/benjisho/windows-mtr/workflows/CI/badge.svg)
   ![Release](https://github.com/benjisho/windows-mtr/workflows/Release/badge.svg)
-  ![Security](https://github.com/benjisho/windows-mtr/workflows/Security/badge.svg)
-  ![Coverage](https://github.com/benjisho/windows-mtr/workflows/Coverage/badge.svg)
   [![Version](https://img.shields.io/github/v/release/benjisho/windows-mtr?color=blue&label=Version)](https://github.com/benjisho/windows-mtr/releases)
   [![Downloads](https://img.shields.io/github/downloads/benjisho/windows-mtr/total?color=green&label=Downloads)](https://github.com/benjisho/windows-mtr/releases)
   [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
-  [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://github.com/benjisho/windows-mtr/blob/main/USAGE.md)
+  [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://github.com/benjisho/windows-mtr/blob/master/USAGE.md)
 </div>
 
 ---
@@ -253,9 +251,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 ## 📋 Documentation
 
-- [📚 Full Documentation](https://benjisho.github.io/windows-mtr/)
-- [🧩 API Reference](https://benjisho.github.io/windows-mtr/rustdoc/windows_mtr/)
-- [📑 Usage Examples](USAGE.md)
+- [📚 Usage Guide](USAGE.md)
 - [🔄 Changelog](CHANGELOG.md)
 
 ## 📊 Project Status & Roadmap
@@ -310,7 +306,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 ## 🤝 Contributing
 
-We welcome contributions from the community! Check out our [contributing guidelines](https://benjisho.github.io/windows-mtr/contributing.html) to get started.
+We welcome contributions from the community! Check out our [contributing guidelines](CONTRIBUTING.md) to get started.
 
 ## 📜 License
 

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   test:
@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
-        rust: [stable, 1.74.0]  # Test on stable and MSRV
+        rust: [stable, 1.88.0]  # Test on stable and MSRV
       fail-fast: false  # Continue with other jobs if one fails
 
     steps:
@@ -31,7 +31,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-${{ matrix.os }}-${{ matrix.rust }}"
           cache-directories: |
             ~/.cargo/registry/index
@@ -83,7 +83,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false # Only save cache for main branch builds
+          save-if: false # Only save cache for master branch builds
           shared-key: "rust-${{ matrix.os }}-${{ matrix.rust }}"
           cache-directories: |
             ~/.cargo/registry/index

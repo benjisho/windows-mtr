@@ -381,7 +381,7 @@ jobs:
             windows-mtr -r -c 10 google.com
             ```
             
-            See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/main/USAGE.md) for complete documentation.
+            See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/master/USAGE.md) for complete documentation.
           draft: false
           prerelease: false
         env:
