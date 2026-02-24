@@ -73,3 +73,13 @@ Update docs when any of these change:
 - Do not rewrite large modules unless explicitly requested.
 - Do not change license or legal notices without maintainer instruction.
 - Do not commit generated artifacts unless repository convention requires it.
+
+## 11) GitHub automation files
+- Keep Copilot guidance in `.github/copilot-instructions.md`.
+- Keep role-specific agent specs in `.github/agents/`.
+- Ensure agent specs define scope, prohibited actions, validation, and output contract.
+
+## 12) Repository-local skills
+- Place project-specific skills under `skills/<skill-name>/SKILL.md`.
+- Prefer narrow skills that automate repeatable tasks (diagnostics, release prep, docs sync).
+- Reuse scripts/templates from a skill directory instead of duplicating long instructions.

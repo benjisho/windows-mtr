@@ -57,3 +57,11 @@ A strong AI-authored PR should include:
 
 ## Ownership and review
 AI output is draft quality until reviewed by a human maintainer. Reviewers may request simplification, stronger tests, or tighter scope.
+
+## GitHub-native instruction files
+When applicable, keep these aligned:
+- `.github/copilot-instructions.md` for Copilot behavior.
+- `.github/agents/` for role-based agent specifications.
+- Root `AGENTS.md` for repository-wide agent policy.
+
+If rules overlap, repository-wide policy should remain consistent across all files.
