@@ -62,6 +62,7 @@ AI output is draft quality until reviewed by a human maintainer. Reviewers may r
 When applicable, keep these aligned:
 - `.github/copilot-instructions.md` for Copilot behavior.
 - `.github/agents/` for role-based agent specifications.
+- `.github/instructions/*.instructions.md` for path-scoped Copilot rules.
 - Root `AGENTS.md` for repository-wide agent policy.
 
 If rules overlap, repository-wide policy should remain consistent across all files.
