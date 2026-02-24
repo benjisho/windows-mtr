@@ -77,9 +77,11 @@ Update docs when any of these change:
 ## 11) GitHub automation files
 - Keep Copilot guidance in `.github/copilot-instructions.md`.
 - Keep role-specific agent specs in `.github/agents/`.
+- Keep path-specific Copilot rules in `.github/instructions/*.instructions.md` using `applyTo`.
 - Ensure agent specs define scope, prohibited actions, validation, and output contract.
 
 ## 12) Repository-local skills
 - Place project-specific skills under `skills/<skill-name>/SKILL.md`.
+- Keep skill metadata concise and trigger-oriented; move long details into `references/`.
 - Prefer narrow skills that automate repeatable tasks (diagnostics, release prep, docs sync).
 - Reuse scripts/templates from a skill directory instead of duplicating long instructions.
