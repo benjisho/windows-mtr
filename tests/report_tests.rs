@@ -20,8 +20,7 @@ fn test_report_format() {
     // Verify the first line contains our banner
     assert!(
         stdout.contains("windows-mtr by Benji Shohet"),
-        "Output should contain banner: {}",
-        stdout
+        "Output should contain banner: {stdout}",
     );
 
     // Verify the report format
@@ -106,6 +105,8 @@ fn test_fixture_structure() {
 
     assert!(!hop_lines.is_empty(), "Fixture should contain hop lines");
 
+    let hop_pattern = Regex::new(r"^\s*(\d+)\.\|--").unwrap();
+
     for line in hop_lines {
         // Verify each hop line has data in the expected positions
         assert!(line.len() > loss_pos, "Line should contain Loss% data");
@@ -114,11 +115,9 @@ fn test_fixture_structure() {
         assert!(line.len() > avg_pos, "Line should contain Avg data");
 
         // Extract and verify hop number format
-        let hop_pattern = Regex::new(r"^\s*(\d+)\.\|--").unwrap();
         assert!(
             hop_pattern.is_match(line),
-            "Hop line should start with hop number: {}",
-            line
+            "Hop line should start with hop number: {line}",
         );
     }
 }

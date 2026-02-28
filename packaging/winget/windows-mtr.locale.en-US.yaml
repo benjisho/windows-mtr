@@ -1,0 +1,10 @@
+PackageIdentifier: benjisho.windows-mtr
+PackageVersion: 2.0.0
+PackageLocale: en-US
+Publisher: Benji Shohet
+PackageName: windows-mtr
+ShortDescription: Windows-native drop-in replacement for Linux mtr with embedded Trippy runtime.
+License: Apache-2.0
+LicenseUrl: https://github.com/benjisho/windows-mtr/blob/main/LICENSE
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
