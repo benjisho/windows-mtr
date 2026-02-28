@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Trippy integration to `trippy`/`trippy-tui` 0.13.0.
 - Updated documentation and roadmap to reflect delivered v2.0 capabilities.
 
+### Fixed
+- Hardened security workflow with a pinned Rust toolchain, explicit `cargo-deny` policy file, and an always-on GitHub Actions job summary.
+
 ## [1.1.2] - 2025-05-04
 
 ### Fixed

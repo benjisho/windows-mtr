@@ -10,9 +10,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: EmbarkStudios/cargo-deny-action@v2
+
+      - name: Set up Rust 1.88.0
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+
+      - name: Run cargo-deny
+        id: cargo_deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          rust-version: 1.88.0
+          command: check
+          arguments: --all-features
+          manifest-path: ./Cargo.toml
+          log-level: warn
+
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
+
       - name: Run cargo audit
+        id: cargo_audit
         run: cargo audit
+
+      - name: Security summary
+        if: always()
+        run: |
+          {
+            echo "## Security workflow summary"
+            echo ""
+            echo "- cargo-deny: ${{ steps.cargo_deny.outcome }}"
+            echo "- cargo-audit: ${{ steps.cargo_audit.outcome }}"
+            echo ""
+            echo "### Notes"
+            echo "- cargo-deny config: \`deny.toml\`"
+            echo "- Rust toolchain pinned to 1.88.0 for security checks"
+          } >> "$GITHUB_STEP_SUMMARY"
