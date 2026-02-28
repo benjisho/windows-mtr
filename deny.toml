@@ -1,0 +1,40 @@
+# cargo-deny configuration for windows-mtr
+# https://embarkstudios.github.io/cargo-deny/
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+# Keep confidence high to reduce false positives from fuzzy matching.
+confidence-threshold = 0.9
+# Allow common permissive licenses used by current dependency tree.
+allow = [
+  "Apache-2.0",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+  "MPL-2.0",
+  "Unlicense",
+]
+# Fail closed for unknown licensing metadata.
+private = { ignore = false }
+
+[bans]
+version = 1
+multiple-versions = "warn"
+wildcards = "deny"
+highlights = "all"
+
+[sources]
+version = 2
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
