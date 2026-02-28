@@ -26,7 +26,9 @@ pub enum MtrError {
     TrippyExecutionFailed(String),
 
     /// Insufficient privileges
-    #[error("Administrator privileges are required to run traceroute\n\nPlease right-click on the command prompt/terminal and select 'Run as administrator' before running windows-mtr.")]
+    #[error(
+        "Administrator privileges are required to run traceroute\n\nPlease right-click on the command prompt/terminal and select 'Run as administrator' before running windows-mtr."
+    )]
     InsufficientPrivileges,
 
     /// Invalid command-line options

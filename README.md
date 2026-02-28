@@ -114,34 +114,28 @@ Follow these steps to compile the Windows MTR executable:
 
 1. Install [Rust](https://www.rust-lang.org/tools/install) with **rustup**.
 2. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) and select the **Desktop development with C++** workload.
-3. Install the `trippy` binary so it is available in your `PATH`:
-   
-   ```bash
-   cargo install trippy
-   ```
-   
-   *(Alternatively download `trip.exe` from GitHub Releases.)*
-
-4. Clone this repository and change into the project directory:
+3. Clone this repository and change into the project directory:
 
    ```bash
    git clone https://github.com/benjisho/windows-mtr.git
    cd windows-mtr
    ```
 
-5. *(Optional)* Generate a lockfile if you need to build offline:
+4. *(Optional)* Generate a lockfile if you need to build offline:
 
    ```bash
    cargo generate-lockfile
    ```
 
-6. Compile in release mode:
+5. Compile in release mode:
 
    ```bash
    cargo build --release
    ```
 
-7. After a successful build the binary is located at `target\release\mtr.exe`. Run it from an elevated command prompt as shown below.
+6. After a successful build the binary is located at `target\release\mtr.exe`.
+
+The resulting executable is now **self-contained** and embeds Trippy directly (no external `trip.exe` required).
 
 ## 🚀 Quick Start
 
@@ -163,6 +157,12 @@ mtr 8.8.8.8
 
 ```bash
 mtr -c 10 -r 8.8.8.8 > network-report.txt
+```
+
+### Generate JSON for automation
+
+```bash
+mtr --json -c 20 8.8.8.8 > network-report.json
 ```
 
 ### Test HTTPS Connectivity
@@ -287,14 +287,19 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
   <td>v1.0.0</td>
 </tr>
 <tr>
-  <td>JSON Output</td>
-  <td>🚧 In Development</td>
-  <td>Q3 2025</td>
+  <td>Single portable executable</td>
+  <td>✅ Released</td>
+  <td>v2.0.0</td>
 </tr>
 <tr>
-  <td>DNS Caching</td>
-  <td>🚧 In Development</td>
-  <td>Q3 2025</td>
+  <td>JSON Output</td>
+  <td>✅ Released</td>
+  <td>v2.0.0</td>
+</tr>
+<tr>
+  <td>DNS Caching (TTL)</td>
+  <td>✅ Released</td>
+  <td>v2.0.0</td>
 </tr>
 <tr>
   <td>REST API</td>

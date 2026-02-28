@@ -11,7 +11,7 @@ fn main() {
     ];
 
     for module in modules {
-        println!("- {}", module);
+        println!("- {module}");
     }
 
     // Print some information about the trippy version

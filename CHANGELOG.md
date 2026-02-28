@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-02-28
+
+### Added
+- Embedded Trippy runtime inside `mtr.exe`, removing the external `trip.exe` runtime dependency.
+- Added JSON output flags: `-j/--json` and `--json-pretty`.
+- Added Linux-parity/high-impact flags: `-b/--show-asn`, `-s/--packet-size`, `-S/--src`, `-z`, `--ecmp`, `-w/--report-wide`, `--interface`, and `--source-port`.
+- Added DNS cache TTL control with `--dns-cache-ttl`.
+- Added power-user passthrough with `--trippy-flags "..."`.
+- Added Linux mtr vs windows-mtr vs trippy mapping table in `USAGE.md`.
+
+### Changed
+- Updated to Rust 2024 edition.
+- Updated Trippy integration to `trippy`/`trippy-tui` 0.13.0.
+- Updated documentation and roadmap to reflect delivered v2.0 capabilities.
+
 ## [1.1.2] - 2025-05-04
 
 ### Fixed
