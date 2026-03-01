@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Hardened security workflow with a pinned Rust toolchain, explicit `cargo-deny` policy file, and an always-on GitHub Actions job summary.
+- Tuned `cargo-deny` policy to handle known transitive advisories and unavoidable duplicate crates in the Trippy 0.13 dependency graph.
 
 ## [1.1.2] - 2025-05-04
 
