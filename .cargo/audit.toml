@@ -1,0 +1,9 @@
+[advisories]
+ignore = [
+  # Transitive via trippy-tui -> maxminddb; fix requires upstream trippy-tui bump.
+  "RUSTSEC-2025-0132",
+  # Transitive via ratatui/trippy stack; upstream replacement pending.
+  "RUSTSEC-2024-0436",
+  # Transitive via ratatui -> lru; upstream ratatui/trippy bump required.
+  "RUSTSEC-2026-0002",
+]
