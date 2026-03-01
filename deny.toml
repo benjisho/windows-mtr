@@ -10,9 +10,7 @@ ignore = []
 
 [licenses]
 version = 2
-# Keep confidence high to reduce false positives from fuzzy matching.
 confidence-threshold = 0.9
-# Allow common permissive licenses used by current dependency tree.
 allow = [
   "Apache-2.0",
   "MIT",
@@ -24,17 +22,14 @@ allow = [
   "MPL-2.0",
   "Unlicense",
 ]
-# Fail closed for unknown licensing metadata.
 private = { ignore = false }
 
 [bans]
-version = 1
 multiple-versions = "warn"
 wildcards = "deny"
-highlights = "all"
+highlight = "all"
 
 [sources]
-version = 2
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
