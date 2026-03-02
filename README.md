@@ -4,19 +4,33 @@
   <img src="assets/banner.png" alt="Windows MTR Banner" width="80%">
   <h3>Enterprise-grade network diagnostics for Windows environments</h3>
 
-  ![CI](https://github.com/benjisho/windows-mtr/workflows/CI/badge.svg)
-  ![Release](https://github.com/benjisho/windows-mtr/workflows/Release/badge.svg)
-  ![Security](https://github.com/benjisho/windows-mtr/workflows/Security/badge.svg)
-  ![Coverage](https://github.com/benjisho/windows-mtr/workflows/Coverage/badge.svg)
+  [![CI](https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml)
+  [![Release](https://github.com/benjisho/windows-mtr/actions/workflows/release.yml/badge.svg?branch=master)](https://github.com/benjisho/windows-mtr/actions/workflows/release.yml)
+  [![Security](https://github.com/benjisho/windows-mtr/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/benjisho/windows-mtr/actions/workflows/security.yml)
+  [![Windows Build](https://github.com/benjisho/windows-mtr/actions/workflows/windows-build.yml/badge.svg)](https://github.com/benjisho/windows-mtr/actions/workflows/windows-build.yml)
   [![Version](https://img.shields.io/github/v/release/benjisho/windows-mtr?color=blue&label=Version)](https://github.com/benjisho/windows-mtr/releases)
   [![Downloads](https://img.shields.io/github/downloads/benjisho/windows-mtr/total?color=green&label=Downloads)](https://github.com/benjisho/windows-mtr/releases)
   [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
-  [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://github.com/benjisho/windows-mtr/blob/main/USAGE.md)
+  [![Usage Guide](https://img.shields.io/badge/usage-guide-blue.svg)](USAGE.md)
 </div>
 
 ---
 
 Windows MTR is an enterprise-grade network diagnostics tool that brings the power of Linux's MTR utility to Windows environments with a focus on performance, security, and reliability. Built by Benji Shohet (benjisho) with enterprise-level best practices.
+
+## 📚 Table of Contents
+
+- [🌟 Features](#-features)
+- [📊 Performance](#-performance)
+- [🔐 Security](#-security)
+- [💻 Installation](#-installation)
+- [🚀 Quick Start](#-quick-start)
+- [📈 Advanced Features](#-advanced-features)
+- [📋 Documentation](#-documentation)
+- [📊 Project Status & Roadmap](#-project-status--roadmap)
+- [🤝 Contributing](#-contributing)
+- [📜 License](#-license)
+- [🙏 Acknowledgements](#-acknowledgements)
 
 ## 🌟 Features
 
@@ -78,6 +92,9 @@ Windows MTR is built with enterprise-level security practices:
 
 ## 💻 Installation
 
+> [!TIP]
+> For most users, the best path is: **GitHub Releases → MSI installer → Run as Administrator**.
+
 ### Windows
 
 #### Professional Installation (Recommended)
@@ -107,6 +124,9 @@ docker pull ghcr.io/benjisho/windows-mtr:latest
 # Run with direct networking
 docker run --network host ghcr.io/benjisho/windows-mtr -c 5 -r 8.8.8.8
 ```
+
+> [!NOTE]
+> Windows container networking can vary by environment. If `--network host` is not available in your setup, run the binary directly on the host for full probe capability.
 
 ### Build from Source on Windows
 
@@ -151,6 +171,12 @@ Windows MTR requires administrator privileges to run properly, as it needs to se
 
 ```bash
 mtr 8.8.8.8
+```
+
+### Report mode with DNS disabled (faster + script-friendly)
+
+```bash
+mtr -n -r -c 20 1.1.1.1
 ```
 
 ### Generate a Shareable Report
