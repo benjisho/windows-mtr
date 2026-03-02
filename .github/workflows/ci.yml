@@ -81,7 +81,25 @@ jobs:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
+      - name: Detect whether stable equals MSRV
+        id: stable_version_check
+        shell: pwsh
+        run: |
+          $stable = (rustc --version)
+          $msrv = "1.88.0"
+
+          if ($stable -match "^rustc\s+$([regex]::Escape($msrv))(\s|$)") {
+            "skip=true" >> $env:GITHUB_OUTPUT
+            "stable_version=$stable" >> $env:GITHUB_OUTPUT
+            echo "Stable toolchain matches MSRV ($msrv). Skipping duplicate stable test lane; already covered by CI / Test (..., 1.88.0)." >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            "skip=false" >> $env:GITHUB_OUTPUT
+            "stable_version=$stable" >> $env:GITHUB_OUTPUT
+            echo "Stable toolchain differs from MSRV ($msrv): $stable" >> $env:GITHUB_STEP_SUMMARY
+          }
+
       - name: Cache Rust dependencies
+        if: steps.stable_version_check.outputs.skip != 'true'
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -93,21 +111,25 @@ jobs:
           cache-on-failure: true
 
       - name: Check
+        if: steps.stable_version_check.outputs.skip != 'true'
         run: cargo check --all-targets
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Run clippy
+        if: steps.stable_version_check.outputs.skip != 'true'
         run: cargo clippy --all-targets -- -D warnings
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Build
+        if: steps.stable_version_check.outputs.skip != 'true'
         run: cargo build --all-targets
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Run tests
+        if: steps.stable_version_check.outputs.skip != 'true'
         run: cargo test --all
         env:
           CARGO_INCREMENTAL: 0
