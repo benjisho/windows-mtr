@@ -132,7 +132,7 @@ docker run --network host ghcr.io/benjisho/windows-mtr -c 5 -r 8.8.8.8
 
 Follow these steps to compile the Windows MTR executable:
 
-1. Install [Rust](https://www.rust-lang.org/tools/install) with **rustup**.
+1. Install [Rust](https://www.rust-lang.org/tools/install) with **rustup** (Rust **1.88.0+** required).
 2. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) and select the **Desktop development with C++** workload.
 3. Clone this repository and change into the project directory:
 
