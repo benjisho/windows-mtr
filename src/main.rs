@@ -1,8 +1,9 @@
 use anyhow::Context;
 use clap::Parser;
 use std::env;
+use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
-use std::process::{self, Command};
+use std::process::{self, Command, Stdio};
 
 mod error;
 use error::{MtrError, Result};
@@ -108,6 +109,25 @@ struct Cli {
     trippy_flags: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum JsonFormat {
+    Compact,
+    Pretty,
+}
+
+fn json_format_from_args(args: &Cli) -> Option<JsonFormat> {
+    if args.json {
+        Some(JsonFormat::Compact)
+    } else if args.json_pretty {
+        Some(JsonFormat::Pretty)
+    } else {
+        None
+    }
+}
+
+fn should_print_banner(args: &Cli) -> bool {
+    json_format_from_args(args).is_none()
+}
 fn print_banner() {
     println!("windows-mtr by Benji Shohet (benjisho) — https://github.com/benjisho/windows-mtr");
 }
@@ -138,7 +158,7 @@ fn verify_options(args: &Cli) -> Result<()> {
 }
 
 fn mode_from_args(args: &Cli) -> &'static str {
-    if args.json || args.json_pretty {
+    if json_format_from_args(args).is_some() {
         "json"
     } else if args.report || args.report_wide {
         "pretty"
@@ -236,8 +256,34 @@ fn build_embedded_trippy_args(args: &Cli, host: &str) -> Result<Vec<String>> {
     Ok(trippy_args)
 }
 
-fn run_embedded_trippy(args: &[String]) -> anyhow::Result<i32> {
+fn run_embedded_trippy(args: &[String], json_format: Option<JsonFormat>) -> anyhow::Result<i32> {
     let current_exe = env::current_exe().context("failed to locate current executable")?;
+
+    if let Some(format) = json_format {
+        let output = Command::new(&current_exe)
+            .env(EMBEDDED_TRIPPY_ENV, "1")
+            .args(args.iter().skip(1))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .output()
+            .context("failed to launch embedded trippy runner")?;
+
+        match format {
+            JsonFormat::Compact => {
+                let value: serde_json::Value = serde_json::from_slice(&output.stdout)
+                    .context("failed to parse trippy JSON output")?;
+                serde_json::to_writer(std::io::stdout(), &value)
+                    .context("failed to write compact JSON output")?;
+                std::io::stdout().write_all(b"\n")?;
+            }
+            JsonFormat::Pretty => {
+                std::io::stdout().write_all(&output.stdout)?;
+            }
+        }
+
+        return Ok(output.status.code().unwrap_or(2));
+    }
+
     let status = Command::new(current_exe)
         .env(EMBEDDED_TRIPPY_ENV, "1")
         .args(args.iter().skip(1))
@@ -251,9 +297,11 @@ fn main() -> anyhow::Result<()> {
         return trippy_tui::trippy();
     }
 
-    print_banner();
-
     let args = Cli::parse();
+
+    if should_print_banner(&args) {
+        print_banner();
+    }
     verify_options(&args)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .context("invalid command-line options")?;
@@ -266,7 +314,7 @@ fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .context("failed to translate windows-mtr options into trippy options")?;
 
-    let code = run_embedded_trippy(&trippy_args)?;
+    let code = run_embedded_trippy(&trippy_args, json_format_from_args(&args))?;
     process::exit(code);
 }
 
@@ -427,5 +475,21 @@ mod tests {
 
         let trippy_args = build_embedded_trippy_args(&args, "8.8.8.8").expect("args should build");
         assert_eq!(trippy_args, vec!["mtr", "--mode", "json", "8.8.8.8"]);
+    }
+    #[test]
+    fn should_not_print_banner_for_json_modes() {
+        let mut args = base_cli();
+        args.json = true;
+        assert!(!should_print_banner(&args));
+
+        let mut args = base_cli();
+        args.json_pretty = true;
+        assert!(!should_print_banner(&args));
+    }
+
+    #[test]
+    fn should_print_banner_for_non_json_modes() {
+        let args = base_cli();
+        assert!(should_print_banner(&args));
     }
 }
