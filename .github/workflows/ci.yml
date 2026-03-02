@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
-        rust: [stable, 1.74.0]  # Test on stable and MSRV
+        rust: [stable, 1.88.0]  # Test on stable and declared MSRV (Cargo.toml rust-version)
       fail-fast: false  # Continue with other jobs if one fails
 
     steps:
