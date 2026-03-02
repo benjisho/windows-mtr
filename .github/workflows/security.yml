@@ -4,6 +4,13 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [ master ]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "deny.toml"
+      - "src/**"
+      - "xtask/**"
+      - ".github/workflows/security.yml"
   push:
     branches: [ master ]
 
