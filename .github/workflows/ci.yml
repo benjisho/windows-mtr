@@ -11,9 +11,35 @@ permissions:
   contents: read
 
 jobs:
+  resolve-msrv:
+    name: Resolve MSRV from Cargo.toml
+    runs-on: ubuntu-latest
+    outputs:
+      msrv: ${{ steps.resolve.outputs.msrv }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve rust-version from Cargo.toml
+        id: resolve
+        shell: bash
+        run: |
+          msrv=$(python3 - <<'PY2'
+          import re
+          from pathlib import Path
+          text = Path('Cargo.toml').read_text(encoding='utf-8')
+          m = re.search(r'^rust-version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"', text, re.M)
+          if not m:
+              raise SystemExit('Unable to resolve rust-version from Cargo.toml')
+          print(m.group(1))
+          PY2
+          )
+          echo "msrv=$msrv" >> "$GITHUB_OUTPUT"
+
   test-msrv:
-    name: Test (${{ matrix.os }}, 1.88.0)
+    name: Test (${{ matrix.os }}, msrv=${{ needs.resolve-msrv.outputs.msrv }})
     runs-on: ${{ matrix.os }}
+    needs: resolve-msrv
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -26,7 +52,7 @@ jobs:
       - name: Setup Rust (MSRV)
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: ${{ needs.resolve-msrv.outputs.msrv }}
           components: clippy
           targets: x86_64-pc-windows-msvc
 
@@ -34,7 +60,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' }}
-          shared-key: "rust-${{ matrix.os }}-1.88.0"
+          shared-key: "rust-${{ matrix.os }}-msrv-${{ needs.resolve-msrv.outputs.msrv }}"
           cache-directories: |
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
@@ -86,12 +112,12 @@ jobs:
         shell: pwsh
         run: |
           $stable = (rustc --version)
-          $msrv = "1.88.0"
+          $msrv = "${{ needs.resolve-msrv.outputs.msrv }}"
 
           if ($stable -match "^rustc\s+$([regex]::Escape($msrv))(\s|$)") {
             "skip=true" >> $env:GITHUB_OUTPUT
             "stable_version=$stable" >> $env:GITHUB_OUTPUT
-            echo "Stable toolchain matches MSRV ($msrv). Skipping duplicate stable test lane; already covered by CI / Test (..., 1.88.0)." >> $env:GITHUB_STEP_SUMMARY
+            echo "Stable toolchain matches MSRV ($msrv). Skipping duplicate stable test lane; already covered by CI / Test (..., msrv=$msrv)." >> $env:GITHUB_STEP_SUMMARY
           } else {
             "skip=false" >> $env:GITHUB_OUTPUT
             "stable_version=$stable" >> $env:GITHUB_OUTPUT
