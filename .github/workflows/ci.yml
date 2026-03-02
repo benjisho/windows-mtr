@@ -16,11 +16,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       msrv: ${{ steps.resolve.outputs.msrv }}
+      stable_version: ${{ steps.resolve.outputs.stable_version }}
+      run_stable: ${{ steps.resolve.outputs.run_stable }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Resolve rust-version from Cargo.toml
+      - name: Resolve rust-version from Cargo.toml and stable toolchain version
         id: resolve
         shell: bash
         run: |
@@ -34,7 +36,25 @@ jobs:
           print(m.group(1))
           PY2
           )
+
+          rustup toolchain install stable --profile minimal
+          stable_version=$(rustc +stable --version | sed -E 's/^rustc ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+
+          if [ "$stable_version" = "$msrv" ]; then
+            run_stable=false
+          else
+            run_stable=true
+          fi
+
           echo "msrv=$msrv" >> "$GITHUB_OUTPUT"
+          echo "stable_version=$stable_version" >> "$GITHUB_OUTPUT"
+          echo "run_stable=$run_stable" >> "$GITHUB_OUTPUT"
+
+          if [ "$run_stable" = "false" ]; then
+            echo "Stable toolchain ($stable_version) matches MSRV ($msrv). Skipping CI / Test (..., stable) because CI / Test (..., msrv=$msrv) already validated this version." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Stable toolchain ($stable_version) differs from MSRV ($msrv). Running CI / Test (..., stable)." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   test-msrv:
     name: Test (${{ matrix.os }}, msrv=${{ needs.resolve-msrv.outputs.msrv }})
@@ -90,7 +110,8 @@ jobs:
   test-stable:
     name: Test (${{ matrix.os }}, stable)
     runs-on: ${{ matrix.os }}
-    needs: test-msrv
+    needs: [resolve-msrv, test-msrv]
+    if: needs.resolve-msrv.outputs.run_stable == 'true'
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -107,25 +128,7 @@ jobs:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
-      - name: Detect whether stable equals MSRV
-        id: stable_version_check
-        shell: pwsh
-        run: |
-          $stable = (rustc --version)
-          $msrv = "${{ needs.resolve-msrv.outputs.msrv }}"
-
-          if ($stable -match "^rustc\s+$([regex]::Escape($msrv))(\s|$)") {
-            "skip=true" >> $env:GITHUB_OUTPUT
-            "stable_version=$stable" >> $env:GITHUB_OUTPUT
-            echo "Stable toolchain matches MSRV ($msrv). Skipping duplicate stable test lane; already covered by CI / Test (..., msrv=$msrv)." >> $env:GITHUB_STEP_SUMMARY
-          } else {
-            "skip=false" >> $env:GITHUB_OUTPUT
-            "stable_version=$stable" >> $env:GITHUB_OUTPUT
-            echo "Stable toolchain differs from MSRV ($msrv): $stable" >> $env:GITHUB_STEP_SUMMARY
-          }
-
       - name: Cache Rust dependencies
-        if: steps.stable_version_check.outputs.skip != 'true'
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' }}
@@ -137,25 +140,21 @@ jobs:
           cache-on-failure: true
 
       - name: Check
-        if: steps.stable_version_check.outputs.skip != 'true'
         run: cargo check --all-targets
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Run clippy
-        if: steps.stable_version_check.outputs.skip != 'true'
         run: cargo clippy --all-targets -- -D warnings
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Build
-        if: steps.stable_version_check.outputs.skip != 'true'
         run: cargo build --all-targets
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Run tests
-        if: steps.stable_version_check.outputs.skip != 'true'
         run: cargo test --all
         env:
           CARGO_INCREMENTAL: 0
@@ -164,8 +163,8 @@ jobs:
   build-pr-binaries:
     name: Build PR Binaries
     runs-on: windows-latest
-    needs: test-stable
-    if: github.event_name == 'pull_request'
+    needs: [test-msrv, test-stable]
+    if: github.event_name == 'pull_request' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
     permissions:
       contents: read
       issues: write
