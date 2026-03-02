@@ -289,17 +289,17 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 <tr>
   <td>Single portable executable</td>
   <td>✅ Released</td>
-  <td>v2.0.0</td>
+  <td>v1.1.3</td>
 </tr>
 <tr>
   <td>JSON Output</td>
   <td>✅ Released</td>
-  <td>v2.0.0</td>
+  <td>v1.1.3</td>
 </tr>
 <tr>
   <td>DNS Caching (TTL)</td>
   <td>✅ Released</td>
-  <td>v2.0.0</td>
+  <td>v1.1.3</td>
 </tr>
 <tr>
   <td>REST API</td>
