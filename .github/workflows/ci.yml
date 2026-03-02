@@ -3,9 +3,9 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [ master, main ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ master ]
 
 jobs:
   test:
@@ -32,7 +32,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-${{ matrix.os }}-${{ matrix.rust }}"
           cache-directories: |
             ~/.cargo/registry/index
@@ -84,7 +84,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          save-if: false # Only save cache for main branch builds
+          save-if: false # Only save cache for master branch builds
           shared-key: "rust-${{ matrix.os }}-${{ matrix.rust }}"
           cache-directories: |
             ~/.cargo/registry/index
