@@ -1,17 +1,13 @@
 name: Release
 
 on:
+  workflow_dispatch:
   # Trigger on push to master branch
   push:
     branches:
       - master
     tags:
       - 'v*.*.*'
-  
-  # Trigger on pull requests targeting master branch
-  pull_request:
-    branches:
-      - master
 
 jobs:
   build:
