@@ -176,9 +176,21 @@ fn duration_seconds(value: f32) -> String {
 }
 
 fn parse_passthrough_flags(flags: &str) -> Result<Vec<String>> {
-    shlex::split(flags).ok_or_else(|| {
+    let parsed = shlex::split(flags).ok_or_else(|| {
         MtrError::InvalidOption("--trippy-flags contains invalid shell quoting".to_string())
-    })
+    })?;
+
+    // Windows shells sometimes preserve wrapping quotes around the entire passthrough
+    // string, which can produce a single token like "--flag value". Split that token
+    // into distinct args so trippy receives valid argv entries.
+    if parsed.len() == 1 {
+        let token = &parsed[0];
+        if token.starts_with("--") && token.contains(' ') {
+            return Ok(token.split_whitespace().map(ToString::to_string).collect());
+        }
+    }
+
+    Ok(parsed)
 }
 
 fn build_embedded_trippy_args(args: &Cli, host: &str) -> Result<Vec<String>> {
@@ -202,7 +214,6 @@ fn build_embedded_trippy_args(args: &Cli, host: &str) -> Result<Vec<String>> {
 
     if let Some(count) = args.count {
         trippy_args.extend(["--report-cycles".to_string(), count.to_string()]);
-        trippy_args.extend(["--max-rounds".to_string(), count.to_string()]);
     }
 
     if let Some(interval) = args.interval {
@@ -398,6 +409,13 @@ mod tests {
     }
 
     #[test]
+    fn parse_passthrough_flags_splits_single_quoted_token() {
+        let parsed =
+            parse_passthrough_flags("\"--tui-refresh-rate 150ms\"").expect("flags should parse");
+        assert_eq!(parsed, vec!["--tui-refresh-rate", "150ms"]);
+    }
+
+    #[test]
     fn build_embedded_trippy_args_maps_core_flags() {
         let args = Cli {
             host: "example.com".to_string(),
@@ -438,8 +456,6 @@ mod tests {
                 "--source-port",
                 "50000",
                 "--report-cycles",
-                "10",
-                "--max-rounds",
                 "10",
                 "--min-round-duration",
                 "0.5s",
