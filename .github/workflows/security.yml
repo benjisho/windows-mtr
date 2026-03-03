@@ -25,6 +25,14 @@ jobs:
         with:
           toolchain: 1.88.0
 
+      - name: Cache Cargo dependencies and installed binaries
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+          shared-key: "rust-security-1.88.0"
+          cache-bin: true
+          cache-on-failure: true
+
       - name: Run cargo-deny
         id: cargo_deny
         uses: EmbarkStudios/cargo-deny-action@v2
