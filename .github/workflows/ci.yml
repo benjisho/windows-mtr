@@ -165,7 +165,7 @@ jobs:
 
 
   docker-build-amd64:
-    name: Docker Build (linux/amd64)
+    name: Test (docker, linux/amd64)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
