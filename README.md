@@ -127,7 +127,7 @@ docker pull ghcr.io/benjisho/windows-mtr:v1.0.0
 docker run --network host ghcr.io/benjisho/windows-mtr:latest -c 5 -r 8.8.8.8
 ```
 
-Container images are published to GHCR from the `Release` workflow for `master` (`latest`) and version tags (`v*.*.*`).
+Container images are published to GHCR from the `Release` workflow as both `latest` (from `master`) and explicit release tags like `v1.2.3`.
 
 > [!NOTE]
 > Windows container networking can vary by environment. If `--network host` is not available in your setup, run the binary directly on the host for full probe capability.
