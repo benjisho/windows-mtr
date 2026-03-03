@@ -7,7 +7,6 @@
   [![CI](https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml/badge.svg)](https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml)
   [![Release](https://github.com/benjisho/windows-mtr/actions/workflows/release.yml/badge.svg?branch=master)](https://github.com/benjisho/windows-mtr/actions/workflows/release.yml)
   [![Security](https://github.com/benjisho/windows-mtr/actions/workflows/security.yml/badge.svg)](https://github.com/benjisho/windows-mtr/actions/workflows/security.yml)
-  [![Windows Build](https://github.com/benjisho/windows-mtr/actions/workflows/windows-build.yml/badge.svg)](https://github.com/benjisho/windows-mtr/actions/workflows/windows-build.yml)
   [![Version](https://img.shields.io/github/v/release/benjisho/windows-mtr?color=blue&label=Version)](https://github.com/benjisho/windows-mtr/releases)
   [![Stars](https://img.shields.io/github/stars/benjisho/windows-mtr?style=flat&label=Stars)](https://github.com/benjisho/windows-mtr/stargazers)
   [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
