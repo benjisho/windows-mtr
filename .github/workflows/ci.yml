@@ -99,11 +99,6 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
 
-      - name: Build
-        run: cargo build --all-targets
-        env:
-          CARGO_INCREMENTAL: 0
-
       - name: Run tests
         run: cargo test --all
         env:
@@ -150,11 +145,6 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --all-targets -- -D warnings
-        env:
-          CARGO_INCREMENTAL: 0
-
-      - name: Build
-        run: cargo build --all-targets
         env:
           CARGO_INCREMENTAL: 0
 
@@ -217,7 +207,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           save-if: false # Only save cache for master branch builds
-          shared-key: "rust-windows-pr"
+          # Restore from the trusted Windows stable cache populated on master.
+          # This avoids cold-start PR builds while keeping PR cache writes disabled.
+          shared-key: "rust-windows-latest-stable"
           cache-bin: true
           cache-directories: |
             ~/.cargo/registry/index
@@ -225,35 +217,25 @@ jobs:
             ~/.cargo/git
           cache-on-failure: true
 
-      - name: Install trippy
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@cargo-binstall
+
+      - name: Install trippy (prebuilt binary)
         run: |
-          echo "Installing trippy..."
-          cargo install trippy --locked
-          
+          echo "Installing trippy prebuilt binary..."
+          cargo binstall trippy --no-confirm --locked
+
           # Verify installation and find location (trippy installs as trip.exe on Windows)
           $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
-          
+
           if (Test-Path $trippyPath) {
             echo "Trippy successfully installed as trip.exe at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
           } else {
-            # Try to find it using where command as fallback
-            try {
-              $whereResult = where.exe trip
-              if ($whereResult) {
-                echo "Found trip.exe via where command at: $whereResult"
-                echo "TRIPPY_PATH=$whereResult" >> $env:GITHUB_ENV
-              } else {
-                throw "trip.exe not found via where command"
-              }
-            } catch {
-              Write-Error "Could not find trip.exe executable after installation. Please check PATH variables and cargo installation."
-              exit 1
-            }
+            Write-Error "Could not find trip.exe executable after cargo binstall."
+            exit 1
           }
         shell: pwsh
-        env:
-          CARGO_INCREMENTAL: 0
 
       - name: Build release binary
         run: cargo build --release --target x86_64-pc-windows-msvc
