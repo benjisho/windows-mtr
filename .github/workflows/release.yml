@@ -8,6 +8,10 @@ on:
       - master
     tags:
       - 'v*.*.*'
+    paths-ignore:
+      - '**/*.md'
+      - '**/.gitignore'
+      - '.gitignore'
 
 permissions:
   contents: read

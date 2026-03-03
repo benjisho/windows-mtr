@@ -13,6 +13,14 @@ on:
       - ".github/workflows/security.yml"
   push:
     branches: [ master ]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'deny.toml'
+      - '.cargo/audit.toml'
+      - 'src/**'
+      - 'xtask/**'
+      - '.github/workflows/security.yml'
 
 jobs:
   cargo-security:
