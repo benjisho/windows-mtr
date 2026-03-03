@@ -120,9 +120,14 @@ Windows MTR is built with enterprise-level security practices:
 # Pull the latest Windows MTR container
 docker pull ghcr.io/benjisho/windows-mtr:latest
 
+# Or pin to a release tag
+docker pull ghcr.io/benjisho/windows-mtr:v1.0.0
+
 # Run with direct networking
-docker run --network host ghcr.io/benjisho/windows-mtr -c 5 -r 8.8.8.8
+docker run --network host ghcr.io/benjisho/windows-mtr:latest -c 5 -r 8.8.8.8
 ```
+
+Container images are published to GHCR from the `Release` workflow as both `latest` (from `master`) and explicit release tags like `v1.2.3` for `linux/amd64` and `linux/arm64`.
 
 > [!NOTE]
 > Windows container networking can vary by environment. If `--network host` is not available in your setup, run the binary directly on the host for full probe capability.
