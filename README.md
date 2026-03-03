@@ -279,9 +279,11 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 ## 📋 Documentation
 
-- [📚 Full Documentation](#-documentation)
-- [🧩 API Reference](https://pkg.rs/crates/windows_mtr)
-- [📑 Usage Examples](USAGE.md)
+- [📚 Full Documentation Hub](docs/README.md)
+- [🧩 CLI/API Reference](docs/API.md)
+- [📑 Usage Examples](docs/USAGE.md)
+- [🛠️ Development Setup](DEVELOPMENT.md)
+- [🤝 Contributing Guide](CONTRIBUTING.md)
 - [🔄 Changelog](CHANGELOG.md)
 
 ## 📊 Project Status & Roadmap
