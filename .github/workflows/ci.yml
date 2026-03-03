@@ -163,12 +163,40 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
 
+
+  docker-build-amd64:
+    name: Test (docker, linux/amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: windows-mtr:ci-amd64
+          cache-from: type=gha,scope=windows-mtr-docker-amd64
+          cache-to: type=gha,mode=max,scope=windows-mtr-docker-amd64
+          provenance: false
+          sbom: false
+
+      - name: Smoke test container entrypoint
+        run: docker run --rm windows-mtr:ci-amd64 --help
+
   # New job to build binaries during pull requests for testing
   build-pr-binaries:
     name: Build PR Binaries
     runs-on: windows-latest
-    needs: [test-msrv, test-stable]
-    if: github.event_name == 'pull_request' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
+    needs: [test-msrv, test-stable, docker-build-amd64]
+    if: github.event_name == 'pull_request' && needs.docker-build-amd64.result == 'success' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
     permissions:
       contents: read
       issues: write
