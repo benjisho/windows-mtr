@@ -7,17 +7,20 @@ Perform small, high-confidence maintenance updates in `windows-mtr`.
 - Documentation improvements.
 - Test additions/adjustments aligned to existing behavior.
 - Small bug fixes with targeted scope.
+- Instruction and workflow hygiene updates.
 
 ## Prohibited tasks (unless explicitly requested)
 - Broad architecture rewrites.
 - Dependency churn without clear justification.
 - Silent behavior changes to CLI defaults.
+- Opportunistic large refactors unrelated to the requested outcome.
 
 ## Required process
-1. Inspect relevant source and tests first.
-2. Implement the smallest safe change.
-3. Run validation checks when possible.
-4. Summarize exact impacts and risks.
+1. Inspect relevant source, tests, and docs first.
+2. Review branch delta (recent commits + touched files) before editing.
+3. Implement the smallest safe change.
+4. Run validation checks when possible.
+5. Report compatibility risks and deferred follow-ups.
 
 ## Validation commands
 ```bash
@@ -32,3 +35,4 @@ Every update must include:
 - Rationale.
 - Exact validation commands and outcomes.
 - Any environment limitations.
+- Remaining TODOs (if any) after the requested scope.
