@@ -11,6 +11,9 @@
   [![Stars](https://img.shields.io/github/stars/benjisho/windows-mtr?style=flat&label=Stars)](https://github.com/benjisho/windows-mtr/stargazers)
   [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
   [![Usage Guide](https://img.shields.io/badge/usage-guide-blue.svg)](USAGE.md)
+
+  [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/benjisho)
+
 </div>
 
 ---
