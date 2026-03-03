@@ -13,8 +13,12 @@ FROM debian:trixie-slim AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 appuser \
+    && useradd --system --uid 10001 --gid appuser --home /nonexistent --shell /usr/sbin/nologin appuser
 
 COPY --from=builder /app/target/release/mtr /usr/local/bin/windows-mtr
+RUN ln -s /usr/local/bin/windows-mtr /usr/local/bin/mtr
 
+USER appuser
 ENTRYPOINT ["/usr/local/bin/windows-mtr"]
