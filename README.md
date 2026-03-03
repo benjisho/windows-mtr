@@ -279,8 +279,8 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 ## 📋 Documentation
 
-- [📚 Full Documentation](https://benjisho.github.io/windows-mtr/)
-- [🧩 API Reference](https://benjisho.github.io/windows-mtr/rustdoc/windows_mtr/)
+- [📚 Full Documentation](#-documentation)
+- [🧩 API Reference](https://pkg.rs/crates/windows_mtr)
 - [📑 Usage Examples](USAGE.md)
 - [🔄 Changelog](CHANGELOG.md)
 
@@ -341,7 +341,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 ## 🤝 Contributing
 
-We welcome contributions from the community! Check out our [contributing guidelines](https://benjisho.github.io/windows-mtr/contributing.html) to get started.
+We welcome contributions from the community! Check out our [contributing guidelines](CONTRIBUTING.md) to get started.
 
 ## 📜 License
 
