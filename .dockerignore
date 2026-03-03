@@ -1,0 +1,13 @@
+.git
+.github
+target
+.gitignore
+.DS_Store
+*.md
+assets
+packaging
+xtask
+skills
+tests
+examples
+docs
