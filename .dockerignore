@@ -1,0 +1,15 @@
+.git
+.github
+target
+.gitignore
+.DS_Store
+*.md
+assets
+packaging
+xtask/*
+!xtask/Cargo.toml
+!xtask/src/**
+skills
+tests
+examples
+docs
