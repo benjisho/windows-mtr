@@ -345,12 +345,42 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 <tr>
   <td>REST API</td>
   <td>📅 Planned</td>
-  <td>Q4 2025</td>
+  <td>H2 2026</td>
 </tr>
 <tr>
   <td>SNMP Integration</td>
   <td>📅 Planned</td>
-  <td>Q4 2025</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>Native Ratatui UI (tabs, hop table, charts)</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>ETW + Windows observability integrations</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>Versioned JSON schema + CSV export</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>Security hardening gates (cargo-audit + fuzz harness in CI)</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>Cross-platform probe parity/privilege smoke tests</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>CLI/runtime cleanup (unused error variants, banner polish)</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
 </tr>
 </table>
 
