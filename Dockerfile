@@ -9,7 +9,10 @@ COPY xtask/Cargo.toml ./xtask/Cargo.toml
 COPY xtask/src ./xtask/src
 COPY src ./src
 
-RUN cargo build --release --locked --bin mtr
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --locked --bin mtr
 
 FROM debian:trixie-slim AS runtime
 
