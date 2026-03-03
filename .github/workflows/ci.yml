@@ -4,8 +4,16 @@ on:
   workflow_dispatch:
   push:
     branches: [ master ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/.gitignore'
+      - '.gitignore'
   pull_request:
     branches: [ master ]
+    paths-ignore:
+      - '**/*.md'
+      - '**/.gitignore'
+      - '.gitignore'
 
 permissions:
   contents: read
