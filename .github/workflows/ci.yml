@@ -217,7 +217,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           save-if: false # Only save cache for master branch builds
-          shared-key: "rust-windows-pr"
+          # Restore from the trusted Windows stable cache populated on master.
+          # This avoids cold-start PR builds while keeping PR cache writes disabled.
+          shared-key: "rust-windows-latest-stable"
           cache-bin: true
           cache-directories: |
             ~/.cargo/registry/index
