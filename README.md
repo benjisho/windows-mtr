@@ -1,7 +1,7 @@
 # Windows MTR
 
 <div align="center">
-  <img src="assets/banner.png" alt="Windows MTR Banner" width="80%">
+  <img src="assets/windows-mtr-m.gif" alt="Windows MTR Banner" width="80%">
   <h3>Enterprise-grade network diagnostics for Windows environments</h3>
 
   [![CI](https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml/badge.svg)](https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml)
