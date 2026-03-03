@@ -412,7 +412,7 @@ jobs:
       # Create the GitHub release with only the official zip file
       - name: Create GitHub Release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/windows-mtr-official.zip
