@@ -60,9 +60,6 @@ jobs:
     name: Test (${{ matrix.os }}, msrv=${{ needs.resolve-msrv.outputs.msrv }})
     runs-on: ${{ matrix.os }}
     needs: resolve-msrv
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: sccache
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -79,8 +76,6 @@ jobs:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -119,9 +114,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [resolve-msrv, test-msrv]
     if: needs.resolve-msrv.outputs.run_stable == 'true'
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: sccache
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
@@ -138,8 +130,6 @@ jobs:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -179,9 +169,6 @@ jobs:
     runs-on: windows-latest
     needs: [test-msrv, test-stable]
     if: github.event_name == 'pull_request' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: sccache
     permissions:
       contents: read
       issues: write
@@ -196,8 +183,6 @@ jobs:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
 
       # Use advanced caching
       - name: Cache Rust dependencies
