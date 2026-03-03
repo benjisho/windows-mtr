@@ -13,6 +13,9 @@ jobs:
   build:
     name: Build and Test
     runs-on: windows-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,12 +26,16 @@ jobs:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       # Use the more efficient Rust caching
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') }}
           shared-key: "rust-windows-release"
+          cache-bin: true
           cache-directories: |
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
@@ -45,7 +52,7 @@ jobs:
       - name: Install trippy
         run: |
           echo "Installing trippy..."
-          cargo install trippy
+          cargo install trippy --locked
           
           # Verify installation and find location (trippy installs as trip.exe on Windows)
           $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
@@ -169,6 +176,9 @@ jobs:
     needs: build
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     # Add explicit permissions for creating releases
     permissions:
       contents: write  # Required for creating releases and uploading assets
@@ -182,12 +192,16 @@ jobs:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
       # Use the more efficient Rust caching
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') }}
           shared-key: "rust-windows-release"
+          cache-bin: true
           cache-directories: |
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
@@ -198,7 +212,7 @@ jobs:
       - name: Install trippy
         run: |
           echo "Installing trippy..."
-          cargo install trippy
+          cargo install trippy --locked
           
           # Verify installation and find location (trippy installs as trip.exe on Windows)
           $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
