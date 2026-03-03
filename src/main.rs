@@ -181,12 +181,15 @@ fn parse_passthrough_flags(flags: &str) -> Result<Vec<String>> {
     })?;
 
     // Windows shells sometimes preserve wrapping quotes around the entire passthrough
-    // string, which can produce a single token like "--flag value". Split that token
-    // into distinct args so trippy receives valid argv entries.
+    // string, which can produce a single token like "--flag value". Re-parse that token
+    // to preserve shell quoting semantics while still producing distinct argv entries.
     if parsed.len() == 1 {
         let token = &parsed[0];
         if token.starts_with("--") && token.contains(' ') {
-            return Ok(token.split_whitespace().map(ToString::to_string).collect());
+            let reparsed = shlex::split(token).ok_or_else(|| {
+                MtrError::InvalidOption("--trippy-flags contains invalid shell quoting".to_string())
+            })?;
+            return Ok(reparsed);
         }
     }
 
@@ -413,6 +416,21 @@ mod tests {
         let parsed =
             parse_passthrough_flags("\"--tui-refresh-rate 150ms\"").expect("flags should parse");
         assert_eq!(parsed, vec!["--tui-refresh-rate", "150ms"]);
+    }
+
+    #[test]
+    fn parse_passthrough_flags_preserves_inner_quoted_values() {
+        let parsed = parse_passthrough_flags("\"--log-filter 'warn info' --verbose\"")
+            .expect("flags should parse");
+        assert_eq!(parsed, vec!["--log-filter", "warn info", "--verbose"]);
+    }
+
+    #[test]
+    fn parse_passthrough_flags_rejects_invalid_shell_quoting() {
+        assert!(matches!(
+            parse_passthrough_flags("\"--foo 'bar\""),
+            Err(MtrError::InvalidOption(_))
+        ));
     }
 
     #[test]
