@@ -6,7 +6,9 @@ target
 *.md
 assets
 packaging
-xtask
+xtask/*
+!xtask/Cargo.toml
+!xtask/src/**
 skills
 tests
 examples

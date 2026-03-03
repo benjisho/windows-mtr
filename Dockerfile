@@ -5,6 +5,8 @@ WORKDIR /app
 
 # Build dependency layer first for better cache reuse.
 COPY Cargo.toml Cargo.lock build.rs ./
+COPY xtask/Cargo.toml ./xtask/Cargo.toml
+COPY xtask/src ./xtask/src
 COPY src ./src
 
 RUN cargo build --release --locked --bin mtr
