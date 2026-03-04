@@ -76,6 +76,17 @@ cargo test --test cli_tests
 cargo test --test report_tests
 ```
 
+
+## Workflow publish order (CI policy)
+
+Publishing to container registries is gated by workflow order:
+
+- `CI`, `CodeQL`, and `Security` must all succeed on `master` for the same commit SHA.
+- The gate workflow (`.github/workflows/publish-gate.yml`) then calls reusable publish logic in `.github/workflows/reusable-publish.yml`.
+- Tag releases continue through `release.yml`, which also reuses the same publish workflow before creating GitHub Releases.
+
+See `docs/WORKFLOW_ORDER_REVIEW.md` for the full policy summary.
+
 ## Project Layout
 
 - `src/` — core application code

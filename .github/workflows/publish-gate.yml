@@ -1,0 +1,87 @@
+name: Publish Gate
+
+on:
+  workflow_run:
+    workflows: ["CI", "CodeQL", "Security"]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: publish-gate-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate-required-workflows:
+    name: Evaluate required workflow results
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.evaluate.outputs.should_publish }}
+    steps:
+      - name: Evaluate CI/CodeQL/Security conclusions for this SHA
+        id: evaluate
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const required = ["CI", "CodeQL", "Security"];
+            const headSha = context.payload.workflow_run.head_sha;
+            const { owner, repo } = context.repo;
+
+            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+              owner,
+              repo,
+              head_sha: headSha,
+              per_page: 100,
+            });
+
+            const latestByName = new Map();
+            for (const run of runs) {
+              if (!required.includes(run.name)) continue;
+              const current = latestByName.get(run.name);
+              if (!current || run.run_number > current.run_number) {
+                latestByName.set(run.name, run);
+              }
+            }
+
+            const missing = [];
+            const failed = [];
+            const incomplete = [];
+
+            for (const workflowName of required) {
+              const run = latestByName.get(workflowName);
+              if (!run) {
+                missing.push(workflowName);
+                continue;
+              }
+
+              if (run.status !== "completed") {
+                incomplete.push(`${workflowName} (${run.status})`);
+                continue;
+              }
+
+              if (run.conclusion !== "success") {
+                failed.push(`${workflowName} (${run.conclusion})`);
+              }
+            }
+
+            const shouldPublish = missing.length === 0 && failed.length === 0 && incomplete.length === 0;
+            core.setOutput("should_publish", String(shouldPublish));
+
+            if (!shouldPublish) {
+              core.notice(`Publish gate blocked for ${headSha}. Missing: [${missing.join(", ")}], Incomplete: [${incomplete.join(", ")}], Failed: [${failed.join(", ")}].`);
+            } else {
+              core.notice(`All required workflows succeeded for ${headSha}; publish is allowed.`);
+            }
+
+  publish:
+    name: Publish after required workflows
+    needs: evaluate-required-workflows
+    if: needs.evaluate-required-workflows.outputs.should_publish == 'true'
+    uses: ./.github/workflows/reusable-publish.yml
+    secrets: inherit
+    with:
+      publish_latest: true
