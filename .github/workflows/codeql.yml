@@ -24,6 +24,7 @@ permissions:
 
 jobs:
   analyze:
+    if: ${{ vars.CODEQL_ADVANCED_ENABLED == 'true' }}
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ matrix.os }}
     strategy:
