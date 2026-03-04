@@ -40,6 +40,9 @@ mtr [options] <hostname-or-ip>
 | `-i <SECONDS>` | Minimum round duration |
 | `-W, --timeout <SECONDS>` | Probe grace timeout |
 | `--dns-cache-ttl <SECONDS>` | Per-run DNS cache TTL |
+| `--rest-api` | Run as HTTP API server instead of CLI trace mode |
+| `--rest-api-bind <ADDR>` | REST API bind address (default `127.0.0.1:8080`) |
+| `--native-ui` | Launch native Ratatui UI (tabs, hops, charts) |
 
 ## Power User Passthrough
 
@@ -64,11 +67,39 @@ mtr [options] <hostname-or-ip>
 | `-W` | `-W`, `--timeout` | `--grace-duration` |
 | `-m` | `-m` | `--max-ttl` |
 
+
+## REST API
+
+Start the server:
+
+```bash
+mtr --rest-api --rest-api-bind 127.0.0.1:8080
+```
+
+Endpoints:
+
+- `GET /health` → `{"status":"ok"}`
+- `POST /v1/report` with JSON body:
+
+```json
+{
+  "host": "1.1.1.1",
+  "count": 5,
+  "tcp": true,
+  "port": 443
+}
+```
+
+Response includes `exit_code`, `target`, and a `report` object from Trippy JSON output.
+
 ## Examples
 
 ```bash
-# Interactive TUI
+# Interactive TUI (embedded trippy)
 mtr 8.8.8.8
+
+# Native Ratatui UI preview
+mtr --native-ui 8.8.8.8
 
 # TCP report
 mtr -T -P 443 -c 15 -r github.com
