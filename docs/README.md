@@ -21,6 +21,7 @@ Welcome to the documentation hub for **Windows MTR**, a Windows-native, enterpri
   - [Contribution process and quality gates](../CONTRIBUTING.md)
   - [CLI/report API semantics](API.md)
   - [Branch review snapshot](BRANCH_REVIEW.md)
+  - [GitHub Actions trigger and ordering review](WORKFLOW_ORDER_REVIEW.md)
 
 ## Common Tasks
 
