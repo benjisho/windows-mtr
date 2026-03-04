@@ -3,11 +3,6 @@ name: Windows Build and Release
 on:
   # Manually triggered from GitHub UI
   workflow_dispatch:
-  
-  # On release tag push
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   build-windows:
