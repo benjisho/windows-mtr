@@ -6,16 +6,18 @@ on:
     tags: ["v*"]
   pull_request:
     branches: ["**"]
-    # Skip docs-only PRs to reduce container CI cost and improve queue efficiency.
+    # Cost/latency optimization: only run when changes can affect Docker image build/output.
     paths:
       - Dockerfile
       - .dockerignore
       - Cargo.toml
       - Cargo.lock
+      - build.rs
       - src/**
-      - packaging/**
-      - scripts/**
+      - xtask/**
       - .github/workflows/docker-scout.yml
+      - .github/workflows/reusable-publish.yml
+      - .github/workflows/ci.yml
 
 env:
   REGISTRY: docker.io
