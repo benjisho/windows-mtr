@@ -26,6 +26,10 @@ permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: release-mutation-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   docker-scout-compare:
     name: Build image and compare with production

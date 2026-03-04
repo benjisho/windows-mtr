@@ -4,6 +4,10 @@ on:
   # Manually triggered from GitHub UI
   workflow_dispatch:
 
+concurrency:
+  group: release-mutation-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-windows:
     runs-on: windows-latest
