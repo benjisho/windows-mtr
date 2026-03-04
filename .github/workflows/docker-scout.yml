@@ -6,6 +6,16 @@ on:
     tags: ["v*"]
   pull_request:
     branches: ["**"]
+    # Skip docs-only PRs to reduce container CI cost and improve queue efficiency.
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - Cargo.toml
+      - Cargo.lock
+      - src/**
+      - packaging/**
+      - scripts/**
+      - .github/workflows/docker-scout.yml
 
 env:
   REGISTRY: docker.io
