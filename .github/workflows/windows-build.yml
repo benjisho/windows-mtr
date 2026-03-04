@@ -1,7 +1,7 @@
 name: Windows Build and Release
 
 # Release publishing source of truth is .github/workflows/release.yml.
-# This workflow is for manual Windows build artifacts only and must not publish tag releases.
+# This workflow is for manual Windows build artifacts and optional draft releases only; it does not publish on tag push events.
 on:
   # Manually triggered from GitHub UI
   workflow_dispatch:
@@ -99,10 +99,10 @@ jobs:
             dist/*.zip
             dist/SHA256SUMS
           
-  # Retained for compatibility, but release publishing is intentionally disabled here.
+  # Manual release helper only; tag-event publishing source of truth is release.yml.
   release:
     needs: build-windows
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write  # Required for creating releases and uploading assets
@@ -113,8 +113,7 @@ jobs:
       - name: Display structure of downloaded files
         run: ls -R
         
-      - name: Create GitHub Release (disabled; see release.yml)
-        if: ${{ false }}
+      - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
