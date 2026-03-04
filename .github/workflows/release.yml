@@ -1,7 +1,6 @@
 name: Release
 
-# NOTE: This workflow is the sole tag-release publisher for this repository.
-# Keep GitHub release creation on tag pushes here only (release job below).
+# Source of truth: this is the only workflow that creates tag releases and publishes release assets.
 on:
   workflow_dispatch:
   push:
