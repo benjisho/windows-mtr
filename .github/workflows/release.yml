@@ -4,10 +4,7 @@ name: Release
 # Keep GitHub release creation on tag pushes here only (release job below).
 on:
   workflow_dispatch:
-  # Trigger on push to master branch
   push:
-    branches:
-      - master
     tags:
       - 'v*.*.*'
     paths-ignore:
@@ -182,67 +179,11 @@ jobs:
   publish-package:
     name: Publish Container Packages
     needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-latest
-    environment: publish-container-packages
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Normalize image names
-        id: image
-        shell: bash
-        run: |
-          echo "ghcr=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-          echo "dockerhub=benjisho/windows-mtr" >> "$GITHUB_OUTPUT"
-
-      - name: Extract image metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ steps.image.outputs.ghcr }}
-            ${{ steps.image.outputs.dockerhub }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=semver,pattern={{version}},value=${{ github.ref_name }}
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=windows-mtr-release-docker
-          cache-to: type=gha,mode=max,scope=windows-mtr-release-docker
-          provenance: true
-          sbom: true
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/reusable-publish.yml
+    with:
+      publish_latest: false
+    secrets: inherit
 
   # Only run for tag pushes (real releases).
   # This is the only workflow that publishes GitHub Releases for tags.
