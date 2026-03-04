@@ -1,5 +1,7 @@
 name: Release
 
+# NOTE: This workflow is the sole tag-release publisher for this repository.
+# Keep GitHub release creation on tag pushes here only (release job below).
 on:
   workflow_dispatch:
   # Trigger on push to master branch
@@ -242,7 +244,8 @@ jobs:
           provenance: true
           sbom: true
 
-  # Only run for tag pushes (real releases)
+  # Only run for tag pushes (real releases).
+  # This is the only workflow that publishes GitHub Releases for tags.
   release:
     name: Create Release
     needs:
