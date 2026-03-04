@@ -17,7 +17,7 @@ concurrency:
 jobs:
   evaluate-required-workflows:
     name: Evaluate required workflow results
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     outputs:
       should_publish: ${{ steps.evaluate.outputs.should_publish }}
@@ -55,6 +55,11 @@ jobs:
               const run = latestByName.get(workflowName);
               if (!run) {
                 missing.push(workflowName);
+                continue;
+              }
+
+              if (run.event !== "push" || run.head_branch !== "master") {
+                failed.push(`${workflowName} (unexpected trigger: event=${run.event}, branch=${run.head_branch})`);
                 continue;
               }
 
