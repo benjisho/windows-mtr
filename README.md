@@ -44,6 +44,7 @@ Windows MTR is an enterprise-grade network diagnostics tool that brings the powe
       <li>Multi-protocol support: ICMP, TCP SYN, and UDP</li>
       <li>Interactive TUI for live monitoring</li>
       <li>Report mode for static output generation</li>
+      <li>REST API server mode for automation</li>
       <li>IPv4 and IPv6 support</li>
       <li>Cross-platform compatibility</li>
       <li>Simple, clean command-line interface</li>
@@ -186,6 +187,40 @@ Windows MTR requires administrator privileges to run properly, as it needs to se
 mtr 8.8.8.8
 ```
 
+### Launch Native Ratatui UI (preview)
+
+```bash
+mtr --native-ui 8.8.8.8
+```
+
+Expected terminal layout preview:
+
+Design cues for this layout were inspired by modern Rust TUIs like yozefu, openapi-tui, oxker, binsider, and scope-tui.
+
+```text
+┌ windows-mtr native UI • target=8.8.8.8 • sort=avg-latency • LIVE ──────────┐
+│ [ Overview ]  Hops  Stats  Help                                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Packet Loss      Quality Score      Avg Latency                              │
+│ [█░░░░░░░░░░░]   [███████████░░░]   [███████░░░░░░]                          │
+│   0.7%              78.4               17.9ms                                │
+├──────────────────────────────────────┬───────────────────────────────────────┤
+│ Latency sparkline ▂▃▄▅▆▇▆▅▄▃▂        │ Session snapshot                      │
+│ Latency trend chart (ms)             │ Target: 8.8.8.8                       │
+│                                      │ Cycles: 42  Uptime: 36s               │
+│                                      │ Jitter: 1.82ms                         │
+│                                      │ Selected hop: #4 8.8.8.8              │
+├──────────────────────────────────────┴───────────────────────────────────────┤
+│ Hop  Host           Loss%  Last    Avg     Best    Worst   Trend             │
+│ 1    gateway.local   0.0    1.2ms   1.1ms   0.9ms   1.8ms   ██░░░░░░          │
+│ 2    metro-edge      0.2    5.8ms   6.0ms   5.2ms   7.3ms   ███░░░░░          │
+│ 3    core-pop        0.3    9.5ms   9.1ms   8.4ms  12.1ms   ████░░░░          │
+│ 4    8.8.8.8         0.7   18.6ms  17.9ms  16.1ms  23.0ms   ███████░          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ q quit • tab switch • ↑/↓ select hop • s sort • space pause/resume          │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
 ### Report mode with DNS disabled (faster + script-friendly)
 
 ```bash
@@ -203,6 +238,22 @@ mtr -c 10 -r 8.8.8.8 > network-report.txt
 ```bash
 mtr --json -c 20 8.8.8.8 > network-report.json
 ```
+
+### Start REST API server
+
+```bash
+mtr --rest-api --rest-api-bind 127.0.0.1:8080
+```
+
+Then call it:
+
+```bash
+curl -s http://127.0.0.1:8080/health
+curl -s -X POST http://127.0.0.1:8080/v1/report \
+  -H "Content-Type: application/json" \
+  -d '{"host":"1.1.1.1","count":5,"tcp":true,"port":443}'
+```
+
 
 ### Test HTTPS Connectivity
 
@@ -344,13 +395,43 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 </tr>
 <tr>
   <td>REST API</td>
-  <td>📅 Planned</td>
-  <td>Q4 2025</td>
+  <td>✅ Released</td>
+  <td>main (unreleased)</td>
 </tr>
 <tr>
   <td>SNMP Integration</td>
   <td>📅 Planned</td>
-  <td>Q4 2025</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>Native Ratatui UI (tabs, hop table, charts)</td>
+  <td>✅ Released</td>
+  <td>main (unreleased)</td>
+</tr>
+<tr>
+  <td>ETW + Windows observability integrations</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>Versioned JSON schema + CSV export</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>Security hardening gates (cargo-audit + fuzz harness in CI)</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>Cross-platform probe parity/privilege smoke tests</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>CLI/runtime cleanup (unused error variants, banner polish)</td>
+  <td>🛣️ Roadmap</td>
+  <td>H2 2026</td>
 </tr>
 </table>
 

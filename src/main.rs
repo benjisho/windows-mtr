@@ -1,17 +1,20 @@
 use anyhow::Context;
 use clap::Parser;
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::process::{self, Command, Stdio};
+use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 
 mod error;
+mod native_ui;
 use error::{MtrError, Result};
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
 
 /// Windows-native clone of Linux mtr - a CLI that delivers ICMP/TCP/UDP traceroute & ping
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author = "Benji Shohet (benjisho)", version, about, long_about = None)]
 #[command(after_help = "Examples:
   windows-mtr 8.8.8.8                           # Basic ICMP trace to Google DNS
@@ -19,10 +22,21 @@ const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
   windows-mtr -U -P 53 1.1.1.1                  # UDP trace to Cloudflare DNS on port 53
   windows-mtr -r -c 10 example.com              # Report mode with 10 pings per hop
   windows-mtr --json -c 20 example.com          # JSON report output
+  windows-mtr --rest-api --rest-api-bind 127.0.0.1:8080 # Start REST API server
+  windows-mtr --native-ui 8.8.8.8               # Launch native Ratatui UI preview
   windows-mtr --trippy-flags '--tui-refresh-rate 150ms' example.com")]
 struct Cli {
     /// Target host to trace (hostname or IP)
-    host: String,
+    #[arg(required_unless_present = "rest_api")]
+    host: Option<String>,
+
+    /// Start HTTP REST API server mode
+    #[arg(long = "rest-api")]
+    rest_api: bool,
+
+    /// Bind address for REST API mode
+    #[arg(long = "rest-api-bind", default_value = "127.0.0.1:8080")]
+    rest_api_bind: String,
 
     /// Use TCP SYN for probes (default is ICMP)
     #[arg(short = 'T', conflicts_with = "udp")]
@@ -107,12 +121,52 @@ struct Cli {
     /// Forward additional native trippy options verbatim
     #[arg(long = "trippy-flags", value_name = "FLAGS")]
     trippy_flags: Option<String>,
+
+    /// Launch native Ratatui UI (tabs, hop table, charts)
+    #[arg(long = "native-ui", conflicts_with_all = ["rest_api", "report", "json", "json_pretty"])]
+    native_ui: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum JsonFormat {
     Compact,
     Pretty,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiTraceRequest {
+    host: String,
+    #[serde(default)]
+    tcp: bool,
+    #[serde(default)]
+    udp: bool,
+    port: Option<u16>,
+    source_port: Option<u16>,
+    count: Option<usize>,
+    interval: Option<f32>,
+    timeout: Option<f32>,
+    #[serde(default)]
+    report_wide: bool,
+    #[serde(default)]
+    no_dns: bool,
+    max_hops: Option<u8>,
+    #[serde(default)]
+    show_asn: bool,
+    #[serde(default)]
+    dns_lookup_as_info: bool,
+    packet_size: Option<u16>,
+    src: Option<IpAddr>,
+    interface: Option<String>,
+    ecmp: Option<String>,
+    dns_cache_ttl: Option<u64>,
+    trippy_flags: Option<String>,
+    #[serde(default)]
+    pretty: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiErrorResponse<'a> {
+    error: &'a str,
 }
 
 fn json_format_from_args(args: &Cli) -> Option<JsonFormat> {
@@ -126,8 +180,9 @@ fn json_format_from_args(args: &Cli) -> Option<JsonFormat> {
 }
 
 fn should_print_banner(args: &Cli) -> bool {
-    json_format_from_args(args).is_none()
+    json_format_from_args(args).is_none() && !args.rest_api && !args.native_ui
 }
+
 fn print_banner() {
     println!("windows-mtr by Benji Shohet (benjisho) — https://github.com/benjisho/windows-mtr");
 }
@@ -143,6 +198,12 @@ fn validate_target(host: &str) -> Result<String> {
 }
 
 fn verify_options(args: &Cli) -> Result<()> {
+    if !args.rest_api && args.host.is_none() {
+        return Err(MtrError::InvalidOption(
+            "host is required unless --rest-api is enabled".to_string(),
+        ));
+    }
+
     if (args.tcp || args.udp) && args.port.is_none() {
         let (protocol, flag) = if args.tcp { ("TCP", 'T') } else { ("UDP", 'U') };
         return Err(MtrError::PortRequired(protocol.to_string(), flag));
@@ -221,9 +282,6 @@ fn parse_passthrough_flags(flags: &str) -> Result<Vec<String>> {
         MtrError::InvalidOption("--trippy-flags contains invalid shell quoting".to_string())
     })?;
 
-    // Windows shells sometimes preserve wrapping quotes around the entire passthrough
-    // string, which can produce a single token like "--flag value". Split that token
-    // into distinct argv entries while preserving embedded quoted segments.
     if parsed.len() == 1 {
         let token = &parsed[0];
         if token.starts_with("--") && token.contains(' ') {
@@ -344,6 +402,161 @@ fn run_embedded_trippy(args: &[String], json_format: Option<JsonFormat>) -> anyh
     Ok(status.code().unwrap_or(2))
 }
 
+fn execute_report_json(
+    cli: &Cli,
+    host: &str,
+    pretty: bool,
+) -> anyhow::Result<(i32, serde_json::Value)> {
+    let mut run_args = cli.clone();
+    run_args.json = !pretty;
+    run_args.json_pretty = pretty;
+    run_args.report = false;
+
+    let trippy_args = build_embedded_trippy_args(&run_args, host)
+        .map_err(|e| anyhow::anyhow!(e.to_string()))
+        .context("failed to translate windows-mtr options into trippy options")?;
+
+    let current_exe = env::current_exe().context("failed to locate current executable")?;
+    let output = Command::new(&current_exe)
+        .env(EMBEDDED_TRIPPY_ENV, "1")
+        .args(trippy_args.iter().skip(1))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .context("failed to launch embedded trippy runner")?;
+
+    let code = output.status.code().unwrap_or(2);
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .context("failed to parse trippy JSON output for REST response")?;
+    Ok((code, json))
+}
+
+fn api_request_to_cli(request: ApiTraceRequest) -> Cli {
+    Cli {
+        host: Some(request.host),
+        rest_api: false,
+        rest_api_bind: "127.0.0.1:8080".to_string(),
+        tcp: request.tcp,
+        udp: request.udp,
+        port: request.port,
+        source_port: request.source_port,
+        report: false,
+        json: !request.pretty,
+        json_pretty: request.pretty,
+        count: request.count,
+        interval: request.interval,
+        timeout: request.timeout,
+        report_wide: request.report_wide,
+        no_dns: request.no_dns,
+        max_hops: request.max_hops,
+        show_asn: request.show_asn,
+        dns_lookup_as_info: request.dns_lookup_as_info,
+        packet_size: request.packet_size,
+        src: request.src,
+        interface: request.interface,
+        ecmp: request.ecmp,
+        dns_cache_ttl: request.dns_cache_ttl,
+        trippy_flags: request.trippy_flags,
+        native_ui: false,
+    }
+}
+
+fn content_type_header(value: &str) -> Header {
+    Header::from_bytes(&b"Content-Type"[..], value.as_bytes()).expect("valid header")
+}
+
+fn respond_json(request: Request, status: u16, value: &serde_json::Value) {
+    let body = value.to_string();
+    let response = Response::from_string(body)
+        .with_status_code(StatusCode(status))
+        .with_header(content_type_header("application/json"));
+    let _ = request.respond(response);
+}
+
+fn respond_json_error(request: Request, status: u16, message: &str) {
+    let payload = serde_json::to_value(ApiErrorResponse { error: message }).unwrap_or_else(
+        |_| serde_json::json!({"error": "internal response serialization failure"}),
+    );
+    respond_json(request, status, &payload);
+}
+
+fn handle_rest_request(mut request: Request) {
+    let method = request.method().clone();
+    let path = request.url().to_string();
+
+    if method == Method::Get && path == "/health" {
+        respond_json(request, 200, &serde_json::json!({"status": "ok"}));
+        return;
+    }
+
+    if method == Method::Post && path == "/v1/report" {
+        let mut body = String::new();
+        if let Err(err) = request.as_reader().read_to_string(&mut body) {
+            respond_json_error(request, 400, &format!("failed to read request body: {err}"));
+            return;
+        }
+
+        let parsed: ApiTraceRequest = match serde_json::from_str(&body) {
+            Ok(value) => value,
+            Err(err) => {
+                respond_json_error(request, 400, &format!("invalid JSON body: {err}"));
+                return;
+            }
+        };
+
+        let cli = api_request_to_cli(parsed);
+        if let Err(err) = verify_options(&cli) {
+            respond_json_error(request, 400, &err.to_string());
+            return;
+        }
+
+        let Some(host_ref) = cli.host.as_deref() else {
+            respond_json_error(request, 400, "host is required");
+            return;
+        };
+
+        let host = match validate_target(host_ref) {
+            Ok(valid) => valid,
+            Err(err) => {
+                respond_json_error(request, 400, &err.to_string());
+                return;
+            }
+        };
+
+        match execute_report_json(&cli, &host, cli.json_pretty) {
+            Ok((exit_code, report)) => {
+                respond_json(
+                    request,
+                    200,
+                    &serde_json::json!({
+                        "exit_code": exit_code,
+                        "target": host,
+                        "report": report
+                    }),
+                );
+            }
+            Err(err) => {
+                respond_json_error(request, 500, &format!("trace execution failed: {err}"));
+            }
+        }
+        return;
+    }
+
+    respond_json_error(request, 404, "route not found");
+}
+
+fn run_rest_api(bind_addr: &str) -> anyhow::Result<()> {
+    let server = Server::http(bind_addr)
+        .map_err(|e| anyhow::anyhow!("failed to bind REST API server on {bind_addr}: {e}"))?;
+
+    eprintln!("windows-mtr REST API listening on http://{bind_addr}");
+    for request in server.incoming_requests() {
+        handle_rest_request(request);
+    }
+
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     if env::var_os(EMBEDDED_TRIPPY_ENV).is_some() {
         return trippy_tui::trippy();
@@ -354,13 +567,31 @@ fn main() -> anyhow::Result<()> {
     if should_print_banner(&args) {
         print_banner();
     }
+
     verify_options(&args)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .context("invalid command-line options")?;
 
-    let host = validate_target(&args.host)
+    if args.rest_api {
+        return run_rest_api(&args.rest_api_bind);
+    }
+
+    if args.native_ui {
+        let host = args
+            .host
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("host is required for --native-ui"))?;
+        return native_ui::run(host);
+    }
+
+    let host_input = args
+        .host
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("host is required"))?;
+
+    let host = validate_target(host_input)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
-        .with_context(|| format!("invalid target host: {}", args.host))?;
+        .with_context(|| format!("invalid target host: {host_input}"))?;
 
     let trippy_args = build_embedded_trippy_args(&args, &host)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
@@ -376,7 +607,9 @@ mod tests {
 
     fn base_cli() -> Cli {
         Cli {
-            host: "8.8.8.8".to_string(),
+            host: Some("8.8.8.8".to_string()),
+            rest_api: false,
+            rest_api_bind: "127.0.0.1:8080".to_string(),
             tcp: false,
             udp: false,
             port: None,
@@ -398,7 +631,26 @@ mod tests {
             ecmp: None,
             dns_cache_ttl: None,
             trippy_flags: None,
+            native_ui: false,
         }
+    }
+
+    #[test]
+    fn verify_options_requires_host_when_not_rest_api() {
+        let mut args = base_cli();
+        args.host = None;
+        assert!(matches!(
+            verify_options(&args),
+            Err(MtrError::InvalidOption(_))
+        ));
+    }
+
+    #[test]
+    fn verify_options_allows_missing_host_in_rest_api_mode() {
+        let mut args = base_cli();
+        args.host = None;
+        args.rest_api = true;
+        assert!(verify_options(&args).is_ok());
     }
 
     #[test]
@@ -481,7 +733,9 @@ mod tests {
     #[test]
     fn build_embedded_trippy_args_maps_core_flags() {
         let args = Cli {
-            host: "example.com".to_string(),
+            host: Some("example.com".to_string()),
+            rest_api: false,
+            rest_api_bind: "127.0.0.1:8080".to_string(),
             tcp: true,
             udp: false,
             port: Some(443),
@@ -503,6 +757,7 @@ mod tests {
             ecmp: Some("paris".to_string()),
             dns_cache_ttl: Some(120),
             trippy_flags: Some("--log-format json --verbose".to_string()),
+            native_ui: false,
         };
 
         let trippy_args =
@@ -555,6 +810,38 @@ mod tests {
         let trippy_args = build_embedded_trippy_args(&args, "8.8.8.8").expect("args should build");
         assert_eq!(trippy_args, vec!["mtr", "--mode", "json", "8.8.8.8"]);
     }
+
+    #[test]
+    fn api_request_to_cli_enables_json_mode() {
+        let request = ApiTraceRequest {
+            host: "1.1.1.1".to_string(),
+            tcp: true,
+            udp: false,
+            port: Some(443),
+            source_port: None,
+            count: Some(3),
+            interval: None,
+            timeout: None,
+            report_wide: false,
+            no_dns: true,
+            max_hops: None,
+            show_asn: false,
+            dns_lookup_as_info: false,
+            packet_size: None,
+            src: None,
+            interface: None,
+            ecmp: None,
+            dns_cache_ttl: None,
+            trippy_flags: None,
+            pretty: false,
+        };
+
+        let cli = api_request_to_cli(request);
+        assert!(cli.json);
+        assert!(!cli.report);
+        assert_eq!(cli.host.as_deref(), Some("1.1.1.1"));
+    }
+
     #[test]
     fn should_not_print_banner_for_json_modes() {
         let mut args = base_cli();
@@ -563,6 +850,20 @@ mod tests {
 
         let mut args = base_cli();
         args.json_pretty = true;
+        assert!(!should_print_banner(&args));
+    }
+
+    #[test]
+    fn should_not_print_banner_for_rest_api_mode() {
+        let mut args = base_cli();
+        args.rest_api = true;
+        assert!(!should_print_banner(&args));
+    }
+
+    #[test]
+    fn should_not_print_banner_for_native_ui_mode() {
+        let mut args = base_cli();
+        args.native_ui = true;
         assert!(!should_print_banner(&args));
     }
 
