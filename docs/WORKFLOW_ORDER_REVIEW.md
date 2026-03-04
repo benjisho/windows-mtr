@@ -24,3 +24,20 @@ To avoid duplicated release/publish code, image publishing is centralized in `.g
 `release.yml` now handles tag-based release flow (`v*.*.*`) and no longer publishes directly from branch pushes.
 
 This separation keeps release publication deterministic and makes policy review straightforward: checks first, then gated publish.
+
+## Recommendations
+
+Selected gating model: **`workflow_run` orchestration**.
+
+Enforcement point for maintainers:
+
+- Upstream required workflows are `CI`, `CodeQL`, and `Security`.
+- `.github/workflows/publish-gate.yml` is the explicit policy gate for branch publication and must remain enabled.
+- The gate only evaluates successful `push`-triggered runs on `master`, then verifies each required run for the same SHA is:
+  - present,
+  - completed,
+  - successful,
+  - and sourced from the expected `push`/`master` trigger context.
+- Only when all checks satisfy those conditions does the gate call `.github/workflows/reusable-publish.yml`.
+
+This means publish ordering is enforced in workflow orchestration (not branch protection rules): the publish workflow cannot proceed until required upstream workflows have already passed for the exact commit being published.
