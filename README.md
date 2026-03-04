@@ -139,6 +139,8 @@ docker run --network host ghcr.io/benjisho/windows-mtr:latest -c 5 -r 8.8.8.8
 
 Container images are published from the `Release` workflow to both GHCR (`ghcr.io/benjisho/windows-mtr`) and Docker Hub (`benjisho/windows-mtr`) as `latest` (from `master`) and explicit release tags like `v1.2.3` for `linux/amd64` and `linux/arm64`.
 
+Pull requests also run a dedicated `Docker Scout` workflow (`.github/workflows/docker-scout.yml`) that builds the proposed image and compares it against the `production` environment baseline in Docker Scout. Configure `REGISTRY_USER` and `REGISTRY_TOKEN` repository secrets (Docker Hub credentials) and enable the `production` Scout environment for meaningful comparisons.
+
 > [!NOTE]
 > Windows container networking can vary by environment. If `--network host` is not available in your setup, run the binary directly on the host for full probe capability.
 
