@@ -65,7 +65,7 @@ jobs:
           fi
 
   test-msrv:
-    name: Test (${{ matrix.os }}, msrv=${{ needs.resolve-msrv.outputs.msrv }})
+    name: Test (${{ matrix.os }}, msrv)
     runs-on: ${{ matrix.os }}
     needs: resolve-msrv
     strategy:
@@ -115,7 +115,7 @@ jobs:
   test-stable:
     name: Test (${{ matrix.os }}, stable)
     runs-on: ${{ matrix.os }}
-    needs: [resolve-msrv, test-msrv]
+    needs: [resolve-msrv]
     if: needs.resolve-msrv.outputs.run_stable == 'true'
     strategy:
       matrix:
@@ -194,7 +194,7 @@ jobs:
     name: Build PR Binaries
     runs-on: windows-latest
     needs: [test-msrv, test-stable, docker-build-amd64]
-    if: github.event_name == 'pull_request' && needs.docker-build-amd64.result == 'success' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
+    if: github.event_name == 'pull_request' && needs.docker-build-amd64.result == 'success' && needs.test-msrv.result == 'success' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
     permissions:
       contents: read
       issues: write
