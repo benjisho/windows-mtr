@@ -347,6 +347,21 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
   <td>v1.1.3</td>
 </tr>
 <tr>
+  <td>CI matrix coverage (Windows + Ubuntu, MSRV + stable)</td>
+  <td>✅ Released</td>
+  <td>v1.2.x</td>
+</tr>
+<tr>
+  <td>CodeQL workflow for Rust</td>
+  <td>✅ Released</td>
+  <td>v1.2.x</td>
+</tr>
+<tr>
+  <td>Container publishing to GHCR + Docker Hub</td>
+  <td>✅ Released</td>
+  <td>v1.2.x</td>
+</tr>
+<tr>
   <td>REST API</td>
   <td>📅 Planned</td>
   <td>H2 2026</td>
@@ -373,11 +388,16 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 </tr>
 <tr>
   <td>Security hardening gates (cargo-audit + fuzz harness in CI)</td>
-  <td>🛣️ Roadmap</td>
+  <td>🚧 In Progress (cargo-audit live, fuzz harness pending)</td>
   <td>H2 2026</td>
 </tr>
 <tr>
   <td>Cross-platform probe parity/privilege smoke tests</td>
+  <td>🚧 In Progress (cross-OS CI live, probe privilege smoke tests pending)</td>
+  <td>H2 2026</td>
+</tr>
+<tr>
+  <td>GitHub Actions hardening (pin third-party actions by commit SHA)</td>
   <td>🛣️ Roadmap</td>
   <td>H2 2026</td>
 </tr>

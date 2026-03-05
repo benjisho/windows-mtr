@@ -1,51 +1,33 @@
 # Branch Review Snapshot
 
-This document summarizes what has been introduced on the current branch history and what still needs attention to stay aligned with repository goals.
+This document summarizes the current branch delta, what is complete, and what still needs edits to stay aligned with `windows-mtr` goals.
 
-## Repository aim (validated against README/USAGE)
-`windows-mtr` aims to provide reliable, secure, Windows-friendly MTR diagnostics with stable CLI behavior, report/JSON output support, and operational CI/CD workflows.
+## PR aim (current branch)
+The branch is focused on CI/CD maintenance (dependency updates in release automation), not runtime CLI or probe-engine behavior.
 
-## What has been done in this branch history
-Based on commit history inspection:
+## What was introduced in this branch
+From branch history (`git log --oneline --name-only`):
 
-### 1) Core product and CLI hardening
-- Implemented and iterated the Rust CLI wrapper and runtime behavior in `src/main.rs`.
-- Added report/JSON parity work and passthrough argument handling improvements.
-- Added/updated tests under `tests/` and examples under `examples/`.
+1. `Bump docker/login-action from 3 to 4`
+   - Updated `docker/login-action` to `v4` in `.github/workflows/release.yml`.
+2. `Bump docker/setup-qemu-action from 3 to 4`
+   - Updated `docker/setup-qemu-action` to `v4` in `.github/workflows/release.yml`.
 
-### 2) Packaging and release workflows
-- Added and refined GitHub Actions workflows (`ci`, `release`, `security`, `windows-build`).
-- Added Windows packaging metadata (`packaging/scoop`, `packaging/winget`).
-- Improved artifact handling and action version updates.
+## Done vs still needed
 
-### 3) Security and quality posture
-- Added `deny.toml` and `.cargo/audit.toml` policy controls.
-- Tightened/adjusted security workflow behavior.
-- Standardized MSRV handling and validation steps in CI.
+### ✅ Done
+- Release workflow action versions were advanced to current major versions for Docker login and QEMU setup.
+- Container publishing path still targets both GHCR and Docker Hub and keeps multi-arch build intent (`linux/amd64`, `linux/arm64`).
 
-### 4) Documentation and contribution guidance
-- Expanded `README.md`, `USAGE.md`, `DEVELOPMENT.md`, and docs pages.
-- Added contributor and AI-agent guidance (`AGENTS.md`, `.github/copilot-instructions.md`, `.github/agents/`, `.github/instructions/`).
+### 🛠️ Still needed / recommended follow-ups
+- Pin third-party actions to full commit SHAs (not only major tags) for stronger supply-chain immutability.
+- Keep least-privilege `permissions` review as part of recurring workflow maintenance.
+- Add/confirm CI checks that validate workflow changes before merge (e.g., actionlint in CI, if adopted by maintainers).
 
-## What still needs to be done / edited
+## Online best-practice verification summary
+A quick online validation against GitHub Actions security guidance confirms:
+- Restrict token permissions where possible.
+- Prefer pinning third-party actions to full-length commit SHAs for immutable references.
+- Continue routine action dependency updates (Dependabot already aligns with this pattern).
 
-### A) Refactor safety controls (high priority)
-- Keep AI and agent instructions explicitly biased toward minimal, request-scoped changes.
-- Require branch-delta review before edits so assistants avoid drifting from intent.
-
-### B) Ongoing compatibility assurance
-- Continue validating CLI parity and output contract changes with regression tests whenever argument translation or output mode logic changes.
-
-### C) Instruction sync hygiene
-- Keep `.github/copilot-instructions.md`, `.github/agents/*`, and root `AGENTS.md` synchronized whenever workflow or process expectations evolve.
-
-### D) Workflow lifecycle maintenance
-- Continue periodic GitHub Action version review and permission-hardening checks.
-
-## Online best-practice verification (quick pass)
-A lightweight online check was used to validate current guidance direction:
-- GitHub Actions hardening guidance was fetched to confirm principle alignment (least privilege, controlled automation behavior, deterministic checks).
-- Result: current direction is broadly correct; biggest opportunity remains stronger anti-refactor guardrails and explicit branch-delta review requirements.
-
-## Scope notes
-This is a process and maintenance snapshot, not a line-by-line security audit of every historical commit.
+Conclusion: this branch direction is valid and aligned with standard CI maintenance best practices, with SHA pinning as the highest-value remaining improvement.
