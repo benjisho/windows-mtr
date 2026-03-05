@@ -4,15 +4,19 @@
   <img src="assets/windows-mtr-m.gif" alt="Windows MTR Banner" width="80%">
   <h3>Enterprise-grade network diagnostics for Windows environments</h3>
 
-  [![CI](https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml/badge.svg)](https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml)
-  [![Release](https://github.com/benjisho/windows-mtr/actions/workflows/release.yml/badge.svg?branch=master)](https://github.com/benjisho/windows-mtr/actions/workflows/release.yml)
-  [![Security](https://github.com/benjisho/windows-mtr/actions/workflows/security.yml/badge.svg)](https://github.com/benjisho/windows-mtr/actions/workflows/security.yml)
-  [![Version](https://img.shields.io/github/v/release/benjisho/windows-mtr?color=blue&label=Version)](https://github.com/benjisho/windows-mtr/releases)
-  [![Stars](https://img.shields.io/github/stars/benjisho/windows-mtr?style=flat&label=Stars)](https://github.com/benjisho/windows-mtr/stargazers)
-  [![License](https://img.shields.io/badge/License-Apache%202.0-orange.svg)](LICENSE)
-  [![Usage Guide](https://img.shields.io/badge/usage-guide-blue.svg)](USAGE.md)
+  <p>
+    <a href="https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml"><img src="https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+    <a href="https://github.com/benjisho/windows-mtr/actions/workflows/release.yml"><img src="https://github.com/benjisho/windows-mtr/actions/workflows/release.yml/badge.svg?branch=master" alt="Release"></a>
+    <a href="https://github.com/benjisho/windows-mtr/actions/workflows/security.yml"><img src="https://github.com/benjisho/windows-mtr/actions/workflows/security.yml/badge.svg" alt="Security"></a>
+    <a href="https://github.com/benjisho/windows-mtr/releases"><img src="https://img.shields.io/github/v/release/benjisho/windows-mtr?color=blue&label=Version" alt="Version"></a>
+  </p>
 
-  [![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/benjisho)
+  <p>
+    <a href="https://github.com/benjisho/windows-mtr/stargazers"><img src="https://img.shields.io/github/stars/benjisho/windows-mtr?style=flat&label=Stars" alt="Stars"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-orange.svg" alt="License"></a>
+    <a href="USAGE.md"><img src="https://img.shields.io/badge/usage-guide-blue.svg" alt="Usage Guide"></a>
+    <a href="https://github.com/sponsors/benjisho"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
+  </p>
 
 </div>
 
