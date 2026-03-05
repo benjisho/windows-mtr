@@ -67,7 +67,7 @@ jobs:
           fi
 
   test-msrv:
-    name: Test (${{ matrix.os }}, msrv=${{ needs.resolve-msrv.outputs.msrv }})
+    name: Test (${{ matrix.os }}, msrv)
     runs-on: ${{ matrix.os }}
     needs: resolve-msrv
     if: github.event_name == 'push' || github.event_name == 'schedule'
@@ -115,11 +115,15 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
 
-  test-windows-stable:
-    name: Test (windows-latest, stable)
-    runs-on: windows-latest
-    needs: [resolve-msrv, test-msrv]
-    if: github.event_name == 'pull_request' || needs.resolve-msrv.outputs.run_stable == 'true'
+  test-stable:
+    name: Test (${{ matrix.os }}, stable)
+    runs-on: ${{ matrix.os }}
+    needs: [resolve-msrv]
+    if: needs.resolve-msrv.outputs.run_stable == 'true'
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+      fail-fast: false
 
     steps:
       - name: Checkout code
@@ -192,8 +196,8 @@ jobs:
   build-pr-binaries:
     name: Build PR Binaries
     runs-on: windows-latest
-    needs: [test-windows-stable, test-ubuntu-smoke, docker-build-amd64]
-    if: github.event_name == 'pull_request' && needs.docker-build-amd64.result == 'success' && needs.test-windows-stable.result == 'success' && needs.test-ubuntu-smoke.result == 'success'
+    needs: [test-msrv, test-stable, docker-build-amd64]
+    if: github.event_name == 'pull_request' && needs.docker-build-amd64.result == 'success' && needs.test-msrv.result == 'success' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
     permissions:
       contents: read
       issues: write
