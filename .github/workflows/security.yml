@@ -25,6 +25,9 @@ on:
       - 'xtask/**'
       - '.github/workflows/security.yml'
 
+permissions:
+  contents: read
+
 jobs:
   cargo-security:
     runs-on: ubuntu-latest
