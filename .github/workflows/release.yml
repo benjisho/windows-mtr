@@ -54,11 +54,27 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
 
-      # Install trippy for use in our package
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@cargo-binstall
+
+      # Install trippy using prebuilt binaries first (same strategy as CI)
       - name: Install trippy
         run: |
           echo "Installing trippy..."
-          cargo install trippy --locked
+
+          # Prefer prebuilt binaries for speed and reliability.
+          # Fallback to a source build only when a prebuilt artifact is unavailable
+          # (for example, temporary upstream gaps for a target/version combination).
+          cargo binstall trippy --no-confirm --locked
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "cargo binstall could not fetch a prebuilt trippy binary; falling back to cargo install from source."
+            cargo install trippy --locked
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Failed to install trippy via both cargo binstall and cargo install fallback."
+              exit 1
+            }
+          }
           
           # Verify installation and find location (trippy installs as trip.exe on Windows)
           $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
@@ -67,19 +83,8 @@ jobs:
             echo "Trippy successfully installed as trip.exe at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
           } else {
-            # Try to find it using where command as fallback
-            try {
-              $whereResult = where.exe trip
-              if ($whereResult) {
-                echo "Found trip.exe via where command at: $whereResult"
-                echo "TRIPPY_PATH=$whereResult" >> $env:GITHUB_ENV
-              } else {
-                throw "trip.exe not found via where command"
-              }
-            } catch {
-              Write-Error "Could not find trip.exe executable after installation. Please check PATH variables and cargo installation."
-              exit 1
-            }
+            Write-Error "trip.exe was not found at expected path: $trippyPath"
+            exit 1
           }
         shell: pwsh
         env:
@@ -277,11 +282,27 @@ jobs:
             ~/.cargo/git
           cache-on-failure: true
 
-      # Install trippy for packaging
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@cargo-binstall
+
+      # Install trippy using prebuilt binaries first (same strategy as build job)
       - name: Install trippy
         run: |
           echo "Installing trippy..."
-          cargo install trippy --locked
+
+          # Prefer prebuilt binaries for speed and reliability.
+          # Fallback to a source build only when a prebuilt artifact is unavailable
+          # (for example, temporary upstream gaps for a target/version combination).
+          cargo binstall trippy --no-confirm --locked
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "cargo binstall could not fetch a prebuilt trippy binary; falling back to cargo install from source."
+            cargo install trippy --locked
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Failed to install trippy via both cargo binstall and cargo install fallback."
+              exit 1
+            }
+          }
           
           # Verify installation and find location (trippy installs as trip.exe on Windows)
           $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
@@ -290,19 +311,8 @@ jobs:
             echo "Trippy successfully installed as trip.exe at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
           } else {
-            # Try to find it using where command as fallback
-            try {
-              $whereResult = where.exe trip
-              if ($whereResult) {
-                echo "Found trip.exe via where command at: $whereResult"
-                echo "TRIPPY_PATH=$whereResult" >> $env:GITHUB_ENV
-              } else {
-                throw "trip.exe not found via where command"
-              }
-            } catch {
-              Write-Error "Could not find trip.exe executable after installation. Please check PATH variables and cargo installation."
-              exit 1
-            }
+            Write-Error "trip.exe was not found at expected path: $trippyPath"
+            exit 1
           }
         shell: pwsh
         env:
