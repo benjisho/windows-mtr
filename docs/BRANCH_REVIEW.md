@@ -6,20 +6,28 @@ This document summarizes the current branch delta, what is complete, and what st
 The branch is focused on CI/CD maintenance (dependency updates in release automation), not runtime CLI or probe-engine behavior.
 
 ## What was introduced in this branch
-From branch history (`git log --oneline --name-only`):
+From branch history in the reviewed range (`git log --oneline --name-only`), the following files changed:
 
-1. `Bump docker/login-action from 3 to 4`
-   - Updated `docker/login-action` to `v4` in `.github/workflows/release.yml`.
-2. `Bump docker/setup-qemu-action from 3 to 4`
-   - Updated `docker/setup-qemu-action` to `v4` in `.github/workflows/release.yml`.
+1. `.github/workflows/release.yml`
+   - Bumped `docker/login-action` from major `v3` to `v4`.
+   - Bumped `docker/setup-qemu-action` from major `v3` to `v4`.
+2. `.github/workflows/security.yml`
+   - Added explicit workflow/job `permissions` to address least-privilege and code-scanning guidance.
+3. `.github/workflows/windows-build.yml`
+   - Added explicit workflow/job `permissions` to address least-privilege and code-scanning guidance.
+4. `README.md`
+   - Updated badge presentation/status messaging.
+   - Updated roadmap/status text to reflect current priorities.
 
-## Done vs still needed
+## 1) Completed in this PR
 
-### ✅ Done
 - Release workflow action versions were advanced to current major versions for Docker login and QEMU setup.
+- Security-sensitive workflows now include explicit `permissions` declarations (`security.yml` and `windows-build.yml`).
+- README documentation updates were included for badge and roadmap/status alignment.
 - Container publishing path still targets both GHCR and Docker Hub and keeps multi-arch build intent (`linux/amd64`, `linux/arm64`).
 
-### 🛠️ Still needed / recommended follow-ups
+## 2) Follow-up recommendations
+
 - Pin third-party actions to full commit SHAs (not only major tags) for stronger supply-chain immutability.
 - Keep least-privilege `permissions` review as part of recurring workflow maintenance.
 - Add/confirm CI checks that validate workflow changes before merge (e.g., actionlint in CI, if adopted by maintainers).
