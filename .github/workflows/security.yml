@@ -32,7 +32,7 @@ jobs:
   cargo-security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Rust 1.88.0
         uses: dtolnay/rust-toolchain@stable
@@ -40,7 +40,7 @@ jobs:
           toolchain: 1.88.0
 
       - name: Cache Cargo dependencies and installed binaries
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-security-1.88.0"
@@ -49,7 +49,7 @@ jobs:
 
       - name: Run cargo-deny
         id: cargo_deny
-        uses: EmbarkStudios/cargo-deny-action@v2
+        uses: EmbarkStudios/cargo-deny-action@3fd3802e88374d3fe9159b834c7714ec57d6c979 # v2
         with:
           rust-version: 1.88.0
           command: check
