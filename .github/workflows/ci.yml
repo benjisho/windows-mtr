@@ -6,16 +6,24 @@ on:
     - cron: '0 5 * * 1'
   push:
     branches: [ master ]
-    paths-ignore:
-      - '**/*.md'
-      - '**/.gitignore'
-      - '.gitignore'
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'tests/**'
+      - 'xtask/**'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [ master ]
-    paths-ignore:
-      - '**/*.md'
-      - '**/.gitignore'
-      - '.gitignore'
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'tests/**'
+      - 'xtask/**'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
 
 permissions:
   contents: read
