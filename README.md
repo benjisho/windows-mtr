@@ -1,7 +1,7 @@
 # Windows MTR
 
 <div align="center">
-  <img src="assets/windows-mtr-m.gif" alt="Windows MTR Banner" width="80%">
+  <img src="assets/windows-mtr-upscaled.gif" alt="Windows MTR Banner" width="80%">
   <h3>Enterprise-grade network diagnostics for Windows environments</h3>
 
   <p align="center">
