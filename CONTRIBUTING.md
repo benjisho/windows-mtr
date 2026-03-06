@@ -57,6 +57,20 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all
 ```
 
+All pull requests run a dedicated **Workflow QA** check with `actionlint` to validate GitHub Actions workflow syntax and semantics.
+
+To mirror CI locally, install [pre-commit](https://pre-commit.com/) and run:
+
+```bash
+pre-commit run --all-files
+```
+
+If you only want to run workflow QA directly, run:
+
+```bash
+actionlint
+```
+
 If any command cannot run in your environment, include:
 
 - The exact command
