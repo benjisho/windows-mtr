@@ -22,7 +22,6 @@ on:
 permissions:
   actions: read
   contents: read
-  security-events: write
 
 jobs:
   analyze:
@@ -43,6 +42,7 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:
+          # Non-uploading mode: run local analysis only and do not publish code-scanning alerts.
           upload: never
           upload-database: false
           wait-for-processing: false
