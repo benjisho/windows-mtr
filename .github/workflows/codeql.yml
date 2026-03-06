@@ -17,7 +17,6 @@ on:
       - 'Cargo.lock'
       - 'src/**'
       - 'tests/**'
-      - '.github/workflows/codeql.yml'
 
 permissions:
   actions: read
