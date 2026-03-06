@@ -3,23 +3,37 @@
 This document summarizes the current branch delta, what is complete, and what still needs edits to stay aligned with `windows-mtr` goals.
 
 ## PR aim (current branch)
-The branch is focused on CI/CD maintenance (dependency updates in release automation), not runtime CLI or probe-engine behavior.
+The branch is focused on CI/CD and code-scanning workflow maintenance (dependency updates, workflow hardening, and documentation alignment), not runtime CLI or probe-engine behavior.
 
 ## What was introduced in this branch
-From branch history (`git log --oneline --name-only`):
+From branch history in the reviewed range (`git log --oneline --name-only`), the following files changed:
 
-1. `Bump docker/login-action from 3 to 4`
-   - Updated `docker/login-action` to `v4` in `.github/workflows/release.yml`.
-2. `Bump docker/setup-qemu-action from 3 to 4`
-   - Updated `docker/setup-qemu-action` to `v4` in `.github/workflows/release.yml`.
+1. `.github/workflows/release.yml`
+   - Bumped `docker/login-action` from major `v3` to `v4`.
+   - Bumped `docker/setup-qemu-action` from major `v3` to `v4`.
+2. `.github/workflows/security.yml`
+   - Added explicit workflow/job `permissions` to address least-privilege and code-scanning guidance.
+3. `.github/workflows/windows-build.yml`
+   - Added explicit workflow/job `permissions` to address least-privilege and code-scanning guidance.
+4. `.github/workflows/codeql.yml`
+   - Added/updated CodeQL workflow configuration for Rust analysis and PR-safe SARIF behavior.
+5. `README.md`
+   - Updated badge presentation/status messaging.
+   - Updated roadmap/status text to reflect current priorities.
 
-## Done vs still needed
+## Why CodeQL checks can still appear on docs-only PRs
+If branch protection requires CodeQL checks, GitHub may still schedule those checks at PR time even when the latest commit only changes Markdown. In this branch, CodeQL configuration was also modified (`.github/workflows/codeql.yml`), so seeing `CodeQL / Analyze (actions)` and `CodeQL / Analyze (rust)` checks is expected for policy/scan consistency.
 
-### ✅ Done
+## 1) Completed in this PR
+
 - Release workflow action versions were advanced to current major versions for Docker login and QEMU setup.
+- Security-sensitive workflows now include explicit `permissions` declarations (`security.yml` and `windows-build.yml`).
+- CodeQL workflow configuration was added/refined (`codeql.yml`) to support repository scanning behavior.
+- README documentation updates were included for badge and roadmap/status alignment.
 - Container publishing path still targets both GHCR and Docker Hub and keeps multi-arch build intent (`linux/amd64`, `linux/arm64`).
 
-### 🛠️ Still needed / recommended follow-ups
+## 2) Follow-up recommendations
+
 - Pin third-party actions to full commit SHAs (not only major tags) for stronger supply-chain immutability.
 - Keep least-privilege `permissions` review as part of recurring workflow maintenance.
 - Add/confirm CI checks that validate workflow changes before merge (e.g., actionlint in CI, if adopted by maintainers).

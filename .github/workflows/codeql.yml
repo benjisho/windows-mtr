@@ -10,6 +10,8 @@ on:
       - 'src/**'
       - 'tests/**'
       - '.github/workflows/codeql.yml'
+      - '!**/*.md'
+      - '!docs/**'
   pull_request:
     branches: [ master ]
     paths:
@@ -18,6 +20,8 @@ on:
       - 'src/**'
       - 'tests/**'
       - '.github/workflows/codeql.yml'
+      - '!**/*.md'
+      - '!docs/**'
 
 permissions:
   actions: read
