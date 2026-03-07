@@ -2,6 +2,21 @@ name: CodeQL
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/codeql.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'tests/**'
   workflow_run:
     workflows: ["Pre-commit"]
     types: [completed]
