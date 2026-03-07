@@ -76,14 +76,20 @@ jobs:
             }
           }
           
-          # Verify installation and find location (trippy installs as trip.exe on Windows)
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
+          $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
+          $candidatePaths = @(
+            (Join-Path $cargoBin "trip.exe"),
+            (Join-Path $cargoBin "trippy.exe"),
+            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
+            (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+          )
+          $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
           
           if (Test-Path $trippyPath) {
-            echo "Trippy successfully installed as trip.exe at: $trippyPath"
+            echo "Trippy executable found at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
           } else {
-            Write-Error "trip.exe was not found at expected path: $trippyPath"
+            Write-Error "trippy executable was not found after install. Checked: $($candidatePaths -join ', ')"
             exit 1
           }
         shell: pwsh
@@ -170,8 +176,19 @@ jobs:
       - name: Find trippy executable for bundling
         id: find_trippy
         run: |
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
-          
+          if (-not $env:TRIPPY_PATH -or -not (Test-Path $env:TRIPPY_PATH)) {
+            $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
+            $candidatePaths = @(
+              (Join-Path $cargoBin "trip.exe"),
+              (Join-Path $cargoBin "trippy.exe"),
+              (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
+              (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+            )
+            $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+          } else {
+            $trippyPath = $env:TRIPPY_PATH
+          }
+
           if (Test-Path $trippyPath) {
             echo "Found trippy at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
@@ -304,14 +321,20 @@ jobs:
             }
           }
           
-          # Verify installation and find location (trippy installs as trip.exe on Windows)
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
+          $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
+          $candidatePaths = @(
+            (Join-Path $cargoBin "trip.exe"),
+            (Join-Path $cargoBin "trippy.exe"),
+            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
+            (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+          )
+          $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
           
           if (Test-Path $trippyPath) {
-            echo "Trippy successfully installed as trip.exe at: $trippyPath"
+            echo "Trippy executable found at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
           } else {
-            Write-Error "trip.exe was not found at expected path: $trippyPath"
+            Write-Error "trippy executable was not found after install. Checked: $($candidatePaths -join ', ')"
             exit 1
           }
         shell: pwsh
@@ -322,8 +345,19 @@ jobs:
       - name: Find trippy executable
         id: find_trippy
         run: |
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
-          
+          if (-not $env:TRIPPY_PATH -or -not (Test-Path $env:TRIPPY_PATH)) {
+            $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
+            $candidatePaths = @(
+              (Join-Path $cargoBin "trip.exe"),
+              (Join-Path $cargoBin "trippy.exe"),
+              (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
+              (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+            )
+            $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+          } else {
+            $trippyPath = $env:TRIPPY_PATH
+          }
+
           if (Test-Path $trippyPath) {
             echo "Found trippy at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
