@@ -412,6 +412,15 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 We welcome contributions from the community! Check out our [contributing guidelines](CONTRIBUTING.md) to get started.
 
+### Run repository checks locally (manual)
+
+To run the same repository-wide hook suite used in CI:
+
+```bash
+python -m pip install pre-commit
+pre-commit run --all-files
+```
+
 ## 📜 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
