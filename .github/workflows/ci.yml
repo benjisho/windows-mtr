@@ -4,28 +4,47 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 5 * * 1'
-  workflow_run:
-    workflows: ["Pre-commit"]
-    types: [completed]
-
+  push:
+    branches: [ master ]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'tests/**'
+      - 'xtask/**'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'tests/**'
+      - 'xtask/**'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
 permissions:
   contents: read
 
 jobs:
-  precommit-gate:
-    name: Pre-commit gate
+  pre-commit:
+    name: Pre-commit
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure pre-commit succeeded for workflow_run
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ] && [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
-            echo "Pre-commit did not succeed (conclusion=${{ github.event.workflow_run.conclusion }}); skipping CI."
-            exit 1
-          fi
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
 
   resolve-msrv:
-    needs: precommit-gate
+    needs: pre-commit
     name: Resolve MSRV from Cargo.toml
     runs-on: ubuntu-latest
     outputs:
@@ -35,8 +54,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Resolve rust-version from Cargo.toml and stable toolchain version
         id: resolve
@@ -77,7 +94,7 @@ jobs:
   test-msrv:
     name: Test (${{ matrix.os }}, msrv)
     runs-on: ${{ matrix.os }}
-    needs: [precommit-gate, resolve-msrv]
+    needs: [pre-commit, resolve-msrv]
     if: github.event_name == 'push' || github.event_name == 'schedule'
     strategy:
       matrix:
@@ -87,8 +104,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Rust (MSRV)
         uses: dtolnay/rust-toolchain@stable
@@ -101,7 +116,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
-          save-if: ${{ github.event_name != 'workflow_run' && github.ref == 'refs/heads/master' }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-${{ matrix.os }}-msrv-${{ needs.resolve-msrv.outputs.msrv }}"
           cache-bin: true
           cache-directories: |
@@ -128,7 +143,7 @@ jobs:
   test-stable:
     name: Test (${{ matrix.os }}, stable)
     runs-on: ${{ matrix.os }}
-    needs: [precommit-gate, resolve-msrv]
+    needs: [pre-commit, resolve-msrv]
     if: needs.resolve-msrv.outputs.run_stable == 'true'
     strategy:
       matrix:
@@ -138,8 +153,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -152,7 +165,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
-          save-if: ${{ github.event_name != 'workflow_run' && github.ref == 'refs/heads/master' }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-windows-latest-stable"
           cache-bin: true
           cache-directories: |
@@ -180,12 +193,10 @@ jobs:
   docker-build-amd64:
     name: Test (docker, linux/amd64)
     runs-on: ubuntu-latest
-    needs: precommit-gate
+    needs: pre-commit
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -211,8 +222,8 @@ jobs:
   build-pr-binaries:
     name: Build PR Binaries
     runs-on: windows-latest
-    needs: [precommit-gate, test-msrv, test-stable, docker-build-amd64]
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' && needs.docker-build-amd64.result == 'success' && needs.test-msrv.result == 'success' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
+    needs: [pre-commit, test-msrv, test-stable, docker-build-amd64]
+    if: github.event_name == 'pull_request' && needs.docker-build-amd64.result == 'success' && needs.test-msrv.result == 'success' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
     permissions:
       contents: read
       issues: write
@@ -220,8 +231,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -292,26 +301,25 @@ jobs:
 
       - name: Create ZIP package
         run: |
-          Compress-Archive -Path pr-build/* -DestinationPath pr-build/windows-mtr-PR${{ github.event.workflow_run.pull_requests[0].number }}.zip -Force
+          Compress-Archive -Path pr-build/* -DestinationPath pr-build/windows-mtr-PR${{ github.event.pull_request.number }}.zip -Force
         shell: pwsh
 
       - name: Upload PR build artifacts
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
-          name: windows-mtr-PR${{ github.event.workflow_run.pull_requests[0].number }}
+          name: windows-mtr-PR${{ github.event.pull_request.number }}
           path: |
             pr-build/*.exe
             pr-build/*.zip
           retention-days: 14
 
       - name: Comment on PR with download link
-        if: ${{ github.event.workflow_run.head_repository.full_name == github.repository }}
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
           script: |
-            const prNumber = context.payload.workflow_run.pull_requests[0]?.number;
-            const artifactName = `windows-mtr-PR${prNumber}`;
+            const artifactName = `windows-mtr-PR${context.issue.number}`;
             const workflowRunId = context.runId;
             const repoOwner = context.repo.owner;
             const repoName = context.repo.repo;
@@ -322,7 +330,7 @@ jobs:
                            `[Download Windows MTR PR Build](${downloadUrl})`;
 
             github.rest.issues.createComment({
-              issue_number: prNumber,
+              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: comment
@@ -330,14 +338,12 @@ jobs:
   test-ubuntu-smoke:
     name: Test (ubuntu-latest, smoke)
     runs-on: ubuntu-latest
-    needs: precommit-gate
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request'
+    needs: pre-commit
+    if: github.event_name == 'pull_request'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -364,14 +370,12 @@ jobs:
   test-ubuntu-stable-full:
     name: Test (ubuntu-latest, stable-full)
     runs-on: ubuntu-latest
-    needs: [precommit-gate, resolve-msrv, test-msrv]
+    needs: [pre-commit, resolve-msrv, test-msrv]
     if: (github.event_name == 'push' || github.event_name == 'schedule') && needs.resolve-msrv.outputs.run_stable == 'true'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -383,7 +387,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
-          save-if: ${{ github.event_name != 'workflow_run' && github.ref == 'refs/heads/master' }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-ubuntu-latest-stable"
           cache-bin: true
           cache-directories: |
