@@ -12,8 +12,17 @@ repos:
     rev: v1.0
     hooks:
       - id: fmt
+        name: rust: cargo fmt --all -- --check
+        args: [--all, --, --check]
+        pass_filenames: false
       - id: cargo-check
+        name: rust: cargo check --workspace
+        args: [--workspace]
+        pass_filenames: false
       - id: clippy
+        name: rust: cargo clippy --all-targets --all-features -- -D warnings
+        args: [--all-targets, --all-features, --, -D, warnings]
+        pass_filenames: false
 
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.11
