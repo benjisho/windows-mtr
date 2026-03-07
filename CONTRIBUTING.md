@@ -65,7 +65,7 @@ To mirror CI locally, install [pre-commit](https://pre-commit.com/) and run:
 pre-commit run --all-files
 ```
 
-The repository pre-commit configuration includes workflow QA and baseline hygiene checks such as `check-merge-conflict`, `check-yaml`, trailing whitespace, and end-of-file normalization.
+The repository pre-commit configuration includes workflow QA, baseline hygiene checks (such as `check-merge-conflict`, `check-yaml`, trailing whitespace, and end-of-file normalization), and Rust checks (`cargo fmt`, `cargo check`, and `cargo clippy`).
 
 If you only want to run workflow QA directly, run:
 

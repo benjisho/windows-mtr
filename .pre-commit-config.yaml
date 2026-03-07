@@ -8,6 +8,13 @@ repos:
       - id: trailing-whitespace
       - id: check-added-large-files
 
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+      - id: cargo-check
+      - id: clippy
+
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.11
     hooks:
