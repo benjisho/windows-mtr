@@ -67,6 +67,28 @@ pre-commit run --all-files
 
 The repository pre-commit configuration includes workflow QA, baseline hygiene checks (such as `check-merge-conflict`, `check-yaml`, trailing whitespace, and end-of-file normalization), and Rust checks (`cargo fmt`, `cargo check`, and `cargo clippy`).
 
+Markdown linting uses a **two-tier policy**:
+
+1. **Baseline full-repository lint must pass** using the repository's relaxed legacy profile in `.markdownlint.jsonc`.
+2. **Any Markdown file changed in your branch must pass strict lint** using `strict.markdownlint.jsonc`.
+
+Run the baseline check:
+
+```bash
+npx -y markdownlint-cli2 "**/*.md" "!target/**" "!vendor/**"
+```
+
+Run strict lint for Markdown files changed from `master`:
+
+```bash
+changed_md_files=$(git diff --name-only --diff-filter=ACMR origin/master...HEAD -- '*.md')
+if [ -n "$changed_md_files" ]; then
+  printf '%s\n' "$changed_md_files" | xargs -r npx -y markdownlint-cli2 --config strict.markdownlint.jsonc
+fi
+```
+
+This approach keeps legacy documentation debt scoped while ensuring newly touched Markdown meets stricter standards.
+
 If you only want to run workflow QA directly, run:
 
 ```bash
