@@ -412,6 +412,12 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 We welcome contributions from the community! Check out our [contributing guidelines](CONTRIBUTING.md) to get started.
 
+Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`:
+
+```bash
+pre-commit run --all-files
+```
+
 ## 📜 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
