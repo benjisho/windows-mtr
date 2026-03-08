@@ -18,6 +18,8 @@ This document covers local setup, day-to-day development workflow, and troublesh
 
 - Rust toolchain (Rust 1.88.0+ recommended)
 - Git
+- [pre-commit](https://pre-commit.com/)
+- `hadolint` (required for local Dockerfile pre-commit hooks)
 
 ### Windows builds
 
@@ -74,6 +76,20 @@ Targeted test examples:
 ```bash
 cargo test --test cli_tests
 cargo test --test report_tests
+```
+
+For repository pre-commit checks:
+
+```bash
+pre-commit run --all-files
+```
+
+Ensure `hadolint` is installed locally before running pre-commit so Dockerfile lint hooks can run.
+
+If you are working in a restricted environment and cannot install it, you can explicitly skip the hook:
+
+```bash
+SKIP=hadolint pre-commit run --all-files
 ```
 
 ## Project Layout
