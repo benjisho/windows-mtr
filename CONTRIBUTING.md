@@ -65,7 +65,15 @@ To mirror CI locally, install [pre-commit](https://pre-commit.com/) and run:
 pre-commit run --all-files
 ```
 
-The repository pre-commit configuration includes workflow QA, baseline hygiene checks (such as `check-merge-conflict`, `check-yaml`, trailing whitespace, and end-of-file normalization), and Rust checks (`cargo fmt`, `cargo check`, and `cargo clippy`).
+The repository pre-commit configuration includes workflow QA, baseline hygiene checks (such as `check-merge-conflict`, `check-yaml`, trailing whitespace, and end-of-file normalization), Rust checks (`cargo fmt`, `cargo check`, and `cargo clippy`), and Dockerfile linting via `hadolint`.
+
+Install `hadolint` locally before running pre-commit so Dockerfile lint hooks can execute without missing-tool failures.
+
+If you are in a restricted/offline environment and cannot install `hadolint`, run pre-commit with an explicit skip:
+
+```bash
+SKIP=hadolint pre-commit run --all-files
+```
 
 Markdown linting uses a **two-tier policy**:
 
