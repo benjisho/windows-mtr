@@ -64,9 +64,11 @@ jobs:
             run_stable=true
           fi
 
-          echo "msrv=$msrv" >> "$GITHUB_OUTPUT"
-          echo "stable_version=$stable_version" >> "$GITHUB_OUTPUT"
-          echo "run_stable=$run_stable" >> "$GITHUB_OUTPUT"
+          {
+            echo "msrv=$msrv"
+            echo "stable_version=$stable_version"
+            echo "run_stable=$run_stable"
+          } >> "$GITHUB_OUTPUT"
 
           if [ "$run_stable" = "false" ]; then
             echo "Stable toolchain ($stable_version) matches MSRV ($msrv). Skipping CI / Test (..., stable) because CI / Test (..., msrv=$msrv) already validated this version." >> "$GITHUB_STEP_SUMMARY"
