@@ -57,9 +57,12 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all
 ```
 
-All pull requests run a dedicated **Workflow QA** check with `actionlint` to validate GitHub Actions workflow syntax and semantics.
+All pull requests run dedicated **Workflow QA** checks for `actionlint` and `pre-commit --all-files` to validate workflow syntax and repository hygiene.
 
 To mirror CI locally, install [pre-commit](https://pre-commit.com/) and run:
+
+> [!IMPORTANT]
+> Install Rust via [rustup](https://www.rust-lang.org/tools/install) first, and ensure `cargo` is available on your `PATH` before running pre-commit, because repository hooks execute Rust tooling.
 
 ```bash
 pre-commit run --all-files
