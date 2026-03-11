@@ -34,6 +34,20 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Set up Rust (for pre-commit Rust hooks)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install hadolint
+        shell: bash
+        run: |
+          HADOLINT_VERSION=v2.12.0
+          curl -sSfL "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-linux-x86_64" -o hadolint
+          chmod +x hadolint
+          sudo mv hadolint /usr/local/bin/hadolint
+          hadolint --version
+
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
 
