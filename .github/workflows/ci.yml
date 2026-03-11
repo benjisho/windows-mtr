@@ -40,6 +40,11 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Set up Rust (for pre-commit Rust hooks)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
 
