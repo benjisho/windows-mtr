@@ -75,7 +75,7 @@ jobs:
               exit 1
             }
           }
-          
+
           $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
           $candidatePaths = @(
             (Join-Path $cargoBin "trip.exe"),
@@ -84,7 +84,7 @@ jobs:
             (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
           )
           $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-          
+
           if (Test-Path $trippyPath) {
             echo "Trippy executable found at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
@@ -95,7 +95,7 @@ jobs:
         shell: pwsh
         env:
           CARGO_INCREMENTAL: 0
-          
+
       # Run the tests
       - name: Run tests
         run: cargo test --all
@@ -113,25 +113,25 @@ jobs:
       - name: Check build output
         run: |
           echo "Checking for binary in target directories..."
-          
+
           # Check standard target directory
           if (Test-Path "target/release") {
             echo "Contents of target/release:"
             Get-ChildItem -Path "target/release" -Filter "*.exe"
           }
-          
+
           # Check target-specific directory
           if (Test-Path "target/x86_64-pc-windows-msvc/release") {
             echo "Contents of target/x86_64-pc-windows-msvc/release:"
             Get-ChildItem -Path "target/x86_64-pc-windows-msvc/release" -Filter "*.exe"
           }
-          
+
           # Also check with slashes in other direction
           if (Test-Path "target\release") {
             echo "Contents of target\release:"
             Get-ChildItem -Path "target\release" -Filter "*.exe"
           }
-          
+
           # Check target-specific directory with backslashes
           if (Test-Path "target\x86_64-pc-windows-msvc\release") {
             echo "Contents of target\x86_64-pc-windows-msvc\release:"
@@ -151,7 +151,7 @@ jobs:
             exit 1
           }
           echo "✓ Help command verified"
-          
+
           # Test version output
           $versionOutput = & ./target/x86_64-pc-windows-msvc/release/mtr.exe --version
           if (-not ($versionOutput -match "mtr ")) {
@@ -159,7 +159,7 @@ jobs:
             exit 1
           }
           echo "✓ Version command verified"
-          
+
           # Test basic command-line argument parsing (without network activity)
           try {
             Start-Process -FilePath "./target/x86_64-pc-windows-msvc/release/mtr.exe" -ArgumentList "-T", "-P", "443", "-c", "1", "-n", "--help" -NoNewWindow -Wait
@@ -168,11 +168,11 @@ jobs:
             Write-Error "Command-line argument parsing test failed: $_"
             exit 1
           }
-          
+
           echo "All binary verification tests passed successfully!"
         shell: pwsh
 
-      # Find and copy trippy executable for bundling 
+      # Find and copy trippy executable for bundling
       - name: Find trippy executable for bundling
         id: find_trippy
         run: |
@@ -320,7 +320,7 @@ jobs:
               exit 1
             }
           }
-          
+
           $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
           $candidatePaths = @(
             (Join-Path $cargoBin "trip.exe"),
@@ -329,7 +329,7 @@ jobs:
             (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
           )
           $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-          
+
           if (Test-Path $trippyPath) {
             echo "Trippy executable found at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
@@ -340,7 +340,7 @@ jobs:
         shell: pwsh
         env:
           CARGO_INCREMENTAL: 0
-      
+
       # Find the trippy executable
       - name: Find trippy executable
         id: find_trippy
@@ -379,17 +379,17 @@ jobs:
         run: |
           # Build the release binary explicitly first
           cargo build --release --bin mtr --target x86_64-pc-windows-msvc
-          
+
           # Check for binary in different locations and list them for debugging
           Write-Host "Searching for the MTR executable..."
-          
+
           $possiblePaths = @(
             "target/x86_64-pc-windows-msvc/release/mtr.exe",
             "target/release/mtr.exe",
-            "target\x86_64-pc-windows-msvc\release\mtr.exe", 
+            "target\x86_64-pc-windows-msvc\release\mtr.exe",
             "target\release\mtr.exe"
           )
-          
+
           $mtrPath = $null
           foreach ($path in $possiblePaths) {
             if (Test-Path $path) {
@@ -398,22 +398,22 @@ jobs:
               break
             }
           }
-          
+
           # If binary not found, look more broadly
           if ($null -eq $mtrPath) {
             Write-Host "Binary not found in expected paths, searching in target directories..."
-            
+
             # Look for any .exe files in target/release or target/x86_64-pc-windows-msvc/release
             $exeFiles = @()
             $exeFiles += Get-ChildItem -Path "target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
             $exeFiles += Get-ChildItem -Path "target/x86_64-pc-windows-msvc/release" -Filter "*.exe" -ErrorAction SilentlyContinue
             $exeFiles += Get-ChildItem -Path "target\release" -Filter "*.exe" -ErrorAction SilentlyContinue
             $exeFiles += Get-ChildItem -Path "target\x86_64-pc-windows-msvc\release" -Filter "*.exe" -ErrorAction SilentlyContinue
-            
+
             foreach ($file in $exeFiles) {
               Write-Host "Found executable: $($file.FullName)"
             }
-            
+
             # If we found any .exe files, use the first one
             if ($exeFiles.Count -gt 0) {
               $mtrPath = $exeFiles[0].FullName
@@ -423,37 +423,37 @@ jobs:
               exit 1
             }
           }
-          
+
           # Create directories
           New-Item -ItemType Directory -Path 'dist' -Force
           New-Item -ItemType Directory -Path 'windows-mtr-official' -Force
-          
+
           # Copy the executable
           Copy-Item $mtrPath windows-mtr-official/windows-mtr.exe
           Copy-Item "${{ env.TRIPPY_PATH }}" windows-mtr-official/trippy.exe
-          
+
           # Add a simple README
           @"
           Windows MTR by Benji Shohet (benjisho)
           -------------------------------------
-          
+
           A Windows-native clone of Linux MTR for network path diagnostics.
-          
+
           Instructions:
           1. Make sure both windows-mtr.exe and trippy.exe are in the same directory
           2. Run windows-mtr.exe from command prompt or PowerShell
-          
+
           Example commands:
           windows-mtr 8.8.8.8            # Basic ICMP trace to Google DNS
           windows-mtr -T -P 443 github.com  # TCP trace to GitHub (HTTPS)
           windows-mtr -r -c 10 example.com  # Generate report with 10 pings
-          
+
           For more information see: https://github.com/benjisho/windows-mtr
           "@ > windows-mtr-official/README.txt
-          
+
           # Create the official ZIP package
           Compress-Archive -Path "windows-mtr-official\*" -DestinationPath "dist\windows-mtr-official.zip" -Force
-          
+
           # Generate SHA256 checksums for the zip file
           $hash = Get-FileHash -Path "dist\windows-mtr-official.zip" -Algorithm SHA256
           Set-Content -Path "dist\SHA256SUM" -Value "$($hash.Hash)  windows-mtr-official.zip"
@@ -478,32 +478,32 @@ jobs:
           name: Windows MTR ${{ github.ref_name }}
           body: |
             # Windows MTR ${{ github.ref_name }}
-            
+
             A Windows-native clone of Linux MTR for network path diagnostics.
-            
+
             ## Download
-            
+
             [**windows-mtr-official.zip**](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr-official.zip) - Contains Windows MTR executable and trippy dependency
-            
+
             ## Installation
-            
+
             1. Download and extract the zip file
             2. Make sure both executables remain in the same directory
             3. Run `windows-mtr.exe` from command prompt or PowerShell
-            
+
             ## Usage
-            
+
             ```
             # Basic usage
             windows-mtr 8.8.8.8
-            
+
             # TCP mode (for HTTPS)
             windows-mtr -T -P 443 example.com
-            
+
             # Report mode (no live updates)
             windows-mtr -r -c 10 google.com
             ```
-            
+
             See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/master/USAGE.md) for complete documentation.
           draft: false
           prerelease: false

@@ -23,18 +23,6 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Run actionlint
-        uses: docker://rhysd/actionlint:1.7.11
-
-  pre-commit:
-    name: pre-commit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-
       - name: Install hadolint
         shell: bash
         run: |
@@ -44,11 +32,13 @@ jobs:
           sudo mv hadolint /usr/local/bin/hadolint
           hadolint --version
 
-      - name: Install pre-commit
-        run: python -m pip install --upgrade pre-commit
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install pre-commit
+        run: python -m pip install --upgrade pre-commit
 
       - name: Run pre-commit
         run: pre-commit run --all-files
