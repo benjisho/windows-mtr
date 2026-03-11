@@ -3,7 +3,7 @@ name: Windows Build and Release
 on:
   # Manually triggered from GitHub UI
   workflow_dispatch:
-  
+
   # On release tag push
   push:
     tags:
@@ -16,44 +16,44 @@ jobs:
   build-windows:
     runs-on: windows-latest
     name: Build Windows Binary
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
 
-          
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
           save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
           shared-key: "rust-windows-build-release"
           cache-bin: true
-        
+
       - name: Build
         run: cargo build --release
-        
+
       - name: Test
         run: cargo test
-      
+
       - name: Create dist directory
         run: powershell -command "New-Item -ItemType Directory -Path 'dist' -Force"
-      
+
       - name: Package binaries
         run: |
           # First check if binary exists in target-specific or standard path
           if (Test-Path "target\x86_64-pc-windows-msvc\release\mtr.exe") {
             $mtrPath = "target\x86_64-pc-windows-msvc\release\mtr.exe"
           } elseif (Test-Path "target\release\mtr.exe") {
-            $mtrPath = "target\release\mtr.exe" 
+            $mtrPath = "target\release\mtr.exe"
           } else {
             # Run cargo build again to make sure we have a binary
             cargo build --release
-            
+
             # Check again for the binary
             if (Test-Path "target\release\mtr.exe") {
               $mtrPath = "target\release\mtr.exe"
@@ -62,35 +62,35 @@ jobs:
               exit 1
             }
           }
-          
+
           # Print the path we found
           Write-Host "Found MTR binary at: $mtrPath"
-          
+
           # Create dist directory if it doesn't exist
           New-Item -ItemType Directory -Path 'dist' -Force
-          
+
           # Copy the binary to dist
           Copy-Item $mtrPath dist\windows-mtr.exe
-          
+
           # Create the ZIP package
           Push-Location dist
-          
+
           # Use PowerShell to create a ZIP file
           Compress-Archive -Path 'windows-mtr.exe' -DestinationPath 'windows-mtr.zip' -Force
-          
+
           # Also create a copy with the original name for convenience
           Copy-Item windows-mtr.exe mtr.exe
           Compress-Archive -Path @('mtr.exe', 'windows-mtr.exe', '..\README.md', '..\LICENSE', '..\USAGE.md') -DestinationPath 'windows-mtr-full.zip' -Force
-          
+
           # Generate SHA-256 checksums
           $files = Get-ChildItem -Filter '*.zip'
-          foreach ($file in $files) { 
+          foreach ($file in $files) {
             $hash = Get-FileHash -Path $file.FullName -Algorithm SHA256
             Add-Content -Path 'SHA256SUMS' -Value "$($hash.Hash)  $($file.Name)"
           }
-          
+
           Pop-Location
-      
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
@@ -100,7 +100,7 @@ jobs:
             dist/mtr.exe
             dist/*.zip
             dist/SHA256SUMS
-          
+
   # Only run on tag push
   release:
     needs: build-windows
@@ -111,10 +111,10 @@ jobs:
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
-        
+
       - name: Display structure of downloaded files
         run: ls -R
-        
+
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2

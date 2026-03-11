@@ -24,12 +24,41 @@ on:
       - 'xtask/**'
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
-
 permissions:
   contents: read
 
 jobs:
+  pre-commit:
+    name: Pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Set up Rust (for pre-commit Rust hooks)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install hadolint
+        shell: bash
+        run: |
+          HADOLINT_VERSION=v2.12.0
+          curl -sSfL "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-linux-x86_64" -o hadolint
+          chmod +x hadolint
+          sudo mv hadolint /usr/local/bin/hadolint
+          hadolint --version
+
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+
   resolve-msrv:
+    needs: pre-commit
     name: Resolve MSRV from Cargo.toml
     runs-on: ubuntu-latest
     outputs:
@@ -79,7 +108,7 @@ jobs:
   test-msrv:
     name: Test (${{ matrix.os }}, msrv)
     runs-on: ${{ matrix.os }}
-    needs: resolve-msrv
+    needs: [pre-commit, resolve-msrv]
     if: github.event_name == 'push' || github.event_name == 'schedule'
     strategy:
       matrix:
@@ -128,7 +157,7 @@ jobs:
   test-stable:
     name: Test (${{ matrix.os }}, stable)
     runs-on: ${{ matrix.os }}
-    needs: [resolve-msrv]
+    needs: [pre-commit, resolve-msrv]
     if: needs.resolve-msrv.outputs.run_stable == 'true'
     strategy:
       matrix:
@@ -178,6 +207,7 @@ jobs:
   docker-build-amd64:
     name: Test (docker, linux/amd64)
     runs-on: ubuntu-latest
+    needs: pre-commit
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -206,7 +236,7 @@ jobs:
   build-pr-binaries:
     name: Build PR Binaries
     runs-on: windows-latest
-    needs: [test-msrv, test-stable, docker-build-amd64]
+    needs: [pre-commit, test-msrv, test-stable, docker-build-amd64]
     if: github.event_name == 'pull_request' && needs.docker-build-amd64.result == 'success' && needs.test-msrv.result == 'success' && (needs.test-stable.result == 'success' || needs.test-stable.result == 'skipped')
     permissions:
       contents: read
@@ -246,14 +276,20 @@ jobs:
           echo "Installing trippy prebuilt binary..."
           cargo binstall trippy --no-confirm --locked
 
-          # Verify installation and find location (trippy installs as trip.exe on Windows)
-          $trippyPath = "$env:USERPROFILE\.cargo\bin\trip.exe"
+          $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
+          $candidatePaths = @(
+            (Join-Path $cargoBin "trip.exe"),
+            (Join-Path $cargoBin "trippy.exe"),
+            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
+            (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+          )
+          $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
           if (Test-Path $trippyPath) {
-            echo "Trippy successfully installed as trip.exe at: $trippyPath"
+            echo "Trippy executable found at: $trippyPath"
             echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
           } else {
-            Write-Error "Could not find trip.exe executable after cargo binstall."
+            Write-Error "Could not find trippy executable after cargo binstall. Checked: $($candidatePaths -join ', ')"
             exit 1
           }
         shell: pwsh
@@ -267,12 +303,12 @@ jobs:
         run: |
           mkdir -p pr-build
           cp target/x86_64-pc-windows-msvc/release/mtr.exe pr-build/windows-mtr.exe
-          
+
           # Copy documentation files individually to avoid PowerShell parameter issues
           cp README.md pr-build/
           cp LICENSE pr-build/
           if (Test-Path USAGE.md) { cp USAGE.md pr-build/ }
-          
+
           # Copy trippy executable
           cp "${{ env.TRIPPY_PATH }}" pr-build/trip.exe
         shell: pwsh
@@ -281,7 +317,7 @@ jobs:
         run: |
           Compress-Archive -Path pr-build/* -DestinationPath pr-build/windows-mtr-PR${{ github.event.pull_request.number }}.zip -Force
         shell: pwsh
-      
+
       - name: Upload PR build artifacts
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
@@ -290,7 +326,7 @@ jobs:
             pr-build/*.exe
             pr-build/*.zip
           retention-days: 14
-          
+
       - name: Comment on PR with download link
         if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
@@ -301,12 +337,12 @@ jobs:
             const workflowRunId = context.runId;
             const repoOwner = context.repo.owner;
             const repoName = context.repo.repo;
-            
+
             const downloadUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${workflowRunId}/artifacts`;
             const comment = `### 🚀 PR Build Ready for Testing\n\n` +
                            `Binary artifacts for this PR have been built and are available for testing.\n\n` +
                            `[Download Windows MTR PR Build](${downloadUrl})`;
-                           
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -316,6 +352,7 @@ jobs:
   test-ubuntu-smoke:
     name: Test (ubuntu-latest, smoke)
     runs-on: ubuntu-latest
+    needs: pre-commit
     if: github.event_name == 'pull_request'
 
     steps:
@@ -347,7 +384,7 @@ jobs:
   test-ubuntu-stable-full:
     name: Test (ubuntu-latest, stable-full)
     runs-on: ubuntu-latest
-    needs: [resolve-msrv, test-msrv]
+    needs: [pre-commit, resolve-msrv, test-msrv]
     if: (github.event_name == 'push' || github.event_name == 'schedule') && needs.resolve-msrv.outputs.run_stable == 'true'
 
     steps:

@@ -414,6 +414,12 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 We welcome contributions from the community! Check out our [contributing guidelines](CONTRIBUTING.md) to get started.
 
+### Run repository checks locally (manual)
+
+To run the same repository-wide hook suite used in CI:
+
+```bash
+python -m pip install pre-commit
 Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`:
 
 ```bash

@@ -222,7 +222,7 @@ echo 1. Help command test: %ERRORLEVEL%
 echo.
 
 echo Testing version command:
-mtr.exe --version > version_output.txt  
+mtr.exe --version > version_output.txt
 echo 2. Version command test: %ERRORLEVEL%
 echo.
 

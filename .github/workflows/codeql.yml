@@ -17,15 +17,44 @@ on:
       - 'Cargo.lock'
       - 'src/**'
       - 'tests/**'
-
 permissions:
   actions: read
   contents: read
 
 jobs:
+  pre-commit:
+    name: Pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Set up Rust (for pre-commit Rust hooks)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install hadolint
+        shell: bash
+        run: |
+          HADOLINT_VERSION=v2.12.0
+          curl -sSfL "https://github.com/hadolint/hadolint/releases/download/${HADOLINT_VERSION}/hadolint-linux-x86_64" -o hadolint
+          chmod +x hadolint
+          sudo mv hadolint /usr/local/bin/hadolint
+          hadolint --version
+
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+
   analyze:
     name: Analyze (rust)
     runs-on: ubuntu-latest
+    needs: pre-commit
     timeout-minutes: 30
 
     steps:
