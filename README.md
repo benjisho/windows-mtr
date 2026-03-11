@@ -262,6 +262,7 @@ For email server connectivity:
 ```bash
 mtr -T -P 25 mailserver.example.com
 ```
+
 </details>
 
 <details>
@@ -292,6 +293,7 @@ For enterprise environments, use our logging features to send results to central
 ```bash
 mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://logging.example.com/api/v1/logs
 ```
+
 </details>
 
 ## 📋 Documentation
@@ -418,6 +420,9 @@ To run the same repository-wide hook suite used in CI:
 
 ```bash
 python -m pip install pre-commit
+Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`:
+
+```bash
 pre-commit run --all-files
 ```
 
