@@ -10,7 +10,10 @@ use xz2::write::XzEncoder;
 use zip::write::{FileOptions, ZipWriter};
 
 fn main() -> Result<()> {
-    let task = env::args().nth(1);
+    // SAFETY: this is used only to select a local developer task command.
+    let task =
+        // nosemgrep: rust.lang.security.args.args
+        env::args().nth(1);
     match task.as_deref() {
         Some("dist") => dist()?,
         Some("dist-windows") => dist_windows()?,

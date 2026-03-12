@@ -309,7 +309,11 @@ fn build_embedded_trippy_args(args: &Cli, host: &str) -> Result<Vec<String>> {
 }
 
 fn run_embedded_trippy(args: &[String], json_format: Option<JsonFormat>) -> anyhow::Result<i32> {
-    let current_exe = env::current_exe().context("failed to locate current executable")?;
+    // SAFETY: `current_exe` is only used to re-exec this process for output formatting,
+    // not for any trust or authorization decision.
+    let current_exe =
+        // nosemgrep: rust.lang.security.current-exe.current-exe
+        env::current_exe().context("failed to locate current executable")?;
 
     if let Some(format) = json_format {
         let output = Command::new(&current_exe)
