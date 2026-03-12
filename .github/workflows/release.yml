@@ -62,14 +62,13 @@ jobs:
         run: |
           echo "Installing trippy..."
 
-          # Prefer prebuilt binaries for speed and reliability.
-          # Fallback to a source build only when a prebuilt artifact is unavailable
-          # (for example, temporary upstream gaps for a target/version combination).
-          cargo binstall trippy --no-confirm --locked
+          # In CI, force installation to avoid stale "already installed" state
+          # and install only the expected Trippy binary (`trip`).
+          cargo binstall trippy --no-confirm --locked --force --bin trip
 
           if ($LASTEXITCODE -ne 0) {
             Write-Warning "cargo binstall could not fetch a prebuilt trippy binary; falling back to cargo install from source."
-            cargo install trippy --locked
+            cargo install trippy --locked --force --bin trip
             if ($LASTEXITCODE -ne 0) {
               Write-Error "Failed to install trippy via both cargo binstall and cargo install fallback."
               exit 1
@@ -79,9 +78,7 @@ jobs:
           $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
           $candidatePaths = @(
             (Join-Path $cargoBin "trip.exe"),
-            (Join-Path $cargoBin "trippy.exe"),
-            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
-            (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -ErrorAction SilentlyContinue)
           )
           $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
@@ -180,9 +177,7 @@ jobs:
             $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
             $candidatePaths = @(
               (Join-Path $cargoBin "trip.exe"),
-              (Join-Path $cargoBin "trippy.exe"),
-              (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
-              (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+              (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -ErrorAction SilentlyContinue)
             )
             $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
           } else {
@@ -308,13 +303,13 @@ jobs:
           echo "Installing trippy..."
 
           # Prefer prebuilt binaries for speed and reliability.
-          # Fallback to a source build only when a prebuilt artifact is unavailable
-          # (for example, temporary upstream gaps for a target/version combination).
-          cargo binstall trippy --no-confirm --locked
+          # In CI, force install the expected Trippy binary (`trip`) to avoid
+          # stale metadata that can report "already installed" without a usable executable.
+          cargo binstall trippy --no-confirm --locked --force --bin trip
 
           if ($LASTEXITCODE -ne 0) {
             Write-Warning "cargo binstall could not fetch a prebuilt trippy binary; falling back to cargo install from source."
-            cargo install trippy --locked
+            cargo install trippy --locked --force --bin trip
             if ($LASTEXITCODE -ne 0) {
               Write-Error "Failed to install trippy via both cargo binstall and cargo install fallback."
               exit 1
@@ -324,9 +319,7 @@ jobs:
           $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
           $candidatePaths = @(
             (Join-Path $cargoBin "trip.exe"),
-            (Join-Path $cargoBin "trippy.exe"),
-            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
-            (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -ErrorAction SilentlyContinue)
           )
           $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
@@ -349,9 +342,7 @@ jobs:
             $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
             $candidatePaths = @(
               (Join-Path $cargoBin "trip.exe"),
-              (Join-Path $cargoBin "trippy.exe"),
-              (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
-              (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
+              (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -ErrorAction SilentlyContinue)
             )
             $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
           } else {
