@@ -1,0 +1,104 @@
+name: "🏷️ PR Auto-Labeler"
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+concurrency:
+  group: labeler-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label-by-path:
+    name: Label by changed files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply path-based labels
+        uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  label-by-title:
+    name: Label by PR title prefix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply label from conventional commit prefix
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          PREFIX=$(printf '%s' "$PR_TITLE" | sed -E 's/^([a-zA-Z]+)[:(].*/\1/' | tr '[:upper:]' '[:lower:]')
+
+          echo "PR title: $PR_TITLE"
+          echo "Detected prefix: '$PREFIX'"
+
+          LABEL=""
+          LABELS=""
+
+          case "$PREFIX" in
+            feat|feature)
+              LABEL="enhancement"
+              ;;
+            fix|bugfix)
+              LABEL="bug"
+              ;;
+            hotfix)
+              LABELS="hotfix bug"
+              ;;
+            docs)
+              LABEL="documentation"
+              ;;
+            ci)
+              LABEL="ci"
+              ;;
+            security)
+              LABEL="security"
+              ;;
+            perf)
+              LABEL="performance"
+              ;;
+            build)
+              LABEL="infrastructure"
+              ;;
+            docker)
+              LABEL="docker"
+              ;;
+            frontend|forntend)
+              LABEL="frontend"
+              ;;
+            patch)
+              LABEL="patch"
+              ;;
+            release)
+              LABEL="release"
+              ;;
+            *)
+              echo "No label mapping for prefix '${PREFIX}' — skipping."
+              exit 0
+              ;;
+          esac
+
+          LABELS=${LABELS:-$LABEL}
+          if [ -z "$LABELS" ]; then
+            echo "::warning::No labels resolved for prefix '$PREFIX' — skipping."
+            exit 0
+          fi
+
+          echo "Applying label(s) '$LABELS' based on prefix '$PREFIX'..."
+          read -r -a LABEL_ARRAY <<< "$LABELS"
+          for label in "${LABEL_ARRAY[@]}"; do
+            gh pr edit "$PR_NUMBER" \
+              --repo "$REPO" \
+              --add-label "$label" \
+              || echo "::warning::Could not apply label '$label' — verify the label exists in the repository."
+          done

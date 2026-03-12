@@ -2,6 +2,8 @@ name: CodeQL
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
   push:
     branches: [ master ]
     paths:
@@ -10,13 +12,6 @@ on:
       - 'src/**'
       - 'tests/**'
       - '.github/workflows/codeql.yml'
-  pull_request:
-    branches: [ master ]
-    paths:
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'src/**'
-      - 'tests/**'
 permissions:
   actions: read
   contents: read
