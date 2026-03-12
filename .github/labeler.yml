@@ -1,0 +1,43 @@
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/actions/**'
+          - '.pre-commit-config.yaml'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - 'docs/**'
+
+rust:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/**'
+          - 'Cargo.toml'
+          - 'Cargo.lock'
+          - 'rustfmt.toml'
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'tests/**'
+          - 'examples/**'
+
+packaging:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'packaging/**'
+          - 'Dockerfile'
+          - 'docker-compose*.yml'
+
+xtask:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'xtask/**'
+
+assets:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'assets/**'
