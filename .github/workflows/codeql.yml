@@ -30,7 +30,7 @@ jobs:
           python-version: '3.x'
 
       - name: Set up Rust (for pre-commit Rust hooks)
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
           toolchain: stable
 
@@ -44,7 +44,7 @@ jobs:
           hadolint --version
 
       - name: Run pre-commit
-        uses: pre-commit/action@v3.0.1
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
   analyze:
     name: Analyze (rust)
