@@ -489,9 +489,11 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            expected_exit_code: "1"
             expected_stderr_any_of: "privileges are required"
           - os: windows-latest
-            expected_stderr_any_of: "Administrator privileges are required to run traceroute||A required privilege is not held by the client||Permission denied"
+            expected_exit_code: "0"
+            expected_stdout_contains: "Hop"
 
     steps:
       - name: Checkout code
@@ -518,7 +520,8 @@ jobs:
         run: cargo test --test privilege_probe_smoke -- --exact privilege_probe_smoke --nocapture
         env:
           CARGO_INCREMENTAL: 0
-          EXPECT_EXIT_CODE: "1"
+          EXPECT_EXIT_CODE: ${{ matrix.expected_exit_code }}
+          EXPECT_STDOUT_CONTAINS: ${{ matrix.expected_stdout_contains }}
           EXPECT_STDERR_ANY_OF: ${{ matrix.expected_stderr_any_of }}
           SMOKE_ARGS: "-n -r -c 1 127.0.0.1"
 
