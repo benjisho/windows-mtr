@@ -6,6 +6,7 @@ use std::net::{IpAddr, ToSocketAddrs};
 use std::process::{self, Command, Stdio};
 
 mod error;
+mod native_ui;
 use error::{MtrError, Result};
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
@@ -149,6 +150,7 @@ struct Cli {
 enum UiPreset {
     Default,
     Enhanced,
+    Native,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -244,6 +246,12 @@ fn verify_options(args: &Cli) -> Result<()> {
     if args.ui == UiPreset::Enhanced && (args.report || args.json || args.json_pretty) {
         return Err(MtrError::InvalidOption(
             "--ui enhanced is only supported in interactive TUI mode".to_string(),
+        ));
+    }
+
+    if args.ui == UiPreset::Native && (args.report || args.json || args.json_pretty) {
+        return Err(MtrError::InvalidOption(
+            "--ui native is only supported in interactive TUI mode".to_string(),
         ));
     }
 
@@ -526,6 +534,11 @@ fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .with_context(|| format!("invalid target host: {}", args.host))?;
 
+    if args.ui == UiPreset::Native {
+        let code = native_ui::run_native_ui(&host)?;
+        process::exit(code);
+    }
+
     let trippy_args = build_embedded_trippy_args(&args, &host)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .context("failed to translate windows-mtr options into trippy options")?;
@@ -776,6 +789,18 @@ mod tests {
             Err(MtrError::InvalidOption(_))
         ));
     }
+
+    #[test]
+    fn verify_options_rejects_native_with_report_mode() {
+        let mut args = base_cli();
+        args.ui = UiPreset::Native;
+        args.report = true;
+        assert!(matches!(
+            verify_options(&args),
+            Err(MtrError::InvalidOption(message)) if message.contains("--ui native")
+        ));
+    }
+
     #[test]
     fn should_not_print_banner_for_json_modes() {
         let mut args = base_cli();

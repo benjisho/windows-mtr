@@ -32,7 +32,18 @@ mtr [options] <hostname-or-ip>
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
 | `-z` | DNS ASN lookup shortcut |
-| `--ui <default\|enhanced>` | Interactive UI preset (enhanced enables diagnostic overlays) |
+| `--ui <default\|enhanced\|native>` | Interactive UI preset (enhanced enables diagnostic overlays) |
+
+
+### Native Ratatui UI preview
+
+The `native` preset launches the in-process Ratatui preview with:
+
+- Top tab bar for **Hop table**, **Latency chart**, and **Loss chart**
+- Keyboard navigation with `Tab`, `←`, and `→`
+- Quick exit with `q` or `Esc`
+
+> Note: `--ui native` currently targets interactive mode only (no `-r/--json`).
 
 ## Enhanced UI options
 
@@ -93,6 +104,9 @@ mtr 8.8.8.8
 
 # Interactive TUI (enhanced diagnostic preset)
 mtr --ui enhanced 8.8.8.8
+
+# Native Ratatui UI preview (tabs + table + charts)
+mtr --ui native 8.8.8.8
 
 # Enhanced mode with custom threshold bands + toggles
 mtr --ui enhanced --latency-warn-ms 80 --latency-bad-ms 180 --loss-warn-pct 1 --loss-bad-pct 3 --enhanced-sparklines off 8.8.8.8

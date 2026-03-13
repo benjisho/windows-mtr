@@ -375,7 +375,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 </tr>
 <tr>
   <td>Native Ratatui UI (tabs, hop table, charts)</td>
-  <td>🛣️ Roadmap</td>
+  <td>🚧 In Progress (preview available via <code>--ui native</code>)</td>
   <td>H2 2026</td>
 </tr>
 <tr>

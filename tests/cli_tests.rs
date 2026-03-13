@@ -67,6 +67,19 @@ fn test_enhanced_wrapper_conflicts_with_passthrough_override() {
     );
 }
 
+#[test]
+fn test_native_ui_conflicts_with_report_mode() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "--ui", "native", "-r", "8.8.8.8"])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
+    assert!(stderr.contains("--ui native is only supported in interactive TUI mode"));
+}
+
 // This test would normally be run with #[ignore] as it requires network access
 // and would be part of an integration test suite rather than unit tests
 #[test]
