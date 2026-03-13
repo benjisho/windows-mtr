@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
           components: clippy
           targets: x86_64-pc-windows-msvc
@@ -55,7 +55,7 @@ jobs:
           CARGO_INCREMENTAL: 0
 
       - name: Install cargo-binstall
-        uses: taiki-e/install-action@cargo-binstall
+        uses: taiki-e/install-action@6eb4471beed212309063862e6f5284ca3da3b01d # cargo-binstall
 
       # Install trippy using prebuilt binaries first (same strategy as CI)
       - name: Install trippy
@@ -275,7 +275,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
           components: clippy
           targets: x86_64-pc-windows-msvc
