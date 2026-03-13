@@ -399,9 +399,9 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
   <td>H2 2026</td>
 </tr>
 <tr>
-  <td>GitHub Actions hardening (pin third-party actions by commit SHA)</td>
-  <td>🛣️ Roadmap</td>
-  <td>H2 2026</td>
+  <td>GitHub Actions hardening (pin workflow actions by commit SHA)</td>
+  <td>✅ Released</td>
+  <td>v1.2.x</td>
 </tr>
 <tr>
   <td>CLI/runtime cleanup (unused error variants, banner polish)</td>
@@ -420,11 +420,12 @@ To run the same repository-wide hook suite used in CI:
 
 ```bash
 python -m pip install pre-commit
-Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`:
-
-```bash
 pre-commit run --all-files
 ```
+
+Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`.
+
+For any workflow change, pin each GitHub Actions `uses:` reference to a full 40-character commit SHA (avoid mutable tags/branches).
 
 ## 📜 License
 
