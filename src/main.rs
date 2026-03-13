@@ -1,5 +1,5 @@
 use anyhow::Context;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use std::env;
 use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
@@ -107,6 +107,81 @@ struct Cli {
     /// Forward additional native trippy options verbatim
     #[arg(long = "trippy-flags", value_name = "FLAGS")]
     trippy_flags: Option<String>,
+
+    /// UI preset for interactive mode
+    #[arg(long = "ui", value_enum, default_value_t = UiPreset::Default)]
+    ui: UiPreset,
+
+    /// Latency warning threshold in milliseconds for enhanced UI coloring
+    #[arg(long = "latency-warn-ms", value_name = "MS")]
+    latency_warn_ms: Option<f32>,
+
+    /// Latency critical threshold in milliseconds for enhanced UI coloring
+    #[arg(long = "latency-bad-ms", value_name = "MS")]
+    latency_bad_ms: Option<f32>,
+
+    /// Packet loss warning threshold percentage for enhanced UI coloring
+    #[arg(long = "loss-warn-pct", value_name = "PCT")]
+    loss_warn_pct: Option<f32>,
+
+    /// Packet loss critical threshold percentage for enhanced UI coloring
+    #[arg(long = "loss-bad-pct", value_name = "PCT")]
+    loss_bad_pct: Option<f32>,
+
+    /// Toggle row coloring bands in enhanced UI
+    #[arg(long = "enhanced-row-color", value_enum, value_name = "on|off")]
+    enhanced_row_color: Option<OnOff>,
+
+    /// Toggle per-hop trend/sparkline column in enhanced UI
+    #[arg(long = "enhanced-sparklines", value_enum, value_name = "on|off")]
+    enhanced_sparklines: Option<OnOff>,
+
+    /// Toggle percentile/jitter summary in enhanced UI
+    #[arg(long = "enhanced-summary", value_enum, value_name = "on|off")]
+    enhanced_summary: Option<OnOff>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum UiPreset {
+    Default,
+    Enhanced,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum OnOff {
+    On,
+    Off,
+}
+
+impl OnOff {
+    fn as_bool(self) -> bool {
+        matches!(self, Self::On)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+struct EnhancedUiConfig {
+    latency_warn_ms: f32,
+    latency_bad_ms: f32,
+    loss_warn_pct: f32,
+    loss_bad_pct: f32,
+    row_coloring: bool,
+    sparklines: bool,
+    summary: bool,
+}
+
+impl EnhancedUiConfig {
+    fn from_cli(args: &Cli) -> Self {
+        Self {
+            latency_warn_ms: args.latency_warn_ms.unwrap_or(100.0),
+            latency_bad_ms: args.latency_bad_ms.unwrap_or(250.0),
+            loss_warn_pct: args.loss_warn_pct.unwrap_or(2.0),
+            loss_bad_pct: args.loss_bad_pct.unwrap_or(5.0),
+            row_coloring: args.enhanced_row_color.unwrap_or(OnOff::On).as_bool(),
+            sparklines: args.enhanced_sparklines.unwrap_or(OnOff::On).as_bool(),
+            summary: args.enhanced_summary.unwrap_or(OnOff::On).as_bool(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -152,6 +227,65 @@ fn verify_options(args: &Cli) -> Result<()> {
         return Err(MtrError::InvalidOption(
             "-w/--report-wide requires -r/--report or --json output mode".to_string(),
         ));
+    }
+
+    let has_enhanced_specific_options = args.latency_warn_ms.is_some()
+        || args.latency_bad_ms.is_some()
+        || args.loss_warn_pct.is_some()
+        || args.loss_bad_pct.is_some()
+        || args.enhanced_row_color.is_some()
+        || args.enhanced_sparklines.is_some()
+        || args.enhanced_summary.is_some();
+
+    if args.ui == UiPreset::Enhanced && (args.report || args.json || args.json_pretty) {
+        return Err(MtrError::InvalidOption(
+            "--ui enhanced is only supported in interactive TUI mode".to_string(),
+        ));
+    }
+
+    if has_enhanced_specific_options && args.ui != UiPreset::Enhanced {
+        return Err(MtrError::InvalidOption(
+            "enhanced UI tuning flags require --ui enhanced".to_string(),
+        ));
+    }
+
+    if args.ui == UiPreset::Enhanced {
+        let config = EnhancedUiConfig::from_cli(args);
+        if config.latency_warn_ms >= config.latency_bad_ms {
+            return Err(MtrError::InvalidOption(
+                "--latency-warn-ms must be lower than --latency-bad-ms".to_string(),
+            ));
+        }
+        if config.loss_warn_pct >= config.loss_bad_pct {
+            return Err(MtrError::InvalidOption(
+                "--loss-warn-pct must be lower than --loss-bad-pct".to_string(),
+            ));
+        }
+    }
+
+    if let Some(flags) = &args.trippy_flags {
+        let parsed = parse_passthrough_flags(flags)?;
+        let conflicting = [
+            "--tui-latency-warn-threshold",
+            "--tui-latency-bad-threshold",
+            "--tui-loss-warn-threshold",
+            "--tui-loss-bad-threshold",
+            "--tui-row-coloring",
+            "--tui-hop-trend",
+            "--tui-summary-jitter",
+            "--tui-summary-percentiles",
+        ];
+
+        if args.ui == UiPreset::Enhanced
+            && parsed
+                .iter()
+                .any(|token| conflicting.iter().any(|flag| token == flag))
+        {
+            return Err(MtrError::InvalidOption(
+                "--trippy-flags cannot override windows-mtr enhanced UI wrapper settings"
+                    .to_string(),
+            ));
+        }
     }
 
     Ok(())
@@ -300,6 +434,28 @@ fn build_embedded_trippy_args(args: &Cli, host: &str) -> Result<Vec<String>> {
         trippy_args.extend(["--dns-ttl".to_string(), format!("{ttl}s")]);
     }
 
+    if args.ui == UiPreset::Enhanced {
+        let ui = EnhancedUiConfig::from_cli(args);
+        trippy_args.extend([
+            "--tui-latency-warn-threshold".to_string(),
+            format!("{}ms", ui.latency_warn_ms),
+            "--tui-latency-bad-threshold".to_string(),
+            format!("{}ms", ui.latency_bad_ms),
+            "--tui-loss-warn-threshold".to_string(),
+            ui.loss_warn_pct.to_string(),
+            "--tui-loss-bad-threshold".to_string(),
+            ui.loss_bad_pct.to_string(),
+            "--tui-row-coloring".to_string(),
+            ui.row_coloring.to_string(),
+            "--tui-hop-trend".to_string(),
+            ui.sparklines.to_string(),
+            "--tui-summary-jitter".to_string(),
+            ui.summary.to_string(),
+            "--tui-summary-percentiles".to_string(),
+            ui.summary.to_string(),
+        ]);
+    }
+
     if let Some(extra) = &args.trippy_flags {
         trippy_args.extend(parse_passthrough_flags(extra)?);
     }
@@ -402,6 +558,14 @@ mod tests {
             ecmp: None,
             dns_cache_ttl: None,
             trippy_flags: None,
+            ui: UiPreset::Default,
+            latency_warn_ms: None,
+            latency_bad_ms: None,
+            loss_warn_pct: None,
+            loss_bad_pct: None,
+            enhanced_row_color: None,
+            enhanced_sparklines: None,
+            enhanced_summary: None,
         }
     }
 
@@ -507,6 +671,14 @@ mod tests {
             ecmp: Some("paris".to_string()),
             dns_cache_ttl: Some(120),
             trippy_flags: Some("--log-format json --verbose".to_string()),
+            ui: UiPreset::Default,
+            latency_warn_ms: None,
+            latency_bad_ms: None,
+            loss_warn_pct: None,
+            loss_bad_pct: None,
+            enhanced_row_color: None,
+            enhanced_sparklines: None,
+            enhanced_summary: None,
         };
 
         let trippy_args =
@@ -558,6 +730,47 @@ mod tests {
 
         let trippy_args = build_embedded_trippy_args(&args, "8.8.8.8").expect("args should build");
         assert_eq!(trippy_args, vec!["mtr", "--mode", "json", "8.8.8.8"]);
+    }
+
+    #[test]
+    fn build_embedded_trippy_args_applies_enhanced_defaults() {
+        let mut args = base_cli();
+        args.ui = UiPreset::Enhanced;
+
+        let trippy_args = build_embedded_trippy_args(&args, "8.8.8.8").expect("args should build");
+        assert!(
+            trippy_args
+                .windows(2)
+                .any(|w| w == ["--tui-latency-warn-threshold", "100ms"])
+        );
+        assert!(
+            trippy_args
+                .windows(2)
+                .any(|w| w == ["--tui-summary-percentiles", "true"])
+        );
+    }
+
+    #[test]
+    fn verify_options_rejects_enhanced_threshold_ordering_errors() {
+        let mut args = base_cli();
+        args.ui = UiPreset::Enhanced;
+        args.latency_warn_ms = Some(300.0);
+        args.latency_bad_ms = Some(100.0);
+        assert!(matches!(
+            verify_options(&args),
+            Err(MtrError::InvalidOption(_))
+        ));
+    }
+
+    #[test]
+    fn verify_options_rejects_conflicting_enhanced_passthrough() {
+        let mut args = base_cli();
+        args.ui = UiPreset::Enhanced;
+        args.trippy_flags = Some("--tui-hop-trend false".to_string());
+        assert!(matches!(
+            verify_options(&args),
+            Err(MtrError::InvalidOption(_))
+        ));
     }
     #[test]
     fn should_not_print_banner_for_json_modes() {
