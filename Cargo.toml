@@ -11,6 +11,7 @@ rust-version = "1.88.0"
 
 [workspace]
 members = ["xtask"]
+exclude = ["fuzz"]
 
 [dependencies]
 trippy = "0.13.0"

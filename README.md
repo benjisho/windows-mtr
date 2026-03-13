@@ -390,7 +390,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 </tr>
 <tr>
   <td>Security hardening gates (cargo-audit + fuzz harness in CI)</td>
-  <td>🚧 In Progress (cargo-audit live, fuzz harness pending)</td>
+  <td>✅ Released (cargo-audit + fuzz harness live in CI)</td>
   <td>H2 2026</td>
 </tr>
 <tr>
@@ -420,11 +420,21 @@ To run the same repository-wide hook suite used in CI:
 
 ```bash
 python -m pip install pre-commit
-Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`:
+```
+
+Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`.
 
 ```bash
 pre-commit run --all-files
 ```
+
+To run the fuzz smoke harness locally (nightly toolchain required):
+
+```bash
+cargo install cargo-fuzz --locked
+(cd fuzz && cargo fuzz run passthrough_flags -- -max_total_time=30)
+```
+
 
 ## 📜 License
 
