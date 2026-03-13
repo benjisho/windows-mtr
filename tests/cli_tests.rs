@@ -15,6 +15,8 @@ fn test_help_output() {
     assert!(stdout.contains("-U")); // UDP option
     assert!(stdout.contains("-P")); // Port option
     assert!(stdout.contains("-r")); // Report mode
+    assert!(stdout.contains("--ui")); // UI preset wrapper
+    assert!(stdout.contains("--enhanced-sparklines")); // Enhanced hop trend toggle
 }
 
 #[test]
@@ -27,6 +29,42 @@ fn test_version_output() {
     let stdout = String::from_utf8(output.stdout).expect("Invalid UTF-8");
 
     assert!(stdout.contains(env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn test_enhanced_ui_conflicts_with_report_mode() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "--ui", "enhanced", "-r", "8.8.8.8"])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
+    assert!(stderr.contains("--ui enhanced is only supported in interactive TUI mode"));
+}
+
+#[test]
+fn test_enhanced_wrapper_conflicts_with_passthrough_override() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--",
+            "--ui",
+            "enhanced",
+            "--trippy-flags",
+            "--tui-summary-percentiles false",
+            "8.8.8.8",
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
+    assert!(
+        stderr.contains("--trippy-flags cannot override windows-mtr enhanced UI wrapper settings")
+    );
 }
 
 // This test would normally be run with #[ignore] as it requires network access
