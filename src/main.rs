@@ -105,7 +105,11 @@ struct Cli {
     dns_cache_ttl: Option<u64>,
 
     /// Forward additional native trippy options verbatim
-    #[arg(long = "trippy-flags", value_name = "FLAGS")]
+    #[arg(
+        long = "trippy-flags",
+        value_name = "FLAGS",
+        allow_hyphen_values = true
+    )]
     trippy_flags: Option<String>,
 
     /// UI preset for interactive mode
