@@ -196,6 +196,12 @@ mtr 8.8.8.8
 mtr --ui native 8.8.8.8
 ```
 
+### Native Ratatui preview (tabs + hop table + charts)
+
+```bash
+mtr --ui native 8.8.8.8
+```
+
 ### Report mode with DNS disabled (faster + script-friendly)
 
 ```bash
@@ -307,6 +313,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 - [📚 Full Documentation Hub](docs/README.md)
 - [🧩 CLI/API Reference](docs/API.md)
 - [🧪 Probe parity matrix](docs/probe-parity.md)
+- [🧪 Probe parity matrix](docs/probe-parity.md)
 - [📑 Usage Examples](docs/USAGE.md)
 - [🛠️ Development Setup](DEVELOPMENT.md)
 - [🤝 Contributing Guide](CONTRIBUTING.md)
@@ -383,6 +390,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 <tr>
   <td>Native Ratatui UI (tabs, hop table, charts)</td>
   <td>🚧 In Progress (`--ui native` preview)</td>
+  <td>🚧 In Progress (`--ui native` preview)</td>
   <td>H2 2026</td>
 </tr>
 <tr>
@@ -397,7 +405,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 </tr>
 <tr>
   <td>Security hardening gates (cargo-audit + fuzz harness in CI)</td>
-  <td>🚧 In Progress (cargo-audit live, fuzz harness pending)</td>
+  <td>✅ Released (cargo-audit + fuzz harness live in CI)</td>
   <td>H2 2026</td>
 </tr>
 <tr>
@@ -406,6 +414,9 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
   <td>H2 2026</td>
 </tr>
 <tr>
+  <td>GitHub Actions hardening (pin workflow actions by commit SHA)</td>
+  <td>✅ Released</td>
+  <td>v1.2.x</td>
   <td>GitHub Actions hardening (pin workflow actions by commit SHA)</td>
   <td>✅ Released</td>
   <td>v1.2.x</td>
@@ -427,12 +438,32 @@ To run the same repository-wide hook suite used in CI:
 
 ```bash
 python -m pip install pre-commit
-pre-commit run --all-files
 ```
 
 Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`.
 
+```bash
+pre-commit run --all-files
+```
+
 For any workflow change, pin each GitHub Actions `uses:` reference to a full 40-character commit SHA (avoid mutable tags/branches).
+
+To run the fuzz smoke harness locally (nightly toolchain required):
+
+```bash
+cargo install cargo-fuzz --locked
+(cd fuzz && cargo fuzz run passthrough_flags -- -max_total_time=30)
+```
+
+For any workflow change, pin each GitHub Actions `uses:` reference to a full 40-character commit SHA (avoid mutable tags/branches).
+
+To run the fuzz smoke harness locally (nightly toolchain required):
+
+```bash
+cargo install cargo-fuzz --locked
+(cd fuzz && cargo fuzz run passthrough_flags -- -max_total_time=30)
+```
+
 
 ## 📜 License
 

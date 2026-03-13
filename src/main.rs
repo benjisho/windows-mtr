@@ -4,6 +4,7 @@ use std::env;
 use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::process::{self, Command, Stdio};
+use windows_mtr::passthrough::parse_passthrough_flags;
 
 mod error;
 mod native_ui;
@@ -304,7 +305,8 @@ fn verify_options(args: &Cli) -> Result<()> {
     }
 
     if let Some(flags) = &args.trippy_flags {
-        let parsed = parse_passthrough_flags(flags)?;
+        let parsed = parse_passthrough_flags(flags)
+            .map_err(|msg| MtrError::InvalidOption(msg.to_string()))?;
         let conflicting = [
             "--tui-latency-warn-threshold",
             "--tui-latency-bad-threshold",
@@ -347,65 +349,6 @@ fn duration_seconds(value: f32) -> String {
     } else {
         format!("{value}s")
     }
-}
-
-fn split_wrapped_passthrough_token(token: &str) -> Vec<String> {
-    let mut result = Vec::new();
-    let mut current = String::new();
-    let mut active_quote: Option<char> = None;
-
-    for ch in token.chars() {
-        if let Some(quote) = active_quote {
-            if ch == quote {
-                active_quote = None;
-            } else {
-                current.push(ch);
-            }
-            continue;
-        }
-
-        if ch.is_whitespace() {
-            if !current.is_empty() {
-                result.push(std::mem::take(&mut current));
-            }
-            continue;
-        }
-
-        if (ch == '\'' || ch == '"') && current.is_empty() {
-            active_quote = Some(ch);
-            continue;
-        }
-
-        current.push(ch);
-    }
-
-    if let Some(quote) = active_quote {
-        current.insert(0, quote);
-    }
-
-    if !current.is_empty() {
-        result.push(current);
-    }
-
-    result
-}
-
-fn parse_passthrough_flags(flags: &str) -> Result<Vec<String>> {
-    let parsed = shlex::split(flags).ok_or_else(|| {
-        MtrError::InvalidOption("--trippy-flags contains invalid shell quoting".to_string())
-    })?;
-
-    // Windows shells sometimes preserve wrapping quotes around the entire passthrough
-    // string, which can produce a single token like "--flag value". Split that token
-    // into distinct argv entries while preserving embedded quoted segments.
-    if parsed.len() == 1 {
-        let token = &parsed[0];
-        if token.starts_with("--") && token.contains(' ') {
-            return Ok(split_wrapped_passthrough_token(token));
-        }
-    }
-
-    Ok(parsed)
 }
 
 fn build_embedded_trippy_args(args: &Cli, host: &str) -> Result<Vec<String>> {
@@ -497,7 +440,10 @@ fn build_embedded_trippy_args(args: &Cli, host: &str) -> Result<Vec<String>> {
     }
 
     if let Some(extra) = &args.trippy_flags {
-        trippy_args.extend(parse_passthrough_flags(extra)?);
+        trippy_args.extend(
+            parse_passthrough_flags(extra)
+                .map_err(|msg| MtrError::InvalidOption(msg.to_string()))?,
+        );
     }
 
     trippy_args.push(host.to_string());
@@ -685,10 +631,7 @@ mod tests {
 
     #[test]
     fn parse_passthrough_flags_rejects_invalid_shell_quoting() {
-        assert!(matches!(
-            parse_passthrough_flags("--foo 'bar"),
-            Err(MtrError::InvalidOption(_))
-        ));
+        assert!(parse_passthrough_flags("--foo 'bar").is_err());
     }
 
     #[test]
