@@ -1,4 +1,4 @@
-pub fn split_wrapped_passthrough_token(token: &str) -> Vec<String> {
+fn split_wrapped_passthrough_token(token: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut current = String::new();
     let mut active_quote: Option<char> = None;
@@ -69,5 +69,17 @@ mod tests {
     #[test]
     fn rejects_invalid_shell_quoting() {
         assert!(parse_passthrough_flags("\"--foo").is_err());
+    }
+
+    #[test]
+    fn preserves_inner_quoted_segments_when_splitting_wrapped_token() {
+        let parsed = parse_passthrough_flags("\"--label 'hello world' --mode tui\"").unwrap();
+        assert_eq!(parsed, vec!["--label", "hello world", "--mode", "tui"]);
+    }
+
+    #[test]
+    fn keeps_unclosed_quote_literal_for_follow_up_validation() {
+        let parsed = split_wrapped_passthrough_token("--flag \"unterminated value");
+        assert_eq!(parsed, vec!["--flag", "\"unterminated value"]);
     }
 }

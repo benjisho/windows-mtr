@@ -65,16 +65,16 @@ jobs:
         run: cargo audit
 
 
-      - name: Install nightly toolchain for fuzzing
-        run: rustup toolchain install nightly --profile minimal
+      - name: Install pinned nightly toolchain for fuzzing
+        run: rustup toolchain install nightly-2026-03-13 --profile minimal
 
       - name: Install cargo-fuzz
-        run: cargo +nightly install cargo-fuzz --locked
+        run: cargo +nightly-2026-03-13 install cargo-fuzz --locked
 
       - name: Run fuzz harness smoke
         id: fuzz_harness
         working-directory: fuzz
-        run: cargo +nightly fuzz run fuzz_passthrough_flags -- -runs=2000
+        run: cargo +nightly-2026-03-13 fuzz run fuzz_passthrough_flags -- -runs=2000
 
       - name: Security summary
         if: always()
