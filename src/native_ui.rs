@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use crossterm::event::{self, Event, KeyCode};
 use crossterm::execute;
 use crossterm::terminal::{
@@ -13,8 +13,13 @@ use ratatui::text::Line;
 use ratatui::widgets::{
     Axis, Block, Borders, Chart, Dataset, GraphType, Paragraph, Row, Sparkline, Table, Tabs,
 };
+use serde_json::Value;
+use std::env;
 use std::io::{self, Stdout};
+use std::process::Command;
 use std::time::{Duration, Instant};
+
+const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
 
 #[derive(Clone)]
 struct HopStat {
@@ -32,7 +37,7 @@ pub struct NativeUiApp {
     hops: Vec<HopStat>,
     latency_history: Vec<(f64, f64)>,
     loss_history: Vec<(f64, f64)>,
-    started: Instant,
+    last_error: Option<String>,
 }
 
 impl NativeUiApp {
@@ -43,38 +48,18 @@ impl NativeUiApp {
             hops: Vec::new(),
             latency_history: Vec::new(),
             loss_history: Vec::new(),
-            started: Instant::now(),
+            last_error: None,
         }
     }
 
-    fn update(&mut self) {
-        let t = self.started.elapsed().as_secs_f64();
-        let mut hops = Vec::with_capacity(8);
-
-        for hop in 1..=8 {
-            let wave = (t + hop as f64 * 0.6).sin().abs();
-            let base = 8.0 + hop as f64 * 4.0;
-            let avg_ms = base + (wave * 30.0);
-            let best_ms = (avg_ms * 0.7).max(1.0);
-            let worst_ms = avg_ms * 1.4;
-            let loss_pct = ((t / 3.0 + hop as f64).sin().abs() * 4.0).min(100.0);
-            let host = if hop < 8 {
-                format!("hop-{hop}.local")
-            } else {
-                self.target.clone()
-            };
-
-            hops.push(HopStat {
-                hop,
-                host,
-                loss_pct,
-                best_ms,
-                avg_ms,
-                worst_ms,
-            });
+    fn ingest_snapshot(&mut self, hops: Vec<HopStat>) {
+        if hops.is_empty() {
+            self.last_error = Some("No hop data returned by trippy JSON report".to_string());
+            return;
         }
 
         self.hops = hops;
+        self.last_error = None;
 
         let latest_latency = self.hops.last().map(|h| h.avg_ms).unwrap_or_default();
         let latest_loss = self.hops.last().map(|h| h.loss_pct).unwrap_or_default();
@@ -100,7 +85,7 @@ impl NativeUiApp {
     }
 }
 
-pub fn run_native_ui(target: &str) -> anyhow::Result<i32> {
+pub fn run_native_ui(target: &str, trippy_args: &[String]) -> anyhow::Result<i32> {
     enable_raw_mode().context("failed to enable raw mode for native UI")?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
@@ -108,7 +93,7 @@ pub fn run_native_ui(target: &str) -> anyhow::Result<i32> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).context("failed to initialize terminal backend")?;
 
-    let result = run_ui_loop(&mut terminal, target);
+    let result = run_ui_loop(&mut terminal, target, trippy_args);
 
     let mut restore_error: Option<anyhow::Error> = None;
 
@@ -138,14 +123,18 @@ pub fn run_native_ui(target: &str) -> anyhow::Result<i32> {
 fn run_ui_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     target: &str,
+    trippy_args: &[String],
 ) -> anyhow::Result<i32> {
     let mut app = NativeUiApp::new(target);
-    let mut last_tick = Instant::now();
-    let tick_rate = Duration::from_millis(700);
+    let mut last_tick = Instant::now() - Duration::from_millis(900);
+    let tick_rate = Duration::from_millis(900);
 
     loop {
         if last_tick.elapsed() >= tick_rate {
-            app.update();
+            match fetch_hops_snapshot(trippy_args, target) {
+                Ok(hops) => app.ingest_snapshot(hops),
+                Err(err) => app.last_error = Some(err.to_string()),
+            }
             last_tick = Instant::now();
         }
 
@@ -162,6 +151,186 @@ fn run_ui_loop(
             }
         }
     }
+}
+
+fn fetch_hops_snapshot(base_args: &[String], target: &str) -> anyhow::Result<Vec<HopStat>> {
+    // SAFETY: `current_exe` is used only to re-exec this trusted process.
+    let current_exe =
+        env::current_exe().context("failed to locate current executable for native UI polling")?;
+
+    let mut args = sanitize_args_for_json_snapshot(base_args);
+    args.extend([
+        "--mode".to_string(),
+        "json".to_string(),
+        "--report-cycles".to_string(),
+        "1".to_string(),
+    ]);
+
+    let output = Command::new(&current_exe)
+        .env(EMBEDDED_TRIPPY_ENV, "1")
+        .args(args.iter().skip(1))
+        .output()
+        .context("failed to run embedded trippy JSON poll")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("trippy poll failed: {}", stderr.trim()));
+    }
+
+    let value: Value = serde_json::from_slice(&output.stdout)
+        .context("failed to parse trippy JSON poll output")?;
+
+    Ok(extract_hops(&value, target))
+}
+
+fn sanitize_args_for_json_snapshot(base_args: &[String]) -> Vec<String> {
+    let mut cleaned = Vec::with_capacity(base_args.len());
+    let mut skip_next = false;
+    let pair_flags = ["--mode", "--report-cycles"];
+
+    for token in base_args {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+
+        if pair_flags.contains(&token.as_str()) {
+            skip_next = true;
+            continue;
+        }
+
+        cleaned.push(token.clone());
+    }
+
+    cleaned
+}
+
+fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
+    let Some(array) = find_hop_array(value) else {
+        return Vec::new();
+    };
+
+    let mut hops = Vec::with_capacity(array.len());
+    for (index, item) in array.iter().enumerate() {
+        if !item.is_object() {
+            continue;
+        }
+
+        let hop = read_usize(item, &["ttl", "hop", "hop_index"]).unwrap_or(index + 1);
+        let host = read_string(item, &["host", "hostname", "ip", "addr"]).unwrap_or_else(|| {
+            if index + 1 == array.len() {
+                target.to_string()
+            } else {
+                format!("hop-{hop}")
+            }
+        });
+        let loss_pct = read_f64(item, &["loss_pct", "loss", "loss_percentage"]).unwrap_or(0.0);
+        let avg_ms =
+            read_f64(item, &["avg_ms", "avg", "average_ms", "last_ms", "last"]).unwrap_or(0.0);
+        let best_ms = read_f64(item, &["best_ms", "best", "min_ms", "min"]).unwrap_or(avg_ms);
+        let worst_ms = read_f64(item, &["worst_ms", "worst", "max_ms", "max"]).unwrap_or(avg_ms);
+
+        hops.push(HopStat {
+            hop,
+            host,
+            loss_pct: normalize_percent(loss_pct),
+            best_ms,
+            avg_ms,
+            worst_ms,
+        });
+    }
+
+    hops
+}
+
+fn normalize_percent(value: f64) -> f64 {
+    if value <= 1.0 { value * 100.0 } else { value }
+}
+
+fn find_hop_array(value: &Value) -> Option<&Vec<Value>> {
+    match value {
+        Value::Array(array) => {
+            if looks_like_hop_array(array) {
+                return Some(array);
+            }
+            for item in array {
+                if let Some(found) = find_hop_array(item) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        Value::Object(map) => {
+            for candidate in ["hops", "hosts", "report", "result", "results", "data"] {
+                if let Some(next) = map.get(candidate)
+                    && let Some(found) = find_hop_array(next)
+                {
+                    return Some(found);
+                }
+            }
+            for next in map.values() {
+                if let Some(found) = find_hop_array(next) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn looks_like_hop_array(array: &[Value]) -> bool {
+    !array.is_empty()
+        && array.iter().all(|item| {
+            item.get("ttl").is_some()
+                || item.get("hop").is_some()
+                || item.get("avg_ms").is_some()
+                || item.get("avg").is_some()
+                || item.get("host").is_some()
+        })
+}
+
+fn read_usize(item: &Value, keys: &[&str]) -> Option<usize> {
+    read_f64(item, keys).map(|v| v.max(0.0) as usize)
+}
+
+fn read_string(item: &Value, keys: &[&str]) -> Option<String> {
+    for key in keys {
+        let Some(value) = item.get(*key) else {
+            continue;
+        };
+        if let Some(s) = value.as_str() {
+            return Some(s.to_string());
+        }
+    }
+    None
+}
+
+fn read_f64(item: &Value, keys: &[&str]) -> Option<f64> {
+    for key in keys {
+        let Some(value) = item.get(*key) else {
+            continue;
+        };
+        match value {
+            Value::Number(number) => {
+                if let Some(n) = number.as_f64() {
+                    return Some(n);
+                }
+            }
+            Value::String(raw) => {
+                let trimmed = raw
+                    .trim()
+                    .trim_end_matches("ms")
+                    .trim_end_matches('%')
+                    .trim();
+                if let Ok(n) = trimmed.parse::<f64>() {
+                    return Some(n);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
@@ -182,7 +351,7 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
     let tabs = Tabs::new(titles)
         .block(
             Block::default()
-                .title(format!("windows-mtr native UI preview ({})", app.target))
+                .title(format!("windows-mtr native UI ({})", app.target))
                 .borders(Borders::ALL),
         )
         .select(app.tab_index)
@@ -201,8 +370,12 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
         _ => render_loss_chart(frame, app, chunks[1]),
     }
 
-    let help = Paragraph::new("Controls: ←/→ or Tab switch tabs • q quits")
-        .block(Block::default().borders(Borders::ALL).title("Help"));
+    let help_text = match &app.last_error {
+        Some(err) => format!("Controls: ←/→ or Tab switch tabs • q quits • Last poll error: {err}"),
+        None => "Controls: ←/→ or Tab switch tabs • q quits".to_string(),
+    };
+    let help =
+        Paragraph::new(help_text).block(Block::default().borders(Borders::ALL).title("Help"));
     frame.render_widget(help, chunks[2]);
 }
 
@@ -240,11 +413,7 @@ fn render_hop_table(
                 .add_modifier(Modifier::BOLD),
         ),
     )
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title("Hop table (native ratatui)"),
-    );
+    .block(Block::default().borders(Borders::ALL).title("Hop table"));
 
     frame.render_widget(table, area);
 }
@@ -352,4 +521,66 @@ fn render_loss_chart(
         ]));
 
     frame.render_widget(chart, area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn sanitize_args_for_json_snapshot_strips_mode_and_cycles_pairs() {
+        let args = vec![
+            "mtr".to_string(),
+            "--mode".to_string(),
+            "tui".to_string(),
+            "--report-cycles".to_string(),
+            "10".to_string(),
+            "--udp".to_string(),
+            "example.com".to_string(),
+        ];
+
+        let cleaned = sanitize_args_for_json_snapshot(&args);
+        assert_eq!(cleaned, vec!["mtr", "--udp", "example.com"]);
+    }
+
+    #[test]
+    fn read_helpers_scan_all_candidate_keys() {
+        let value = json!({
+            "avg": "12.5ms",
+            "hostname": "example.com"
+        });
+
+        assert_eq!(read_f64(&value, &["avg_ms", "avg"]), Some(12.5));
+        assert_eq!(
+            read_string(&value, &["host", "hostname"]),
+            Some("example.com".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_hops_supports_nested_report_shapes_and_defaults_last_hop_host() {
+        let payload = json!({
+            "result": {
+                "hops": [
+                    {"ttl": 1, "host": "10.0.0.1", "loss": "1%", "avg_ms": 10.0},
+                    {"ttl": 2, "loss_pct": 0.5, "avg": "20ms", "min": 15.0, "max": 25.0}
+                ]
+            }
+        });
+
+        let hops = extract_hops(&payload, "target.example");
+        assert_eq!(hops.len(), 2);
+
+        assert_eq!(hops[0].hop, 1);
+        assert_eq!(hops[0].host, "10.0.0.1");
+        assert_eq!(hops[0].loss_pct, 1.0);
+
+        assert_eq!(hops[1].hop, 2);
+        assert_eq!(hops[1].host, "target.example");
+        assert_eq!(hops[1].loss_pct, 50.0);
+        assert_eq!(hops[1].best_ms, 15.0);
+        assert_eq!(hops[1].avg_ms, 20.0);
+        assert_eq!(hops[1].worst_ms, 25.0);
+    }
 }

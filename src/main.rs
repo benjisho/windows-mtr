@@ -277,32 +277,6 @@ fn verify_options(args: &Cli) -> Result<()> {
         }
     }
 
-    if args.ui == UiPreset::Native
-        && (args.tcp
-            || args.udp
-            || args.port.is_some()
-            || args.source_port.is_some()
-            || args.count.is_some()
-            || args.interval.is_some()
-            || args.timeout.is_some()
-            || args.report_wide
-            || args.no_dns
-            || args.max_hops.is_some()
-            || args.show_asn
-            || args.dns_lookup_as_info
-            || args.packet_size.is_some()
-            || args.src.is_some()
-            || args.interface.is_some()
-            || args.ecmp.is_some()
-            || args.dns_cache_ttl.is_some()
-            || args.trippy_flags.is_some()
-            || has_enhanced_specific_options)
-    {
-        return Err(MtrError::InvalidOption(
-            "--ui native currently supports only the target host argument".to_string(),
-        ));
-    }
-
     if let Some(flags) = &args.trippy_flags {
         let parsed = parse_passthrough_flags(flags)?;
         let conflicting = [
@@ -562,14 +536,14 @@ fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .with_context(|| format!("invalid target host: {}", args.host))?;
 
-    if args.ui == UiPreset::Native {
-        let code = native_ui::run_native_ui(&host)?;
-        process::exit(code);
-    }
-
     let trippy_args = build_embedded_trippy_args(&args, &host)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .context("failed to translate windows-mtr options into trippy options")?;
+
+    if args.ui == UiPreset::Native {
+        let code = native_ui::run_native_ui(&host, &trippy_args)?;
+        process::exit(code);
+    }
 
     let code = run_embedded_trippy(&trippy_args, json_format_from_args(&args))?;
     process::exit(code);
@@ -819,25 +793,19 @@ mod tests {
     }
 
     #[test]
-    fn verify_options_rejects_report_modes_for_native_ui() {
+    fn verify_options_allows_report_mode_for_native_ui() {
         let mut args = base_cli();
         args.ui = UiPreset::Native;
         args.report = true;
-        assert!(matches!(
-            verify_options(&args),
-            Err(MtrError::InvalidOption(_))
-        ));
+        assert!(verify_options(&args).is_ok());
     }
 
     #[test]
-    fn verify_options_rejects_extra_flags_for_native_ui_preview() {
+    fn verify_options_allows_extra_flags_for_native_ui() {
         let mut args = base_cli();
         args.ui = UiPreset::Native;
         args.count = Some(5);
-        assert!(matches!(
-            verify_options(&args),
-            Err(MtrError::InvalidOption(_))
-        ));
+        assert!(verify_options(&args).is_ok());
     }
     #[test]
     fn should_not_print_banner_for_json_modes() {
