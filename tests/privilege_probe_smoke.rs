@@ -41,14 +41,18 @@ fn privilege_probe_smoke() {
         "unexpected exit code for `{binary} {args}`\nstdout:\n{stdout}\nstderr:\n{stderr}"
     );
 
-    if let Ok(expected_stdout) = env::var("EXPECT_STDOUT_CONTAINS") {
+    if let Ok(expected_stdout) = env::var("EXPECT_STDOUT_CONTAINS")
+        && !expected_stdout.trim().is_empty()
+    {
         assert!(
             stdout.contains(&expected_stdout),
             "expected stdout to contain `{expected_stdout}`\nactual stdout:\n{stdout}"
         );
     }
 
-    if let Ok(expected_stderr_any_of) = env::var("EXPECT_STDERR_ANY_OF") {
+    if let Ok(expected_stderr_any_of) = env::var("EXPECT_STDERR_ANY_OF")
+        && !expected_stderr_any_of.trim().is_empty()
+    {
         let alternatives = parse_alternatives(&expected_stderr_any_of);
         assert!(
             alternatives.iter().any(|needle| stderr.contains(needle)),
