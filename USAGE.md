@@ -34,9 +34,9 @@ mtr [options] <hostname-or-ip>
 | `-z` | DNS ASN lookup shortcut |
 | `--ui <default\|enhanced\|native>` | Interactive UI preset (enhanced enables diagnostic overlays) |
 
-## Native Ratatui UI preview
+## Native Ratatui UI
 
-Use `--ui native` to run the built-in Ratatui preview with tabs, a hop table, and charts.
+Use `--ui native` to run the built-in Ratatui interface with live hop data, a hop table, and charts.
 
 ```bash
 mtr --ui native 8.8.8.8
@@ -47,7 +47,7 @@ Controls:
 - `←` switch to previous tab
 - `q` quit
 
-> Note: `--ui native` is currently a focused preview mode and only supports the target host argument.
+`--ui native` accepts the standard probe and output tuning options, and renders them in the native Ratatui view.
 
 ## Enhanced UI options
 
