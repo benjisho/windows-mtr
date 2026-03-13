@@ -46,6 +46,7 @@ mtr [options] <hostname-or-ip>
 | Option | Description |
 |---|---|
 | `--trippy-flags "<FLAGS>"` | Forwards native Trippy flags verbatim |
+| `--profile <pretty|minimal|ascii-safe>` | Applies curated visual TUI defaults |
 | `--ecmp <classic\|paris\|dublin>` | ECMP/multipath strategy |
 
 ## Linux `mtr` parity mapping (minimum viable)
@@ -81,4 +82,24 @@ mtr -S 192.0.2.10 -s 128 8.8.4.4
 
 # Advanced trippy tuning passthrough
 mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.8
+```
+
+
+## Visual-first profile examples
+
+```bash
+# Pretty profile for Windows Terminal (recommended for demos and NOC wallboards)
+mtr --profile pretty 8.8.8.8
+
+# Minimal profile for smaller panes + fast readability
+mtr --profile minimal --trippy-flags "--tui-refresh-rate 400ms" 1.1.1.1
+
+# ASCII-safe profile for classic cmd rendering quirks
+mtr --profile ascii-safe --trippy-flags "--tui-address-mode ip" example.com
+
+# Visual tuning: faster refresh and deeper report sampling for a packet-loss investigation
+mtr --profile pretty --trippy-flags "--tui-refresh-rate 200ms" -c 60 -r 8.8.4.4
+
+# Address-mode and report-depth focused invocation for side-by-side comparisons
+mtr --profile minimal -n -c 80 -r github.com
 ```

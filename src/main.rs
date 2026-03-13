@@ -1,5 +1,5 @@
 use anyhow::Context;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use std::env;
 use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
@@ -107,6 +107,52 @@ struct Cli {
     /// Forward additional native trippy options verbatim
     #[arg(long = "trippy-flags", value_name = "FLAGS")]
     trippy_flags: Option<String>,
+
+    /// Apply a curated TUI profile [pretty|minimal|ascii-safe]
+    #[arg(long = "profile", value_enum)]
+    profile: Option<ProfilePreset>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, ValueEnum)]
+enum ProfilePreset {
+    Pretty,
+    Minimal,
+    AsciiSafe,
+}
+
+impl ProfilePreset {
+    fn flags(self) -> &'static [&'static str] {
+        match self {
+            Self::Pretty => &[
+                "--tui-refresh-rate",
+                "250ms",
+                "--tui-address-mode",
+                "host",
+                "--tui-as-mode",
+                "asn",
+                "--tui-custom-columns",
+                "hol,loss%,sent,last,avg,best,wrst,stddev",
+            ],
+            Self::Minimal => &[
+                "--tui-refresh-rate",
+                "500ms",
+                "--tui-address-mode",
+                "ip",
+                "--tui-custom-columns",
+                "hol,loss%,last,avg,best,wrst",
+            ],
+            Self::AsciiSafe => &[
+                "--tui-refresh-rate",
+                "300ms",
+                "--tui-address-mode",
+                "ip",
+                "--tui-privacy-max-ttl",
+                "0",
+                "--tui-custom-columns",
+                "hol,loss%,sent,last,avg,best,wrst,stddev,jttr",
+            ],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -300,6 +346,10 @@ fn build_embedded_trippy_args(args: &Cli, host: &str) -> Result<Vec<String>> {
         trippy_args.extend(["--dns-ttl".to_string(), format!("{ttl}s")]);
     }
 
+    if let Some(profile) = args.profile {
+        trippy_args.extend(profile.flags().iter().map(|flag| (*flag).to_string()));
+    }
+
     if let Some(extra) = &args.trippy_flags {
         trippy_args.extend(parse_passthrough_flags(extra)?);
     }
@@ -402,7 +452,45 @@ mod tests {
             ecmp: None,
             dns_cache_ttl: None,
             trippy_flags: None,
+            profile: None,
         }
+    }
+
+    #[test]
+    fn build_embedded_trippy_args_applies_profile_presets() {
+        let mut args = base_cli();
+        args.profile = Some(ProfilePreset::Minimal);
+
+        let trippy_args = build_embedded_trippy_args(&args, "8.8.8.8").expect("args should build");
+        assert!(
+            trippy_args
+                .windows(2)
+                .any(|pair| pair == ["--tui-refresh-rate", "500ms"])
+        );
+        assert!(
+            trippy_args
+                .windows(2)
+                .any(|pair| pair == ["--tui-custom-columns", "hol,loss%,last,avg,best,wrst"])
+        );
+    }
+
+    #[test]
+    fn build_embedded_trippy_args_profile_flags_can_be_overridden() {
+        let mut args = base_cli();
+        args.profile = Some(ProfilePreset::Pretty);
+        args.trippy_flags = Some("--tui-refresh-rate 100ms".to_string());
+
+        let trippy_args = build_embedded_trippy_args(&args, "8.8.8.8").expect("args should build");
+        let profile_index = trippy_args
+            .iter()
+            .position(|item| item == "500ms" || item == "250ms")
+            .expect("profile flag value should be present");
+        let override_index = trippy_args
+            .iter()
+            .position(|item| item == "100ms")
+            .expect("override flag value should be present");
+
+        assert!(override_index > profile_index);
     }
 
     #[test]

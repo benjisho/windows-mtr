@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <rect width="1200" height="675" fill="#0c0f14"/>
+  <rect x="24" y="24" width="1152" height="627" rx="8" fill="#111826" stroke="#2b3650"/>
+  <text x="48" y="72" fill="#8be9fd" font-family="Consolas, monospace" font-size="28">windows-mtr --profile pretty 8.8.8.8</text>
+  <text x="48" y="118" fill="#f8f8f2" font-family="Consolas, monospace" font-size="20">Hop  Hostname                 Loss% Sent Last  Avg  Best Wrst StDev</text>
+  <text x="48" y="154" fill="#50fa7b" font-family="Consolas, monospace" font-size="20">1    gateway.local             0.0   86  1.2  1.7  0.8  4.5  0.6</text>
+  <text x="48" y="186" fill="#f8f8f2" font-family="Consolas, monospace" font-size="20">5    core1.isp.net             2.3   86 22.4 24.1 20.9 35.8  2.7</text>
+  <text x="48" y="218" fill="#ffb86c" font-family="Consolas, monospace" font-size="20">9    dns.google                1.1   86 31.0 33.2 28.5 49.0  3.8</text>
+  <text x="48" y="620" fill="#6272a4" font-family="Consolas, monospace" font-size="18">Windows Terminal recommended · refresh 250ms · host + ASN columns</text>
+</svg>

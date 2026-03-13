@@ -218,6 +218,30 @@ mtr -T -P 443 example.com
 
 Visit our [detailed usage guide](USAGE.md) for comprehensive examples.
 
+
+## 🖼️ TUI Profile Screenshot Gallery
+
+> [!TIP]
+> For the clearest experience, run these profiles in **Windows Terminal** with an elevated shell.
+
+### `--profile pretty`
+
+![windows-mtr pretty profile screenshot](assets/tui-profile-pretty.svg)
+
+### `--profile minimal`
+
+![windows-mtr minimal profile screenshot](assets/tui-profile-minimal.svg)
+
+### `--profile ascii-safe`
+
+![windows-mtr ascii-safe profile screenshot](assets/tui-profile-ascii-safe.svg)
+
+## ✅ Visual/TUI Success Metrics
+
+- **Readability in default `cmd.exe`:** measure operator readability score (1-5) versus baseline.
+- **Time-to-diagnose packet loss spike:** track median time to identify first lossy hop in a scripted incident replay.
+- **User preference feedback:** collect profile preference and comments after hands-on use of `pretty`, `minimal`, and `ascii-safe`.
+
 ## 📈 Advanced Features
 
 <details>
