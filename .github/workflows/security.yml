@@ -66,15 +66,15 @@ jobs:
 
 
       - name: Install pinned nightly toolchain for fuzzing
-        run: rustup toolchain install nightly-2026-03-13 --profile minimal
+        run: rustup toolchain install nightly-2025-06-23 --profile minimal
 
       - name: Install cargo-fuzz
-        run: cargo +nightly-2026-03-13 install cargo-fuzz --locked
+        run: cargo +nightly-2025-06-23 install cargo-fuzz --locked
 
       - name: Run fuzz harness smoke
         id: fuzz_harness
         working-directory: fuzz
-        run: cargo +nightly-2026-03-13 fuzz run fuzz_passthrough_flags -- -runs=2000
+        run: cargo +nightly-2025-06-23 fuzz run fuzz_passthrough_flags -- -runs=2000
 
       - name: Security summary
         if: always()
@@ -89,4 +89,5 @@ jobs:
             echo "### Notes"
             echo "- cargo-deny config: \`deny.toml\`"
             echo "- Rust toolchain pinned to 1.88.0 for security checks"
+            echo "- Fuzz toolchain pinned to nightly-2025-06-23 (stable historical nightly)"
           } >> "$GITHUB_STEP_SUMMARY"
