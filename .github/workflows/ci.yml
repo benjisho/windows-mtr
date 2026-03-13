@@ -2,6 +2,12 @@ name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      run_windows_elevated_self_hosted:
+        description: "Run privileged Windows probe smoke on an elevated self-hosted runner"
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '0 5 * * 1'
   push:
@@ -424,3 +430,120 @@ jobs:
         run: cargo test --all
         env:
           CARGO_INCREMENTAL: 0
+
+  privilege-probe-smoke:
+    name: Privilege probe smoke (${{ matrix.os }}, non-elevated)
+    runs-on: ${{ matrix.os }}
+    needs: pre-commit
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            expected_stderr_any_of: "privileges are required"
+          - os: windows-latest
+            expected_stderr_any_of: "Administrator privileges are required to run traceroute||A required privilege is not held by the client||Permission denied"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          save-if: false
+          shared-key: "rust-${{ matrix.os }}-probe-smoke"
+          cache-bin: true
+          cache-directories: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+          cache-on-failure: true
+
+      - name: Run non-elevated privilege smoke harness
+        run: cargo test --test privilege_probe_smoke -- --exact privilege_probe_smoke --nocapture
+        env:
+          CARGO_INCREMENTAL: 0
+          EXPECT_EXIT_CODE: "1"
+          EXPECT_STDERR_ANY_OF: ${{ matrix.expected_stderr_any_of }}
+
+  privilege-probe-smoke-linux-privileged:
+    name: Privilege probe smoke (ubuntu-latest, elevated)
+    runs-on: ubuntu-latest
+    needs: pre-commit
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          save-if: false
+          shared-key: "rust-ubuntu-latest-probe-smoke-elevated"
+          cache-bin: true
+          cache-directories: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+          cache-on-failure: true
+
+      - name: Build smoke harness without running
+        run: cargo test --test privilege_probe_smoke --no-run
+        env:
+          CARGO_INCREMENTAL: 0
+
+      - name: Run elevated privilege smoke harness
+        shell: bash
+        run: |
+          test_bin=$(find target/debug/deps -maxdepth 1 -type f -name 'privilege_probe_smoke-*' -executable | head -n 1)
+          if [ -z "$test_bin" ]; then
+            echo "Unable to locate compiled privilege smoke harness"
+            exit 1
+          fi
+
+          sudo EXPECT_EXIT_CODE=0 EXPECT_STDOUT_CONTAINS=Hop "$test_bin" --exact privilege_probe_smoke --nocapture
+
+  privilege-probe-smoke-windows-elevated-self-hosted:
+    name: Privilege probe smoke (windows, elevated self-hosted)
+    runs-on: [self-hosted, Windows, X64, elevated]
+    needs: pre-commit
+    if: github.event_name == 'workflow_dispatch' && inputs.run_windows_elevated_self_hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Run elevated privilege smoke harness
+        shell: pwsh
+        run: |
+          $env:EXPECT_EXIT_CODE = "0"
+          $env:EXPECT_STDOUT_CONTAINS = "Hop"
+          cargo test --test privilege_probe_smoke -- --exact privilege_probe_smoke --nocapture
+
+  privilege-probe-smoke-windows-elevated-note:
+    name: Privilege probe smoke (windows, elevated lane note)
+    runs-on: windows-latest
+    needs: pre-commit
+    if: github.event_name != 'workflow_dispatch' || !inputs.run_windows_elevated_self_hosted
+
+    steps:
+      - name: Document GitHub-hosted Windows elevation constraint
+        shell: pwsh
+        run: |
+          "GitHub-hosted windows-latest runners cannot be interactively elevated; elevated probe smoke is provided via the optional self-hosted 'elevated' lane." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
