@@ -151,14 +151,14 @@ fn run_ui_loop(
 
         terminal.draw(|f| draw_ui(f, &app))?;
 
-        if event::poll(Duration::from_millis(100)).context("failed to poll terminal events")? {
-            if let Event::Key(key) = event::read().context("failed to read terminal event")? {
-                match key.code {
-                    KeyCode::Char('q') => return Ok(0),
-                    KeyCode::Right | KeyCode::Tab => app.next_tab(),
-                    KeyCode::Left => app.prev_tab(),
-                    _ => {}
-                }
+        if event::poll(Duration::from_millis(100)).context("failed to poll terminal events")?
+            && let Event::Key(key) = event::read().context("failed to read terminal event")?
+        {
+            match key.code {
+                KeyCode::Char('q') => return Ok(0),
+                KeyCode::Right | KeyCode::Tab => app.next_tab(),
+                KeyCode::Left => app.prev_tab(),
+                _ => {}
             }
         }
     }
