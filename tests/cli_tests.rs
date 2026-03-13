@@ -1,4 +1,11 @@
 use std::process::Command;
+use std::{fs, path::Path};
+
+#[allow(dead_code)]
+#[path = "../src/error.rs"]
+mod error;
+
+use error::MtrError;
 
 #[test]
 fn test_help_output() {
@@ -64,6 +71,71 @@ fn test_enhanced_wrapper_conflicts_with_passthrough_override() {
     let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
     assert!(
         stderr.contains("--trippy-flags cannot override windows-mtr enhanced UI wrapper settings")
+    );
+}
+
+#[test]
+fn test_insufficient_privileges_diagnostic_contract_is_stable() {
+    let error = MtrError::InsufficientPrivileges;
+    let message = error.to_string();
+
+    assert!(
+        matches!(error, MtrError::InsufficientPrivileges),
+        "Expected explicit InsufficientPrivileges error category to remain present",
+    );
+    assert!(
+        message.contains("Administrator privileges are required to run traceroute"),
+        "Expected insufficient privilege diagnostics to keep user-readable summary",
+    );
+    assert!(
+        message.contains("Run as administrator"),
+        "Expected insufficient privilege diagnostics to include actionable guidance",
+    );
+}
+
+#[test]
+fn test_tcp_without_port_exits_with_error_and_actionable_guidance() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "-T", "8.8.8.8"])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(
+        !output.status.success(),
+        "Expected non-zero exit for TCP mode without required port",
+    );
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
+    assert!(
+        stderr.contains("Port option required for TCP protocol"),
+        "Expected protocol-specific error instead of silent fallback to another probe mode",
+    );
+    assert!(
+        stderr.contains("Example: windows-mtr.exe -T -P 443 8.8.8.8"),
+        "Expected actionable guidance for TCP privilege/usage diagnostics",
+    );
+}
+
+#[test]
+fn test_udp_without_port_exits_with_error_and_actionable_guidance() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "-U", "8.8.8.8"])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(
+        !output.status.success(),
+        "Expected non-zero exit for UDP mode without required port",
+    );
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
+    assert!(
+        stderr.contains("Port option required for UDP protocol"),
+        "Expected protocol-specific error instead of silent fallback to another probe mode",
+    );
+    assert!(
+        stderr.contains("Example: windows-mtr.exe -U -P 443 8.8.8.8"),
+        "Expected actionable guidance for UDP privilege/usage diagnostics",
     );
 }
 
