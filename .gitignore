@@ -40,3 +40,9 @@ Cargo.lock
 # Local development files
 /trippy/
 /trippy.exe
+
+# Fuzzing artifacts
+/fuzz/artifacts/
+/fuzz/corpus/
+/fuzz/coverage/
+/fuzz/target/

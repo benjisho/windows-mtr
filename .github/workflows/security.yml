@@ -64,6 +64,18 @@ jobs:
         id: cargo_audit
         run: cargo audit
 
+
+      - name: Install nightly toolchain for fuzzing
+        run: rustup toolchain install nightly --profile minimal
+
+      - name: Install cargo-fuzz
+        run: cargo +nightly install cargo-fuzz --locked
+
+      - name: Run fuzz harness smoke
+        id: fuzz_harness
+        working-directory: fuzz
+        run: cargo +nightly fuzz run fuzz_passthrough_flags -- -runs=2000
+
       - name: Security summary
         if: always()
         run: |
@@ -72,6 +84,7 @@ jobs:
             echo ""
             echo "- cargo-deny: ${{ steps.cargo_deny.outcome }}"
             echo "- cargo-audit: ${{ steps.cargo_audit.outcome }}"
+            echo "- fuzz harness smoke: ${{ steps.fuzz_harness.outcome }}"
             echo ""
             echo "### Notes"
             echo "- cargo-deny config: \`deny.toml\`"

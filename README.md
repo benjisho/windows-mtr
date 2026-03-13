@@ -397,7 +397,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 </tr>
 <tr>
   <td>Security hardening gates (cargo-audit + fuzz harness in CI)</td>
-  <td>🚧 In Progress (cargo-audit live, fuzz harness pending)</td>
+  <td>✅ Released (cargo-audit + fuzz harness smoke in CI security workflow)</td>
   <td>H2 2026</td>
 </tr>
 <tr>
