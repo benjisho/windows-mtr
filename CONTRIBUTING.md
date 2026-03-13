@@ -43,6 +43,7 @@ For local setup details, see [DEVELOPMENT.md](DEVELOPMENT.md).
    - Treat CLI input, hostnames, packets, and files as untrusted input.
 4. **Validate locally**
    - Run formatting, linting, and tests before opening a PR.
+   - For workflow edits, pin every `uses:` action reference to a full 40-character commit SHA (avoid mutable tags/branches).
 5. **Open a pull request**
    - Use `.github/PULL_REQUEST_TEMPLATE.md`.
    - Clearly describe what changed, why, and how you tested it.
