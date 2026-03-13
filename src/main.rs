@@ -6,6 +6,7 @@ use std::net::{IpAddr, ToSocketAddrs};
 use std::process::{self, Command, Stdio};
 
 mod error;
+mod native_ui;
 use error::{MtrError, Result};
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
@@ -149,6 +150,7 @@ struct Cli {
 enum UiPreset {
     Default,
     Enhanced,
+    Native,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -241,10 +243,18 @@ fn verify_options(args: &Cli) -> Result<()> {
         || args.enhanced_sparklines.is_some()
         || args.enhanced_summary.is_some();
 
-    if args.ui == UiPreset::Enhanced && (args.report || args.json || args.json_pretty) {
-        return Err(MtrError::InvalidOption(
-            "--ui enhanced is only supported in interactive TUI mode".to_string(),
-        ));
+    if (args.ui == UiPreset::Enhanced || args.ui == UiPreset::Native)
+        && (args.report || args.json || args.json_pretty)
+    {
+        let ui_name = match args.ui {
+            UiPreset::Enhanced => "enhanced",
+            UiPreset::Native => "native",
+            UiPreset::Default => "default",
+        };
+
+        return Err(MtrError::InvalidOption(format!(
+            "--ui {ui_name} is only supported in interactive TUI mode"
+        )));
     }
 
     if has_enhanced_specific_options && args.ui != UiPreset::Enhanced {
@@ -265,6 +275,32 @@ fn verify_options(args: &Cli) -> Result<()> {
                 "--loss-warn-pct must be lower than --loss-bad-pct".to_string(),
             ));
         }
+    }
+
+    if args.ui == UiPreset::Native
+        && (args.tcp
+            || args.udp
+            || args.port.is_some()
+            || args.source_port.is_some()
+            || args.count.is_some()
+            || args.interval.is_some()
+            || args.timeout.is_some()
+            || args.report_wide
+            || args.no_dns
+            || args.max_hops.is_some()
+            || args.show_asn
+            || args.dns_lookup_as_info
+            || args.packet_size.is_some()
+            || args.src.is_some()
+            || args.interface.is_some()
+            || args.ecmp.is_some()
+            || args.dns_cache_ttl.is_some()
+            || args.trippy_flags.is_some()
+            || has_enhanced_specific_options)
+    {
+        return Err(MtrError::InvalidOption(
+            "--ui native currently supports only the target host argument".to_string(),
+        ));
     }
 
     if let Some(flags) = &args.trippy_flags {
@@ -526,6 +562,11 @@ fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .with_context(|| format!("invalid target host: {}", args.host))?;
 
+    if args.ui == UiPreset::Native {
+        let code = native_ui::run_native_ui(&host)?;
+        process::exit(code);
+    }
+
     let trippy_args = build_embedded_trippy_args(&args, &host)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .context("failed to translate windows-mtr options into trippy options")?;
@@ -771,6 +812,28 @@ mod tests {
         let mut args = base_cli();
         args.ui = UiPreset::Enhanced;
         args.trippy_flags = Some("--tui-hop-trend false".to_string());
+        assert!(matches!(
+            verify_options(&args),
+            Err(MtrError::InvalidOption(_))
+        ));
+    }
+
+    #[test]
+    fn verify_options_rejects_report_modes_for_native_ui() {
+        let mut args = base_cli();
+        args.ui = UiPreset::Native;
+        args.report = true;
+        assert!(matches!(
+            verify_options(&args),
+            Err(MtrError::InvalidOption(_))
+        ));
+    }
+
+    #[test]
+    fn verify_options_rejects_extra_flags_for_native_ui_preview() {
+        let mut args = base_cli();
+        args.ui = UiPreset::Native;
+        args.count = Some(5);
         assert!(matches!(
             verify_options(&args),
             Err(MtrError::InvalidOption(_))

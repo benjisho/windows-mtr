@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Added a native Ratatui preview mode via `--ui native` with tabs, hop table rendering, and live latency/loss charts.
+
+### Changed
+- Updated README/USAGE roadmap and examples to document the new native UI preview and controls.
+
 ## [1.1.3] - 2026-02-28
 
 ### Added
