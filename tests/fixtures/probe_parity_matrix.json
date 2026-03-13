@@ -1,0 +1,170 @@
+[
+  {
+    "id": "linux-unprivileged-icmp-invalid-host",
+    "os": "linux",
+    "privilege": "unprivileged",
+    "probe_mode": "icmp",
+    "args": ["invalid host with spaces"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "host_validation",
+      "stderr_contains": ["Failed to resolve hostname"]
+    },
+    "enforce_in_ci": true
+  },
+  {
+    "id": "linux-unprivileged-tcp-port-required",
+    "os": "linux",
+    "privilege": "unprivileged",
+    "probe_mode": "tcp",
+    "args": ["-T", "8.8.8.8"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "option_validation",
+      "stderr_contains": ["Port option required for TCP protocol"]
+    },
+    "enforce_in_ci": true
+  },
+  {
+    "id": "linux-unprivileged-udp-port-required",
+    "os": "linux",
+    "privilege": "unprivileged",
+    "probe_mode": "udp",
+    "args": ["-U", "8.8.8.8"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "option_validation",
+      "stderr_contains": ["Port option required for UDP protocol"]
+    },
+    "enforce_in_ci": true
+  },
+  {
+    "id": "linux-elevated-icmp-invalid-host",
+    "os": "linux",
+    "privilege": "elevated",
+    "probe_mode": "icmp",
+    "args": ["invalid host with spaces"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "host_validation",
+      "stderr_contains": ["Failed to resolve hostname"]
+    },
+    "enforce_in_ci": false
+  },
+  {
+    "id": "linux-elevated-tcp-port-required",
+    "os": "linux",
+    "privilege": "elevated",
+    "probe_mode": "tcp",
+    "args": ["-T", "8.8.8.8"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "option_validation",
+      "stderr_contains": ["Port option required for TCP protocol"]
+    },
+    "enforce_in_ci": false
+  },
+  {
+    "id": "linux-elevated-udp-port-required",
+    "os": "linux",
+    "privilege": "elevated",
+    "probe_mode": "udp",
+    "args": ["-U", "8.8.8.8"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "option_validation",
+      "stderr_contains": ["Port option required for UDP protocol"]
+    },
+    "enforce_in_ci": false
+  },
+  {
+    "id": "windows-unprivileged-icmp-invalid-host",
+    "os": "windows",
+    "privilege": "unprivileged",
+    "probe_mode": "icmp",
+    "args": ["invalid host with spaces"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "host_validation",
+      "stderr_contains": ["Failed to resolve hostname"]
+    },
+    "enforce_in_ci": true
+  },
+  {
+    "id": "windows-unprivileged-tcp-port-required",
+    "os": "windows",
+    "privilege": "unprivileged",
+    "probe_mode": "tcp",
+    "args": ["-T", "8.8.8.8"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "option_validation",
+      "stderr_contains": ["Port option required for TCP protocol"]
+    },
+    "enforce_in_ci": true
+  },
+  {
+    "id": "windows-unprivileged-udp-port-required",
+    "os": "windows",
+    "privilege": "unprivileged",
+    "probe_mode": "udp",
+    "args": ["-U", "8.8.8.8"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "option_validation",
+      "stderr_contains": ["Port option required for UDP protocol"]
+    },
+    "enforce_in_ci": true
+  },
+  {
+    "id": "windows-elevated-icmp-invalid-host",
+    "os": "windows",
+    "privilege": "elevated",
+    "probe_mode": "icmp",
+    "args": ["invalid host with spaces"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "host_validation",
+      "stderr_contains": ["Failed to resolve hostname"]
+    },
+    "enforce_in_ci": false
+  },
+  {
+    "id": "windows-elevated-tcp-port-required",
+    "os": "windows",
+    "privilege": "elevated",
+    "probe_mode": "tcp",
+    "args": ["-T", "8.8.8.8"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "option_validation",
+      "stderr_contains": ["Port option required for TCP protocol"]
+    },
+    "enforce_in_ci": false
+  },
+  {
+    "id": "windows-elevated-udp-port-required",
+    "os": "windows",
+    "privilege": "elevated",
+    "probe_mode": "udp",
+    "args": ["-U", "8.8.8.8"],
+    "expected": {
+      "outcome": "failure",
+      "exit_code": 1,
+      "failure_class": "option_validation",
+      "stderr_contains": ["Port option required for UDP protocol"]
+    },
+    "enforce_in_ci": false
+  }
+]

@@ -306,6 +306,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 - [📚 Full Documentation Hub](docs/README.md)
 - [🧩 CLI/API Reference](docs/API.md)
+- [🧪 Probe parity matrix](docs/probe-parity.md)
 - [📑 Usage Examples](docs/USAGE.md)
 - [🛠️ Development Setup](DEVELOPMENT.md)
 - [🤝 Contributing Guide](CONTRIBUTING.md)
