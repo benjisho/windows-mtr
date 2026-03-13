@@ -402,7 +402,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 </tr>
 <tr>
   <td>Cross-platform probe parity/privilege smoke tests</td>
-  <td>🚧 In Progress (cross-OS CI live, probe privilege smoke tests pending)</td>
+  <td>✅ Released (CI `Probe parity (windows-latest|ubuntu-latest)` + privilege smoke lanes: `Privilege probe smoke (ubuntu-latest|windows-latest, non-elevated)`, `Privilege probe smoke (ubuntu-latest, elevated)`, and optional `Privilege probe smoke (windows, elevated self-hosted)`; coverage includes non-elevated failures on Windows/Ubuntu and elevated success on Ubuntu + Windows self-hosted; constraint: elevated Windows lane requires self-hosted runner because GitHub-hosted `windows-latest` cannot be interactively elevated.)</td>
   <td>H2 2026</td>
 </tr>
 <tr>
