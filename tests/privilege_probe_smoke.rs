@@ -52,9 +52,7 @@ fn privilege_probe_smoke() {
         let alternatives = parse_alternatives(&expected_stderr_any_of);
         assert!(
             alternatives.iter().any(|needle| stderr.contains(needle)),
-            "expected stderr to contain one of {:?}\nactual stderr:\n{}",
-            alternatives,
-            stderr
+            "expected stderr to contain one of {alternatives:?}\nactual stderr:\n{stderr}",
         );
     }
 }

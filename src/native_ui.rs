@@ -246,7 +246,7 @@ fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
 }
 
 fn normalize_percent(value: f64) -> f64 {
-    if value <= 1.0 { value * 100.0 } else { value }
+    if value < 1.0 { value * 100.0 } else { value }
 }
 
 fn find_hop_array(value: &Value) -> Option<&Vec<Value>> {

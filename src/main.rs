@@ -793,11 +793,14 @@ mod tests {
     }
 
     #[test]
-    fn verify_options_allows_report_mode_for_native_ui() {
+    fn verify_options_rejects_report_mode_for_native_ui() {
         let mut args = base_cli();
         args.ui = UiPreset::Native;
         args.report = true;
-        assert!(verify_options(&args).is_ok());
+        assert!(matches!(
+            verify_options(&args),
+            Err(MtrError::InvalidOption(_))
+        ));
     }
 
     #[test]
