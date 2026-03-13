@@ -20,6 +20,7 @@ on:
       - 'xtask/**'
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
+      - 'docs/probe-parity.md'
   pull_request:
     branches: [ master ]
     paths:
@@ -30,6 +31,7 @@ on:
       - 'xtask/**'
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
+      - 'docs/probe-parity.md'
 permissions:
   contents: read
 
@@ -208,6 +210,53 @@ jobs:
         run: cargo test --all
         env:
           CARGO_INCREMENTAL: 0
+
+  probe-parity:
+    name: Probe parity (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [pre-commit]
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          save-if: false
+          shared-key: "rust-${{ matrix.os }}-probe-parity"
+          cache-bin: true
+          cache-directories: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git
+          cache-on-failure: true
+
+      - name: Run probe parity tests
+        shell: bash
+        env:
+          PARITY_SUMMARY_PATH: ${{ runner.temp }}/probe-parity-summary.md
+          CARGO_INCREMENTAL: 0
+        run: cargo test --test probe_parity_tests -- --nocapture
+
+      - name: Publish parity summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "${{ runner.temp }}/probe-parity-summary.md" ]; then
+            cat "${{ runner.temp }}/probe-parity-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Probe parity summary file was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
 
   docker-build-amd64:

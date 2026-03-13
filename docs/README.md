@@ -20,6 +20,7 @@ Welcome to the documentation hub for **Windows MTR**, a Windows-native, enterpri
   - [Development setup and workflow](../DEVELOPMENT.md)
   - [Contribution process and quality gates](../CONTRIBUTING.md)
   - [CLI/report API semantics](API.md)
+  - [Probe parity matrix](probe-parity.md)
   - [Branch review snapshot](BRANCH_REVIEW.md)
 
 ## Common Tasks
