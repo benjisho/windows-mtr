@@ -154,8 +154,10 @@ fn run_ui_loop(
 }
 
 fn fetch_hops_snapshot(base_args: &[String], target: &str) -> anyhow::Result<Vec<HopStat>> {
-    // SAFETY: `current_exe` is used only to re-exec this trusted process.
+    // SAFETY: `current_exe` is only used to re-exec this process for local JSON polling,
+    // not for any trust or authorization decision.
     let current_exe =
+        // nosemgrep: rust.lang.security.current-exe.current-exe
         env::current_exe().context("failed to locate current executable for native UI polling")?;
 
     let mut args = sanitize_args_for_json_snapshot(base_args);
