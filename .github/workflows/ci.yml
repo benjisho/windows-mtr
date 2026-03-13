@@ -471,6 +471,7 @@ jobs:
           CARGO_INCREMENTAL: 0
           EXPECT_EXIT_CODE: "1"
           EXPECT_STDERR_ANY_OF: ${{ matrix.expected_stderr_any_of }}
+          SMOKE_ARGS: "-n -r -c 1 127.0.0.1"
 
   privilege-probe-smoke-linux-privileged:
     name: Privilege probe smoke (ubuntu-latest, elevated)
@@ -512,7 +513,7 @@ jobs:
             exit 1
           fi
 
-          sudo EXPECT_EXIT_CODE=0 EXPECT_STDOUT_CONTAINS=Hop "$test_bin" --exact privilege_probe_smoke --nocapture
+          sudo EXPECT_EXIT_CODE=0 EXPECT_STDOUT_CONTAINS=Hop SMOKE_ARGS="-n -r -c 1 127.0.0.1" "$test_bin" --exact privilege_probe_smoke --nocapture
 
   privilege-probe-smoke-windows-elevated-self-hosted:
     name: Privilege probe smoke (windows, elevated self-hosted)
@@ -534,6 +535,7 @@ jobs:
         run: |
           $env:EXPECT_EXIT_CODE = "0"
           $env:EXPECT_STDOUT_CONTAINS = "Hop"
+          $env:SMOKE_ARGS = "-n -r -c 1 127.0.0.1"
           cargo test --test privilege_probe_smoke -- --exact privilege_probe_smoke --nocapture
 
   privilege-probe-smoke-windows-elevated-note:

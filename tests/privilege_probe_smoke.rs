@@ -2,7 +2,7 @@ use std::env;
 use std::process::Command;
 
 fn parse_args(raw: &str) -> Vec<String> {
-    raw.split_whitespace().map(ToString::to_string).collect()
+    shlex::split(raw).unwrap_or_else(|| raw.split_whitespace().map(ToString::to_string).collect())
 }
 
 fn parse_alternatives(raw: &str) -> Vec<String> {
@@ -57,4 +57,25 @@ fn privilege_probe_smoke() {
             stderr
         );
     }
+}
+
+#[test]
+fn parse_args_supports_shell_quoting() {
+    let args = parse_args("--trippy-flags \"--log-format json --verbose\" -c 1 127.0.0.1");
+    assert_eq!(
+        args,
+        vec![
+            "--trippy-flags",
+            "--log-format json --verbose",
+            "-c",
+            "1",
+            "127.0.0.1",
+        ]
+    );
+}
+
+#[test]
+fn parse_alternatives_drops_empty_entries() {
+    let values = parse_alternatives("foo|| ||bar||");
+    assert_eq!(values, vec!["foo", "bar"]);
 }
