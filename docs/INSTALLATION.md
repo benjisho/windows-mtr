@@ -33,8 +33,8 @@ mtr --help
 
 ## Portable Installation
 
-1. Download `windows-mtr.zip` (or compressed variant).
-2. Extract to a folder, e.g. `C:\Tools\windows-mtr`.
+1. Download `windows-mtr-x86_64.exe` (direct executable) or `windows-mtr-official-x86_64.zip` (official portable bundle).
+2. Extract to a folder (if using ZIP), e.g. `C:\Tools\windows-mtr`.
 3. Run directly:
 
 ```powershell

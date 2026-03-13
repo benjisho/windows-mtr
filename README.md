@@ -111,8 +111,8 @@ Windows MTR is built with enterprise-level security practices:
 
 #### Portable Installation
 
-1. Download `windows-mtr.zip` or `windows-mtr.zip.xz` (40% smaller) from [GitHub Releases](https://github.com/benjisho/windows-mtr/releases)
-2. Extract the ZIP file
+1. Download `windows-mtr-x86_64.exe` (direct executable) or `windows-mtr-official-x86_64.zip` (official portable bundle) from [GitHub Releases](https://github.com/benjisho/windows-mtr/releases)
+2. Extract the ZIP file if you chose the portable bundle
 3. Run `mtr.exe` directly - no installation required
 
 #### System Requirements
@@ -172,7 +172,7 @@ Follow these steps to compile the Windows MTR executable:
 
 6. After a successful build the binary is located at `target\release\mtr.exe`.
 
-The resulting executable is now **self-contained** and embeds Trippy directly (no external `trip.exe` required).
+The resulting executable is now **self-contained** and embeds Trippy directly (no additional runtime executable required).
 
 ## 🚀 Quick Start
 
