@@ -43,7 +43,9 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
-          if [ ! -f .github/label-taxonomy.yml ]; then
+          TAXONOMY_FILE=".github/label-taxonomy.yml"
+
+          if [ ! -f "${TAXONOMY_FILE}" ]; then
             echo "::warning::.github/label-taxonomy.yml not found; skipping title-based labeling."
             exit 0
           fi
@@ -53,11 +55,21 @@ jobs:
           echo "PR title: $PR_TITLE"
           echo "Detected prefix: '$PREFIX'"
 
-          LABELS=$(PREFIX_VALUE="$PREFIX" ruby -ryaml -e '
+          LABELS=$(PREFIX_VALUE="$PREFIX" TAXONOMY_FILE="$TAXONOMY_FILE" ruby -ryaml -e '
             prefix = ENV.fetch("PREFIX_VALUE", "").strip.downcase
-            taxonomy = YAML.load_file(".github/label-taxonomy.yml")
+            taxonomy_file = ENV.fetch("TAXONOMY_FILE", ".github/label-taxonomy.yml")
+
+            unless File.file?(taxonomy_file)
+              warn("taxonomy file not found at #{taxonomy_file}; skipping.")
+              exit 0
+            end
+
+            taxonomy = YAML.load_file(taxonomy_file)
             labels = taxonomy.fetch("title_prefix_to_labels", {}).fetch(prefix, [])
             puts labels.join(" ")
+          rescue Psych::Exception => e
+            warn("failed to parse taxonomy file #{taxonomy_file}: #{e.message}")
+            exit 0
           ')
 
           if [ -z "$LABELS" ]; then
