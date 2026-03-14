@@ -33,6 +33,7 @@ jobs:
       - name: Checkout repository metadata
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 1
 
       - name: Apply label from title prefix taxonomy
@@ -47,7 +48,7 @@ jobs:
             exit 0
           fi
 
-          PREFIX=$(printf '%s' "$PR_TITLE" | sed -E 's/^([a-zA-Z]+).*/\1/' | tr '[:upper:]' '[:lower:]')
+          PREFIX=$(printf '%s' "$PR_TITLE" | sed -E 's/^[[:space:]]*([a-zA-Z]+).*/\1/' | tr '[:upper:]' '[:lower:]')
 
           echo "PR title: $PR_TITLE"
           echo "Detected prefix: '$PREFIX'"
