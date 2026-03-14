@@ -1,3 +1,4 @@
+## Keep label names aligned with .github/label-definitions.yml and .github/release.yml.
 ci:
   - changed-files:
       - any-glob-to-any-file:

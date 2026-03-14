@@ -1,0 +1,74 @@
+# =============================================================================
+# Auto-generated release notes configuration
+# =============================================================================
+# Controls how GitHub groups merged PRs in automatically generated changelogs.
+# Used by GitHub Releases and by `gh release create --generate-notes`.
+#
+# Label source of truth:
+#   .github/label-definitions.yml
+#
+# Docs:
+# https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+# =============================================================================
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - skip-changelog
+      - dependencies
+    authors:
+      - dependabot
+      - dependabot[bot]
+
+  categories:
+    - title: "🚀 Features & Improvements"
+      labels:
+        - enhancement
+        - performance
+
+    - title: "🐛 Fixes"
+      labels:
+        - bug
+        - hotfix
+        - patch
+
+    - title: "🔐 Security"
+      labels:
+        - security
+
+    - title: "🧱 Core Rust / Engine"
+      labels:
+        - rust
+
+    - title: "🧪 Tests"
+      labels:
+        - tests
+
+    - title: "🏗️ CI / Infrastructure / Release"
+      labels:
+        - ci
+        - infrastructure
+        - release
+
+    - title: "📦 Packaging / Docker"
+      labels:
+        - packaging
+        - docker
+
+    - title: "🖥️ Frontend / Assets"
+      labels:
+        - frontend
+        - assets
+
+    - title: "🛠️ Project Tooling"
+      labels:
+        - xtask
+
+    - title: "📚 Documentation"
+      labels:
+        - documentation
+
+    - title: "🔧 Other Changes"
+      labels:
+        - "*"

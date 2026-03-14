@@ -1,0 +1,51 @@
+# Canonical label catalog for this repository.
+# Keep this file in sync with:
+# - .github/labeler.yml (path-based auto-labeler)
+# - .github/workflows/pr-auto-labeler.yml (title-prefix auto-labeler)
+# - .github/release.yml (auto-generated release notes categories)
+
+labels:
+  # Path-based labels (.github/labeler.yml)
+  path_based:
+    - ci
+    - documentation
+    - rust
+    - tests
+    - packaging
+    - xtask
+    - assets
+
+  # Title-prefix labels (.github/workflows/pr-auto-labeler.yml)
+  title_prefix:
+    - enhancement
+    - bug
+    - hotfix
+    - documentation
+    - ci
+    - security
+    - performance
+    - infrastructure
+    - docker
+    - frontend
+    - patch
+    - release
+
+  # Union of labels currently applied by auto-labeler CI.
+  all:
+    - assets
+    - bug
+    - ci
+    - docker
+    - documentation
+    - enhancement
+    - frontend
+    - hotfix
+    - infrastructure
+    - packaging
+    - patch
+    - performance
+    - release
+    - rust
+    - security
+    - tests
+    - xtask
