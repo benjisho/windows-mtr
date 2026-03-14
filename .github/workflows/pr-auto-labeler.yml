@@ -42,59 +42,19 @@ jobs:
           echo "PR title: $PR_TITLE"
           echo "Detected prefix: '$PREFIX'"
 
-          LABEL=""
-          LABELS=""
+          LABELS=$(PREFIX_VALUE="$PREFIX" ruby -ryaml -e '
+            prefix = ENV.fetch("PREFIX_VALUE", "").strip.downcase
+            taxonomy = YAML.load_file(".github/label-taxonomy.yml")
+            labels = taxonomy.fetch("title_prefix_to_labels", {}).fetch(prefix, [])
+            puts labels.join(" ")
+          ')
 
-          case "$PREFIX" in
-            feat|feature)
-              LABEL="enhancement"
-              ;;
-            fix|bugfix)
-              LABEL="bug"
-              ;;
-            hotfix)
-              LABELS="hotfix bug"
-              ;;
-            docs)
-              LABEL="documentation"
-              ;;
-            ci)
-              LABEL="ci"
-              ;;
-            security)
-              LABEL="security"
-              ;;
-            perf)
-              LABEL="performance"
-              ;;
-            build)
-              LABEL="infrastructure"
-              ;;
-            docker)
-              LABEL="docker"
-              ;;
-            frontend|forntend)
-              LABEL="frontend"
-              ;;
-            patch)
-              LABEL="patch"
-              ;;
-            release)
-              LABEL="release"
-              ;;
-            *)
-              echo "No label mapping for prefix '${PREFIX}' — skipping."
-              exit 0
-              ;;
-          esac
-
-          LABELS=${LABELS:-$LABEL}
           if [ -z "$LABELS" ]; then
-            echo "::warning::No labels resolved for prefix '$PREFIX' — skipping."
+            echo "No label mapping for prefix '${PREFIX}' — skipping."
             exit 0
           fi
 
-          echo "Applying label(s) '$LABELS' based on prefix '$PREFIX'..."
+          echo "Applying label(s) '$LABELS' based on prefix '$PREFIX' from .github/label-taxonomy.yml..."
           read -r -a LABEL_ARRAY <<< "$LABELS"
           for label in "${LABEL_ARRAY[@]}"; do
             gh pr edit "$PR_NUMBER" \

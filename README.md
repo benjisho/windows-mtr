@@ -96,7 +96,6 @@ Windows MTR is built with enterprise-level security practices:
 - 🧪 Comprehensive fuzzing with 1000+ malformed packet tests
 - 🔑 Cryptographically signed releases with SHA-256 verification
 
-
 ### REST API security and operational limits (v1 plan)
 
 For planned REST API deployments, the security baseline is:

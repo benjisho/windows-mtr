@@ -1,0 +1,53 @@
+title_prefix_to_labels:
+  feat: [enhancement]
+  feature: [enhancement]
+  fix: [bug]
+  bugfix: [bug]
+  hotfix: [hotfix, bug]
+  docs: [documentation]
+  ci: [ci]
+  security: [security]
+  perf: [performance]
+  build: [infrastructure]
+  docker: [docker]
+  frontend: [frontend]
+  forntend: [frontend]
+  patch: [patch]
+  release: [release]
+
+path_labels:
+  - ci
+  - documentation
+  - rust
+  - tests
+  - packaging
+  - xtask
+  - assets
+
+release_notes_categories:
+  - title: "🚀 New Features"
+    labels: [enhancement]
+  - title: "🐛 Bug Fixes"
+    labels: [bug, hotfix, patch]
+  - title: "⚡ Performance"
+    labels: [performance]
+  - title: "🔒 Security"
+    labels: [security]
+  - title: "🏗️ Infrastructure & CI"
+    labels: [ci, infrastructure, release]
+  - title: "📦 Packaging & Distribution"
+    labels: [packaging, docker]
+  - title: "📚 Documentation"
+    labels: [documentation]
+  - title: "🧪 Testing"
+    labels: [tests]
+  - title: "🦀 Core Rust"
+    labels: [rust]
+  - title: "🛠️ Tooling"
+    labels: [xtask]
+  - title: "🖥️ Frontend"
+    labels: [frontend]
+  - title: "🎨 Assets"
+    labels: [assets]
+  - title: "🔧 Other Changes"
+    labels: ["*"]
