@@ -96,6 +96,20 @@ Windows MTR is built with enterprise-level security practices:
 - 🧪 Comprehensive fuzzing with 1000+ malformed packet tests
 - 🔑 Cryptographically signed releases with SHA-256 verification
 
+
+### REST API security and operational limits (v1 plan)
+
+For planned REST API deployments, the security baseline is:
+
+- Default bind address: `127.0.0.1:3000` (localhost only)
+- Non-local bind requires explicit opt-in + authentication (`X-API-Key` or mTLS)
+- Default request timeout: `10s`
+- Max concurrent probes: `8`
+- Max targets per request: `8`
+- Max payload size: `16 KiB`
+
+See [docs/security/rest-api.md](docs/security/rest-api.md) for the full threat model and controls.
+
 ## 💻 Installation
 
 > [!TIP]

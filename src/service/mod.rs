@@ -1,3 +1,4 @@
+pub mod rest_api;
 use anyhow::Context;
 use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
