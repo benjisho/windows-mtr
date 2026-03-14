@@ -345,6 +345,20 @@ pre-commit run --all-files
 
 Before running local pre-commit hooks, install Rust via [rustup](https://www.rust-lang.org/tools/install) and make sure `cargo` is available on your `PATH`.
 
+### Local API verification workflow
+
+To validate API behavior and schema compatibility locally, run:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --test api_contract_tests -- --nocapture
+cargo test --test api_integration_tests -- --nocapture
+./scripts/check_openapi_compat.sh master
+```
+
+`check_openapi_compat.sh` resolves `origin/<base-ref>` first, then local `<base-ref>`, then `HEAD~1` as a local fallback. It requires a local Docker engine and you can pin a different `oasdiff` image via `OASDIFF_IMAGE=<image:tag>`.
+
 For any workflow change, pin each GitHub Actions `uses:` reference to a full 40-character commit SHA (avoid mutable tags/branches).
 
 ## 📜 License
