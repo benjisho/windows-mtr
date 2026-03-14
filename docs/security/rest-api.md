@@ -87,4 +87,3 @@ This v1 model aligns with common API hardening guidance:
 - **HTTP Semantics (RFC 9110)** status-code usage for payload and request throttling outcomes (e.g., 413/429).
 
 These references were checked during this update to ensure the guardrails match mainstream operator expectations.
-
