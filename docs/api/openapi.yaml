@@ -5,6 +5,19 @@ info:
   description: |
     Initial v1 contract for a service wrapper around windows-mtr probe/report concepts.
 
+    ## Security defaults for v1
+    - Bind address defaults to `127.0.0.1:3000`.
+    - Non-local bind (`0.0.0.0` or public/private interfaces) is disabled by default and requires explicit opt-in.
+    - Per-request timeout defaults to `10` seconds.
+    - Maximum concurrent probes defaults to `8` in-flight jobs.
+    - Maximum target count per request defaults to `8` entries.
+    - Maximum request payload defaults to `16384` bytes.
+
+    ## Authentication strategy decision (v1)
+    - **Default**: `none-local-only` when bound to loopback only.
+    - **Required for non-local bind**: `api_key` or `mTLS`.
+    - Deployments exposing the API beyond localhost MUST NOT run without authentication.
+
     ## Mapping from CLI/report concepts (`USAGE.md`)
     - Report row semantics (`Loss%`, `Snt`, `Last`, `Avg`, `Best`, `Wrst`, `StDev`) map to per-hop API fields:
       `loss_pct`, `sent`, `last_ms`, `avg_ms`, `best_ms`, `worst_ms`, `stddev_ms`.
@@ -22,6 +35,8 @@ info:
 servers:
   - url: https://example.invalid
     description: Placeholder server URL for contract documentation
+security:
+  - ApiKeyAuth: []
 paths:
   /api/v1/health:
     get:
@@ -57,6 +72,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Payload too large (abuse-prevention guard)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Request rejected by rate/concurrency limiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/probes/{id}:
     get:
       summary: Fetch probe result status and report snapshot
@@ -87,6 +114,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Required for non-local deployments unless mTLS is enforced by the ingress.
+    MutualTLS:
+      type: mutualTLS
+      description: Optional alternative authentication strategy for non-local deployments.
   schemas:
     EnvelopeMeta:
       type: object
@@ -166,12 +202,20 @@ components:
     CreateProbeRequestIcmp:
       type: object
       required:
-        - target
+        - targets
       properties:
-        target:
-          type: string
-          description: Hostname or IP target (maps to CLI positional target).
-          example: 1.1.1.1
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 8
+          description: |
+            Hostname/IP targets to probe. All inputs are normalized and validated before execution.
+            Operational limit: at most 8 targets per request.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 253
+          example: ["1.1.1.1"]
         protocol:
           type: string
           enum: [icmp]
@@ -193,18 +237,37 @@ components:
           type: boolean
           default: false
           description: Include ASN lookups when available (maps to `-b`/`-z`).
+        interval_seconds:
+          type: number
+          format: float
+          exclusiveMinimum: 0
+          description: Probe interval in seconds. Must be positive.
+        timeout_seconds:
+          type: number
+          format: float
+          exclusiveMinimum: 0
+          default: 10
+          description: Per-request timeout in seconds. Must be positive and >= `interval_seconds`.
       additionalProperties: false
     CreateProbeRequestTcpUdp:
       type: object
       required:
-        - target
+        - targets
         - protocol
         - port
       properties:
-        target:
-          type: string
-          description: Hostname or IP target (maps to CLI positional target).
-          example: 1.1.1.1
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 8
+          description: |
+            Hostname/IP targets to probe. All inputs are normalized and validated before execution.
+            Operational limit: at most 8 targets per request.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 253
+          example: ["1.1.1.1", "example.com"]
         protocol:
           type: string
           enum: [tcp, udp]
@@ -230,6 +293,17 @@ components:
           type: boolean
           default: false
           description: Include ASN lookups when available (maps to `-b`/`-z`).
+        interval_seconds:
+          type: number
+          format: float
+          exclusiveMinimum: 0
+          description: Probe interval in seconds. Must be positive.
+        timeout_seconds:
+          type: number
+          format: float
+          exclusiveMinimum: 0
+          default: 10
+          description: Per-request timeout in seconds. Must be positive and >= `interval_seconds`.
       additionalProperties: false
     CreateProbeData:
       type: object

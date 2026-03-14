@@ -136,3 +136,26 @@ mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.
 
 ![Default mode demo](assets/windows-mtr-m.gif)
 ![Enhanced mode demo](assets/windows-mtr-upscaled.gif)
+
+
+## REST API operational limits (v1 plan)
+
+If you deploy the planned REST API wrapper, apply these defaults unless you have a reviewed reason to change them:
+
+- Bind to `127.0.0.1:3000` by default
+- Require explicit opt-in for non-local bind addresses
+- Request timeout: `10s`
+- Max concurrent probes: `8`
+- Max targets per request: `8`
+- Max request body size: `16 KiB`
+
+Authentication decision for v1:
+- Local-only bind: `none-local-only` is acceptable
+- Non-local bind: require `X-API-Key` or mTLS
+
+Input validation before probe execution:
+- Hostnames/IPs normalized and validated
+- Ports validated in `1..=65535` (required for TCP/UDP)
+- Intervals/timeouts validated as positive finite numbers (`timeout >= interval`)
+
+See [docs/security/rest-api.md](docs/security/rest-api.md).
