@@ -8,7 +8,7 @@ use windows_mtr::passthrough::parse_passthrough_flags as parse_passthrough_flags
 
 mod error;
 mod native_ui;
-use error::{MtrError, Result};
+use error::MtrError;
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
 
@@ -166,42 +166,11 @@ impl OnOff {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
-struct EnhancedUiConfig {
-    latency_warn_ms: f32,
-    latency_bad_ms: f32,
-    loss_warn_pct: f32,
-    loss_bad_pct: f32,
-    row_coloring: bool,
-    sparklines: bool,
-    summary: bool,
-}
-
-impl EnhancedUiConfig {
-    fn from_cli(args: &Cli) -> Self {
-        Self {
-            latency_warn_ms: args.latency_warn_ms.unwrap_or(100.0),
-            latency_bad_ms: args.latency_bad_ms.unwrap_or(250.0),
-            loss_warn_pct: args.loss_warn_pct.unwrap_or(2.0),
-            loss_bad_pct: args.loss_bad_pct.unwrap_or(5.0),
-            row_coloring: args.enhanced_row_color.unwrap_or(OnOff::On).as_bool(),
-            sparklines: args.enhanced_sparklines.unwrap_or(OnOff::On).as_bool(),
-            summary: args.enhanced_summary.unwrap_or(OnOff::On).as_bool(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-enum JsonFormat {
-    Compact,
-    Pretty,
-}
-
-fn json_format_from_args(args: &Cli) -> Option<JsonFormat> {
+fn json_format_from_args(args: &Cli) -> Option<JsonOutput> {
     if args.json {
-        Some(JsonFormat::Compact)
+        Some(JsonOutput::Compact)
     } else if args.json_pretty {
-        Some(JsonFormat::Pretty)
+        Some(JsonOutput::Pretty)
     } else {
         None
     }
@@ -210,17 +179,28 @@ fn json_format_from_args(args: &Cli) -> Option<JsonFormat> {
 fn should_print_banner(args: &Cli) -> bool {
     json_format_from_args(args).is_none()
 }
+
 fn print_banner() {
     println!("windows-mtr by Benji Shohet (benjisho) — https://github.com/benjisho/windows-mtr");
 }
 
-fn validate_target(host: &str) -> Result<String> {
-    match (host, 0).to_socket_addrs() {
-        Ok(_) => Ok(host.to_string()),
-        Err(_) => match host.parse::<IpAddr>() {
-            Ok(_) => Ok(host.to_string()),
-            Err(_) => Err(MtrError::HostResolutionError(host.to_string())),
-        },
+fn ui_mode_from_cli(ui: UiPreset) -> UiMode {
+    match ui {
+        UiPreset::Default => UiMode::Default,
+        UiPreset::Enhanced => UiMode::Enhanced,
+        UiPreset::Native => UiMode::Native,
+    }
+}
+
+fn enhanced_ui_config_from_cli(args: &Cli) -> EnhancedUiConfig {
+    EnhancedUiConfig {
+        latency_warn_ms: args.latency_warn_ms.unwrap_or(100.0),
+        latency_bad_ms: args.latency_bad_ms.unwrap_or(250.0),
+        loss_warn_pct: args.loss_warn_pct.unwrap_or(2.0),
+        loss_bad_pct: args.loss_bad_pct.unwrap_or(5.0),
+        row_coloring: args.enhanced_row_color.unwrap_or(OnOff::On).as_bool(),
+        sparklines: args.enhanced_sparklines.unwrap_or(OnOff::On).as_bool(),
+        summary: args.enhanced_summary.unwrap_or(OnOff::On).as_bool(),
     }
 }
 
@@ -474,15 +454,20 @@ fn main() -> anyhow::Result<()> {
     if should_print_banner(&args) {
         print_banner();
     }
-    verify_options(&args)
+
+    let request = build_probe_request(&args);
+    verify_options(&request)
+        .map_err(to_cli_error)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .context("invalid command-line options")?;
 
-    let host = validate_target(&args.host)
+    let host = validate_target(&request.host)
+        .map_err(to_cli_error)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
-        .with_context(|| format!("invalid target host: {}", args.host))?;
+        .with_context(|| format!("invalid target host: {}", request.host))?;
 
-    let trippy_args = build_embedded_trippy_args(&args, &host)
+    let trippy_args = build_embedded_trippy_args(&request, &host)
+        .map_err(to_cli_error)
         .map_err(|e| anyhow::anyhow!(e.to_string()))
         .context("failed to translate windows-mtr options into trippy options")?;
 
@@ -491,285 +476,17 @@ fn main() -> anyhow::Result<()> {
         process::exit(code);
     }
 
-    let code = run_embedded_trippy(&trippy_args, json_format_from_args(&args))?;
-    process::exit(code);
-}
+    // SAFETY: `current_exe` is only used to re-exec this process for output formatting,
+    // not for any trust or authorization decision.
+    let current_exe =
+        // nosemgrep: rust.lang.security.current-exe.current-exe
+        env::current_exe().context("failed to locate current executable")?;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn base_cli() -> Cli {
-        Cli {
-            host: "8.8.8.8".to_string(),
-            tcp: false,
-            udp: false,
-            port: None,
-            source_port: None,
-            report: false,
-            json: false,
-            json_pretty: false,
-            count: None,
-            interval: None,
-            timeout: None,
-            report_wide: false,
-            no_dns: false,
-            max_hops: None,
-            show_asn: false,
-            dns_lookup_as_info: false,
-            packet_size: None,
-            src: None,
-            interface: None,
-            ecmp: None,
-            dns_cache_ttl: None,
-            trippy_flags: None,
-            ui: UiPreset::Default,
-            latency_warn_ms: None,
-            latency_bad_ms: None,
-            loss_warn_pct: None,
-            loss_bad_pct: None,
-            enhanced_row_color: None,
-            enhanced_sparklines: None,
-            enhanced_summary: None,
-        }
-    }
-
-    #[test]
-    fn verify_options_requires_port_for_tcp_udp() {
-        let mut tcp = base_cli();
-        tcp.tcp = true;
-        assert!(matches!(
-            verify_options(&tcp),
-            Err(MtrError::PortRequired(_, 'T'))
-        ));
-
-        let mut udp = base_cli();
-        udp.udp = true;
-        assert!(matches!(
-            verify_options(&udp),
-            Err(MtrError::PortRequired(_, 'U'))
-        ));
-    }
-
-    #[test]
-    fn verify_options_accepts_valid_ports() {
-        for port in [1, 443, 65535] {
-            let mut args = base_cli();
-            args.tcp = true;
-            args.port = Some(port);
-            assert!(verify_options(&args).is_ok());
-        }
-    }
-
-    #[test]
-    fn verify_options_rejects_report_wide_without_report_mode() {
-        let mut args = base_cli();
-        args.report_wide = true;
-        assert!(matches!(
-            verify_options(&args),
-            Err(MtrError::InvalidOption(_))
-        ));
-    }
-
-    #[test]
-    fn validate_target_accepts_ip_and_hostname() {
-        assert!(validate_target("8.8.8.8").is_ok());
-        assert!(validate_target("localhost").is_ok());
-    }
-
-    #[test]
-    fn validate_target_rejects_invalid_target() {
-        assert!(validate_target("invalid host with spaces").is_err());
-    }
-
-    #[test]
-    fn parse_passthrough_flags_splits_single_quoted_token() {
-        let parsed =
-            parse_passthrough_flags("\"--tui-refresh-rate 150ms\"").expect("flags should parse");
-        assert_eq!(parsed, vec!["--tui-refresh-rate", "150ms"]);
-    }
-
-    #[test]
-    fn parse_passthrough_flags_preserves_inner_quoted_values() {
-        let parsed = parse_passthrough_flags("\"--log-filter 'warn info' --verbose\"")
-            .expect("flags should parse");
-        assert_eq!(parsed, vec!["--log-filter", "warn info", "--verbose"]);
-    }
-
-    #[test]
-    fn parse_passthrough_flags_allows_literal_apostrophe_values() {
-        let parsed =
-            parse_passthrough_flags("\"--interface O'Reilly\"").expect("flags should parse");
-        assert_eq!(parsed, vec!["--interface", "O'Reilly"]);
-    }
-
-    #[test]
-    fn parse_passthrough_flags_rejects_invalid_shell_quoting() {
-        assert!(matches!(
-            parse_passthrough_flags("--foo 'bar"),
-            Err(MtrError::InvalidOption(_))
-        ));
-    }
-
-    #[test]
-    fn build_embedded_trippy_args_maps_core_flags() {
-        let args = Cli {
-            host: "example.com".to_string(),
-            tcp: true,
-            udp: false,
-            port: Some(443),
-            source_port: Some(50000),
-            report: true,
-            json: false,
-            json_pretty: false,
-            count: Some(10),
-            interval: Some(0.5),
-            timeout: Some(3.0),
-            report_wide: true,
-            no_dns: true,
-            max_hops: Some(20),
-            show_asn: true,
-            dns_lookup_as_info: false,
-            packet_size: Some(128),
-            src: Some("192.0.2.2".parse().expect("valid test ip")),
-            interface: Some("Ethernet".to_string()),
-            ecmp: Some("paris".to_string()),
-            dns_cache_ttl: Some(120),
-            trippy_flags: Some("--log-format json --verbose".to_string()),
-            ui: UiPreset::Default,
-            latency_warn_ms: None,
-            latency_bad_ms: None,
-            loss_warn_pct: None,
-            loss_bad_pct: None,
-            enhanced_row_color: None,
-            enhanced_sparklines: None,
-            enhanced_summary: None,
-        };
-
-        let trippy_args =
-            build_embedded_trippy_args(&args, "example.com").expect("args should build");
-        assert_eq!(
-            trippy_args,
-            vec![
-                "mtr",
-                "--mode",
-                "pretty",
-                "--tcp",
-                "--target-port",
-                "443",
-                "--source-port",
-                "50000",
-                "--report-cycles",
-                "10",
-                "--min-round-duration",
-                "0.5s",
-                "--grace-duration",
-                "3s",
-                "--tui-address-mode",
-                "ip",
-                "--max-ttl",
-                "20",
-                "--dns-lookup-as-info",
-                "--packet-size",
-                "128",
-                "--source-address",
-                "192.0.2.2",
-                "--interface",
-                "Ethernet",
-                "--multipath-strategy",
-                "paris",
-                "--dns-ttl",
-                "120s",
-                "--log-format",
-                "json",
-                "--verbose",
-                "example.com"
-            ]
-        );
-    }
-
-    #[test]
-    fn build_embedded_trippy_args_supports_json_mode() {
-        let mut args = base_cli();
-        args.json = true;
-
-        let trippy_args = build_embedded_trippy_args(&args, "8.8.8.8").expect("args should build");
-        assert_eq!(trippy_args, vec!["mtr", "--mode", "json", "8.8.8.8"]);
-    }
-
-    #[test]
-    fn build_embedded_trippy_args_applies_enhanced_defaults() {
-        let mut args = base_cli();
-        args.ui = UiPreset::Enhanced;
-
-        let trippy_args = build_embedded_trippy_args(&args, "8.8.8.8").expect("args should build");
-        assert!(
-            trippy_args
-                .windows(2)
-                .any(|w| w == ["--tui-latency-warn-threshold", "100ms"])
-        );
-        assert!(
-            trippy_args
-                .windows(2)
-                .any(|w| w == ["--tui-summary-percentiles", "true"])
-        );
-    }
-
-    #[test]
-    fn verify_options_rejects_enhanced_threshold_ordering_errors() {
-        let mut args = base_cli();
-        args.ui = UiPreset::Enhanced;
-        args.latency_warn_ms = Some(300.0);
-        args.latency_bad_ms = Some(100.0);
-        assert!(matches!(
-            verify_options(&args),
-            Err(MtrError::InvalidOption(_))
-        ));
-    }
-
-    #[test]
-    fn verify_options_rejects_conflicting_enhanced_passthrough() {
-        let mut args = base_cli();
-        args.ui = UiPreset::Enhanced;
-        args.trippy_flags = Some("--tui-hop-trend false".to_string());
-        assert!(matches!(
-            verify_options(&args),
-            Err(MtrError::InvalidOption(_))
-        ));
-    }
-
-    #[test]
-    fn verify_options_rejects_report_mode_for_native_ui() {
-        let mut args = base_cli();
-        args.ui = UiPreset::Native;
-        args.report = true;
-        assert!(matches!(
-            verify_options(&args),
-            Err(MtrError::InvalidOption(_))
-        ));
-    }
-
-    #[test]
-    fn verify_options_allows_extra_flags_for_native_ui() {
-        let mut args = base_cli();
-        args.ui = UiPreset::Native;
-        args.count = Some(5);
-        assert!(verify_options(&args).is_ok());
-    }
-    #[test]
-    fn should_not_print_banner_for_json_modes() {
-        let mut args = base_cli();
-        args.json = true;
-        assert!(!should_print_banner(&args));
-
-        let mut args = base_cli();
-        args.json_pretty = true;
-        assert!(!should_print_banner(&args));
-    }
-
-    #[test]
-    fn should_print_banner_for_non_json_modes() {
-        let args = base_cli();
-        assert!(should_print_banner(&args));
-    }
+    let result = run_embedded_trippy(
+        &current_exe,
+        &trippy_args,
+        request.json_output,
+        EMBEDDED_TRIPPY_ENV,
+    )?;
+    process::exit(result.exit_code);
 }
