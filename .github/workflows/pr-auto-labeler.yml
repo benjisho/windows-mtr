@@ -56,20 +56,22 @@ jobs:
           echo "Detected prefix: '$PREFIX'"
 
           LABELS=$(PREFIX_VALUE="$PREFIX" TAXONOMY_FILE="$TAXONOMY_FILE" ruby -ryaml -e '
-            prefix = ENV.fetch("PREFIX_VALUE", "").strip.downcase
-            taxonomy_file = ENV.fetch("TAXONOMY_FILE", ".github/label-taxonomy.yml")
+            begin
+              prefix = ENV.fetch("PREFIX_VALUE", "").strip.downcase
+              taxonomy_file = ENV.fetch("TAXONOMY_FILE", ".github/label-taxonomy.yml")
 
-            unless File.file?(taxonomy_file)
-              warn("taxonomy file not found at #{taxonomy_file}; skipping.")
+              unless File.file?(taxonomy_file)
+                warn("taxonomy file not found at #{taxonomy_file}; skipping.")
+                exit 0
+              end
+
+              taxonomy = YAML.load_file(taxonomy_file)
+              labels = taxonomy.fetch("title_prefix_to_labels", {}).fetch(prefix, [])
+              puts labels.join(" ")
+            rescue Psych::Exception, Errno::ENOENT => e
+              warn("failed to load taxonomy file #{taxonomy_file}: #{e.message}")
               exit 0
             end
-
-            taxonomy = YAML.load_file(taxonomy_file)
-            labels = taxonomy.fetch("title_prefix_to_labels", {}).fetch(prefix, [])
-            puts labels.join(" ")
-          rescue Psych::Exception => e
-            warn("failed to parse taxonomy file #{taxonomy_file}: #{e.message}")
-            exit 0
           ')
 
           if [ -z "$LABELS" ]; then
