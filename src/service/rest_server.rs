@@ -14,7 +14,9 @@ use tokio::time::timeout;
 use crate::service::api_models::{
     CreateProbeRequestDto, CreateProbeResponseDto, HealthResponseDto, ProbeResultResponseDto,
 };
-use crate::service::rest_api::{ProbeConcurrencyGate, RestApiConfig, RestApiValidationError};
+use crate::service::rest_api::{
+    CreateProbeApiRequest, ProbeConcurrencyGate, RestApiConfig, RestApiValidationError,
+};
 
 #[derive(Debug, Clone)]
 pub struct ProbeExecutionResult {
@@ -124,7 +126,7 @@ async fn create_probe(
     Json(payload): Json<CreateProbeRequestDto>,
 ) -> Result<(StatusCode, Json<CreateProbeResponseDto>), (StatusCode, String)> {
     run_with_timeout(state.config.request_timeout, async move {
-        let create_request = payload.into();
+        let create_request: CreateProbeApiRequest = payload.into();
         let normalized = create_request
             .normalize_and_validate(&state.config)
             .map_err(validation_error_response)?;
@@ -213,7 +215,7 @@ async fn run_with_timeout<T>(
         Ok(result) => result,
         Err(_) => Err((
             StatusCode::REQUEST_TIMEOUT,
-            format!("request processing exceeded timeout of {:?}", duration),
+            format!("request processing exceeded timeout of {duration:?}"),
         )),
     }
 }

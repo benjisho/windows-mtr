@@ -165,7 +165,7 @@ components:
         detail:
           type: string
           description: Human-readable detail specific to this occurrence.
-          example: Failed to resolve host: invalid host
+          example: "Failed to resolve host: invalid host"
         code:
           type: string
           description: Stable machine-readable project error code.
@@ -189,7 +189,7 @@ components:
           type: https://windows-mtr.dev/problems/invalid-target
           title: Invalid target
           status: 400
-          detail: Failed to resolve host: invalid host
+          detail: "Failed to resolve host: invalid host"
           code: invalid_target
       additionalProperties: false
     HealthData:

@@ -310,7 +310,11 @@ fn main() -> anyhow::Result<()> {
         process::exit(code);
     }
 
-    let current_exe = env::current_exe().context("failed to locate current executable")?;
+    // SAFETY: this path is used only to re-exec ourselves for local output handling,
+    // not for trust, auth, or authorization decisions.
+    let current_exe =
+        // nosemgrep: rust.lang.security.current-exe.current-exe
+        env::current_exe().context("failed to locate current executable")?;
 
     let result = run_embedded_trippy(
         &current_exe,
