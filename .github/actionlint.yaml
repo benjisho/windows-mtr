@@ -1,3 +1,2 @@
 self-hosted-runner:
-  labels:
-    - elevated
+  labels: ["self-hosted", "Windows", "X64", "elevated"]

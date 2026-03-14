@@ -48,10 +48,11 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Set up Rust (for pre-commit Rust hooks)
+      - name: Set up Rust 1.88.0 (for pre-commit Rust hooks)
         uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
-          toolchain: stable
+          toolchain: 1.88.0
+          components: rustfmt, clippy
 
       - name: Install hadolint
         shell: bash

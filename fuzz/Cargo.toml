@@ -1,0 +1,19 @@
+[package]
+name = "windows-mtr-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+windows-mtr = { path = ".." }
+
+[[bin]]
+name = "fuzz_passthrough_flags"
+path = "fuzz_targets/fuzz_passthrough_flags.rs"
+test = false
+doc = false
+bench = false
