@@ -49,6 +49,3 @@ pub enum MtrError {
     #[error("Error: {0}")]
     Other(String),
 }
-
-/// Result type for Windows MTR
-pub type Result<T> = std::result::Result<T, MtrError>;
