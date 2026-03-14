@@ -190,7 +190,7 @@ Windows MTR requires administrator privileges to run properly, as it needs to se
 mtr 8.8.8.8
 ```
 
-### Native Ratatui preview (tabs + hop table + charts)
+### Native Ratatui UI (live hops + table + charts)
 
 ```bash
 mtr --ui native 8.8.8.8
@@ -382,7 +382,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 </tr>
 <tr>
   <td>Native Ratatui UI (tabs, hop table, charts)</td>
-  <td>🚧 In Progress (`--ui native` preview)</td>
+  <td>✅ Released (`--ui native`)</td>
   <td>H2 2026</td>
 </tr>
 <tr>

@@ -1,6 +1,9 @@
 self-hosted-runner:
   labels:
+<<<<<<< benjisho/verify-completion-percentage-of-security-hardening-2026-03-13
     - self-hosted
     - Windows
     - X64
+=======
+>>>>>>> master
     - elevated
