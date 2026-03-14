@@ -2,10 +2,8 @@ name: Release
 
 on:
   workflow_dispatch:
-  # Trigger on push to master branch
+  # Trigger on immutable release version tags only
   push:
-    branches:
-      - master
     tags:
       - 'v*.*.*'
     paths-ignore:
@@ -39,7 +37,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
-          save-if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') }}
+          save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
           shared-key: "rust-windows-release"
           cache-bin: true
           cache-directories: |
@@ -197,7 +195,7 @@ jobs:
   publish-package:
     name: Publish Container Packages
     needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     environment: publish-container-packages
     permissions:
@@ -241,7 +239,6 @@ jobs:
             ${{ steps.image.outputs.ghcr }}
             ${{ steps.image.outputs.dockerhub }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=semver,pattern={{version}},value=${{ github.ref_name }}
 
@@ -285,7 +282,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
         with:
-          save-if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/') }}
+          save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
           shared-key: "rust-windows-release"
           cache-bin: true
           cache-directories: |
