@@ -21,6 +21,8 @@ on:
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
       - 'docs/probe-parity.md'
+      - 'docs/api/openapi.yaml'
+      - 'scripts/check_openapi_compat.sh'
   pull_request:
     branches: [ master ]
     paths:
@@ -32,6 +34,8 @@ on:
       - 'Dockerfile'
       - '.github/workflows/ci.yml'
       - 'docs/probe-parity.md'
+      - 'docs/api/openapi.yaml'
+      - 'scripts/check_openapi_compat.sh'
 permissions:
   contents: read
 
@@ -258,6 +262,51 @@ jobs:
           else
             echo "Probe parity summary file was not generated." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+
+  api-contract-and-integration:
+    name: API contract + integration
+    runs-on: ubuntu-latest
+    needs: pre-commit
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run API contract tests
+        run: cargo test --test api_contract_tests -- --nocapture
+        env:
+          CARGO_INCREMENTAL: 0
+
+      - name: Run API integration tests
+        run: cargo test --test api_integration_tests -- --nocapture
+        env:
+          CARGO_INCREMENTAL: 0
+
+      - name: Verify OpenAPI compatibility (breaking changes require version bump)
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="${{ github.base_ref }}"
+          else
+            base_ref="master"
+          fi
+
+          ./scripts/check_openapi_compat.sh "${base_ref}"
 
 
   docker-build-amd64:
