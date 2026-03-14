@@ -305,6 +305,7 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 ## 📋 Documentation
 
 - [📚 Full Documentation Hub](docs/README.md)
+- [🛣️ Product Roadmap](docs/ROADMAP.md)
 - [🧩 CLI/API Reference](docs/API.md)
 - [🧪 Probe parity matrix](docs/probe-parity.md)
 - [📑 Usage Examples](docs/USAGE.md)
@@ -314,108 +315,13 @@ mtr --reporter json --log-level info 8.8.8.8 | curl -X POST -d @- https://loggin
 
 ## 📊 Project Status & Roadmap
 
-<table>
-<tr>
-  <th>Feature</th>
-  <th>Status</th>
-  <th>Timeline</th>
-</tr>
-<tr>
-  <td>Core MTR Functionality</td>
-  <td>✅ Released</td>
-  <td>v1.0.0</td>
-</tr>
-<tr>
-  <td>MSI Installer</td>
-  <td>✅ Released</td>
-  <td>v1.0.0</td>
-</tr>
-<tr>
-  <td>IPv6 Support</td>
-  <td>✅ Released</td>
-  <td>v1.0.0</td>
-</tr>
-<tr>
-  <td>Docker Support</td>
-  <td>✅ Released</td>
-  <td>v1.0.0</td>
-</tr>
-<tr>
-  <td>Single portable executable</td>
-  <td>✅ Released</td>
-  <td>v1.1.3</td>
-</tr>
-<tr>
-  <td>JSON Output</td>
-  <td>✅ Released</td>
-  <td>v1.1.3</td>
-</tr>
-<tr>
-  <td>DNS Caching (TTL)</td>
-  <td>✅ Released</td>
-  <td>v1.1.3</td>
-</tr>
-<tr>
-  <td>CI matrix coverage (Windows + Ubuntu, MSRV + stable)</td>
-  <td>✅ Released</td>
-  <td>v1.2.x</td>
-</tr>
-<tr>
-  <td>CodeQL workflow for Rust</td>
-  <td>✅ Released</td>
-  <td>v1.2.x</td>
-</tr>
-<tr>
-  <td>Container publishing to GHCR + Docker Hub</td>
-  <td>✅ Released</td>
-  <td>v1.2.x</td>
-</tr>
-<tr>
-  <td>REST API</td>
-  <td>📅 Planned</td>
-  <td>H2 2026</td>
-</tr>
-<tr>
-  <td>SNMP Integration</td>
-  <td>📅 Planned</td>
-  <td>H2 2026</td>
-</tr>
-<tr>
-  <td>Native Ratatui UI (tabs, hop table, charts)</td>
-  <td>✅ Released (`--ui native`)</td>
-  <td>H2 2026</td>
-</tr>
-<tr>
-  <td>ETW + Windows observability integrations</td>
-  <td>🛣️ Roadmap</td>
-  <td>H2 2026</td>
-</tr>
-<tr>
-  <td>Versioned JSON schema + CSV export</td>
-  <td>🛣️ Roadmap</td>
-  <td>H2 2026</td>
-</tr>
-<tr>
-  <td>Security hardening gates (cargo-audit + fuzz harness in CI)</td>
-  <td>🚧 In Progress (cargo-audit live, fuzz harness pending)</td>
-  <td>H2 2026</td>
-</tr>
-<tr>
-  <td>Cross-platform probe parity/privilege smoke tests</td>
-  <td>✅ Released (CI `Probe parity (windows-latest|ubuntu-latest)` + privilege smoke lanes: `Privilege probe smoke (ubuntu-latest|windows-latest, non-elevated)`, `Privilege probe smoke (ubuntu-latest, elevated)`, and optional `Privilege probe smoke (windows, elevated self-hosted)`; coverage includes non-elevated failures on Windows/Ubuntu and elevated success on Ubuntu + Windows self-hosted; constraint: elevated Windows lane requires self-hosted runner because GitHub-hosted `windows-latest` cannot be interactively elevated.)</td>
-  <td>H2 2026</td>
-</tr>
-<tr>
-  <td>GitHub Actions hardening (pin workflow actions by commit SHA)</td>
-  <td>✅ Released</td>
-  <td>v1.2.x</td>
-</tr>
-<tr>
-  <td>CLI/runtime cleanup (unused error variants, banner polish)</td>
-  <td>🛣️ Roadmap</td>
-  <td>H2 2026</td>
-</tr>
-</table>
+The full roadmap now lives in [docs/ROADMAP.md](docs/ROADMAP.md), which is the single source of truth for feature status and planned milestones.
+
+Quick snapshot:
+
+- ✅ Released: Core MTR functionality, MSI installer, IPv6, Docker, JSON output, DNS cache TTL.
+- 🚧 In progress: Security hardening gates (`cargo-audit` in CI, fuzz harness pending).
+- 📅 Planned / 🛣️ Roadmap: REST API, SNMP integration, ETW observability, versioned JSON schema + CSV export, runtime cleanup.
 
 ## 🤝 Contributing
 
