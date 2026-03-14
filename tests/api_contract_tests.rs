@@ -52,6 +52,20 @@ fn required_property_names(schema: &Value) -> Vec<String> {
         .collect()
 }
 
+fn property_names(schema: &Value) -> Vec<String> {
+    let schema_map = as_mapping(schema);
+    let properties = as_mapping(map_get(schema_map, "properties"));
+
+    properties
+        .keys()
+        .map(|item| {
+            item.as_str()
+                .expect("property entries should be strings")
+                .to_string()
+        })
+        .collect()
+}
+
 fn schema_ref_at_operation_response(
     paths: &Mapping,
     path: &str,
@@ -168,6 +182,40 @@ fn openapi_contract_uses_envelope_across_success_and_error() {
         schema_ref_at_operation_response(paths, "/api/v1/probes/{id}", "get", "404"),
         "#/components/schemas/ErrorResponse"
     );
+}
+
+#[test]
+fn openapi_contract_documents_error_shape_fields_and_required() {
+    let openapi = load_openapi();
+    let openapi_map = as_mapping(&openapi);
+    let components = as_mapping(map_get(openapi_map, "components"));
+    let schemas = as_mapping(map_get(components, "schemas"));
+
+    let error_response_required = required_property_names(map_get(schemas, "ErrorResponse"));
+    assert!(
+        error_response_required.iter().any(|field| field == "meta"),
+        "ErrorResponse must require meta"
+    );
+    assert!(
+        error_response_required.iter().any(|field| field == "error"),
+        "ErrorResponse must require error"
+    );
+
+    let error_required = required_property_names(map_get(schemas, "ApiProblemDetails"));
+    for required in ["type", "title", "status", "detail", "code"] {
+        assert!(
+            error_required.iter().any(|field| field == required),
+            "ApiProblemDetails.required must contain {required}"
+        );
+    }
+
+    let error_properties = property_names(map_get(schemas, "ApiProblemDetails"));
+    for property in ["type", "title", "status", "detail", "code"] {
+        assert!(
+            error_properties.iter().any(|field| field == property),
+            "ApiProblemDetails.properties must contain {property}"
+        );
+    }
 }
 
 #[test]
