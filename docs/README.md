@@ -7,6 +7,7 @@ Welcome to the documentation hub for **Windows MTR**, a Windows-native, enterpri
 - [Installation Guide](INSTALLATION.md)
 - [Usage Guide](USAGE.md)
 - [API Reference](API.md)
+- [Roadmap](ROADMAP.md)
 - [Development Guide](../DEVELOPMENT.md)
 - [Contributing Guide](../CONTRIBUTING.md)
 
@@ -20,6 +21,7 @@ Welcome to the documentation hub for **Windows MTR**, a Windows-native, enterpri
   - [Development setup and workflow](../DEVELOPMENT.md)
   - [Contribution process and quality gates](../CONTRIBUTING.md)
   - [CLI/report API semantics](API.md)
+  - [Project roadmap and status](ROADMAP.md)
   - [Probe parity matrix](probe-parity.md)
   - [Branch review snapshot](BRANCH_REVIEW.md)
 
