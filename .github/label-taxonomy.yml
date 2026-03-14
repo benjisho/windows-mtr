@@ -1,0 +1,34 @@
+title_prefix_to_labels:
+  add:
+    - enhancement
+  feat:
+    - enhancement
+  feature:
+    - enhancement
+  fix:
+    - bug
+  bugfix:
+    - bug
+  hotfix:
+    - hotfix
+    - bug
+  docs:
+    - documentation
+  ci:
+    - ci
+  security:
+    - security
+  perf:
+    - performance
+  build:
+    - infrastructure
+  docker:
+    - docker
+  frontend:
+    - frontend
+  forntend:
+    - frontend
+  patch:
+    - patch
+  release:
+    - release
