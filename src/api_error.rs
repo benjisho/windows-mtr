@@ -20,7 +20,16 @@ pub struct ApiError {
 /// JSON envelope returned for API failures.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct ApiErrorResponse {
+    pub meta: ApiResponseMeta,
     pub error: ApiProblemDetails,
+}
+
+/// Shared response metadata envelope for versioning/correlation.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+pub struct ApiResponseMeta {
+    pub schema_version: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
 }
 
 /// RFC 9457 style problem details with a project-specific machine code.
@@ -65,6 +74,10 @@ impl ApiError {
 
     pub fn response(&self) -> ApiErrorResponse {
         ApiErrorResponse {
+            meta: ApiResponseMeta {
+                schema_version: "v1",
+                request_id: None,
+            },
             error: ApiProblemDetails {
                 type_url: Self::problem_type(self.code),
                 title: self.title,
@@ -266,6 +279,8 @@ mod tests {
         assert_eq!(api_error.code, "probe_execution_failed");
 
         let body = api_error.response();
+        assert_eq!(body.meta.schema_version, "v1");
+        assert_eq!(body.meta.request_id, None);
         assert_eq!(body.error.status, 502);
         assert_eq!(body.error.code, "probe_execution_failed");
         assert_eq!(
