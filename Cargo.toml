@@ -30,6 +30,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 [dev-dependencies]
 regex = "1.10.3"
 serde_yaml = "0.9.34"
+reqwest = { version = "0.12.9", default-features = false, features = ["json", "rustls-tls"] }
 
 [profile.release]
 lto = true

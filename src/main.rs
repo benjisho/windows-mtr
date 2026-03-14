@@ -1,8 +1,10 @@
 use anyhow::Context;
-use clap::{Parser, ValueEnum};
+use clap::{Args, Parser, ValueEnum};
 use std::env;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::process;
+use windows_mtr::service::rest_api::RestApiConfig;
+use windows_mtr::service::rest_server::run_rest_api_server;
 use windows_mtr::service::{
     EnhancedUiConfig, JsonOutput, ProbeError, ProbeRequest, UiMode, build_probe_plan,
     run_embedded_trippy,
@@ -23,10 +25,25 @@ const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
   windows-mtr -U -P 53 1.1.1.1                  # UDP trace to Cloudflare DNS on port 53
   windows-mtr -r -c 10 example.com              # Report mode with 10 pings per hop
   windows-mtr --json -c 20 example.com          # JSON report output
+  windows-mtr --api                              # Run REST API runtime
   windows-mtr --trippy-flags '--tui-refresh-rate 150ms' example.com")]
 struct Cli {
+    /// Run in REST API mode instead of probe CLI mode
+    #[arg(long = "api")]
+    api: bool,
+
+    /// Bind address for API mode
+    #[arg(long = "api-bind", value_name = "ADDR")]
+    api_bind: Option<SocketAddr>,
+
+    #[command(flatten)]
+    trace: TraceCli,
+}
+
+#[derive(Args, Debug)]
+struct TraceCli {
     /// Target host to trace (hostname or IP)
-    host: String,
+    host: Option<String>,
 
     /// Use TCP SYN for probes (default is ICMP)
     #[arg(short = 'T', conflicts_with = "udp")]
@@ -168,7 +185,7 @@ impl OnOff {
     }
 }
 
-fn json_output_from_cli(args: &Cli) -> Option<JsonOutput> {
+fn json_output_from_cli(args: &TraceCli) -> Option<JsonOutput> {
     if args.json {
         Some(JsonOutput::Compact)
     } else if args.json_pretty {
@@ -179,7 +196,7 @@ fn json_output_from_cli(args: &Cli) -> Option<JsonOutput> {
 }
 
 fn should_print_banner(args: &Cli) -> bool {
-    json_output_from_cli(args).is_none()
+    !args.api && json_output_from_cli(&args.trace).is_none()
 }
 
 fn print_banner() {
@@ -194,7 +211,7 @@ fn ui_mode_from_cli(ui: UiPreset) -> UiMode {
     }
 }
 
-fn enhanced_ui_config_from_cli(args: &Cli) -> EnhancedUiConfig {
+fn enhanced_ui_config_from_cli(args: &TraceCli) -> EnhancedUiConfig {
     EnhancedUiConfig {
         latency_warn_ms: args.latency_warn_ms.unwrap_or(100.0),
         latency_bad_ms: args.latency_bad_ms.unwrap_or(250.0),
@@ -206,7 +223,12 @@ fn enhanced_ui_config_from_cli(args: &Cli) -> EnhancedUiConfig {
     }
 }
 
-fn build_probe_request(args: &Cli) -> ProbeRequest {
+fn build_probe_request(args: &TraceCli) -> anyhow::Result<ProbeRequest> {
+    let host = args
+        .host
+        .clone()
+        .ok_or_else(|| anyhow::anyhow!("missing host argument (or run with --api)"))?;
+
     let has_enhanced_overrides = args.latency_warn_ms.is_some()
         || args.latency_bad_ms.is_some()
         || args.loss_warn_pct.is_some()
@@ -215,8 +237,8 @@ fn build_probe_request(args: &Cli) -> ProbeRequest {
         || args.enhanced_sparklines.is_some()
         || args.enhanced_summary.is_some();
 
-    ProbeRequest {
-        host: args.host.clone(),
+    Ok(ProbeRequest {
+        host,
         tcp: args.tcp,
         udp: args.udp,
         port: args.port,
@@ -240,7 +262,7 @@ fn build_probe_request(args: &Cli) -> ProbeRequest {
         ui_mode: ui_mode_from_cli(args.ui),
         enhanced_ui: enhanced_ui_config_from_cli(args),
         has_enhanced_overrides,
-    }
+    })
 }
 
 fn to_cli_error(error: ProbeError) -> MtrError {
@@ -258,11 +280,26 @@ fn main() -> anyhow::Result<()> {
 
     let args = Cli::parse();
 
+    if args.api {
+        let mut config = RestApiConfig::default();
+        if let Some(bind) = args.api_bind {
+            config.bind_addr = bind;
+        }
+        config
+            .validate_security_defaults()
+            .map_err(|e| anyhow::anyhow!(
+                "invalid REST API security configuration: {e}. Action: keep localhost defaults or set --api-bind with a secure auth strategy in config"
+            ))?;
+
+        let runtime = tokio::runtime::Runtime::new().context("failed to start tokio runtime")?;
+        return runtime.block_on(run_rest_api_server(config));
+    }
+
     if should_print_banner(&args) {
         print_banner();
     }
 
-    let request = build_probe_request(&args);
+    let request = build_probe_request(&args.trace)?;
     let plan = build_probe_plan(&request)
         .map_err(to_cli_error)
         .map_err(|error| anyhow::anyhow!(error.to_string()))
@@ -273,11 +310,7 @@ fn main() -> anyhow::Result<()> {
         process::exit(code);
     }
 
-    // SAFETY: `current_exe` is only used to re-exec this process for output formatting,
-    // not for any trust or authorization decision.
-    let current_exe =
-        // nosemgrep: rust.lang.security.current-exe.current-exe
-        env::current_exe().context("failed to locate current executable")?;
+    let current_exe = env::current_exe().context("failed to locate current executable")?;
 
     let result = run_embedded_trippy(
         &current_exe,
