@@ -137,7 +137,6 @@ mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.
 ![Default mode demo](assets/windows-mtr-m.gif)
 ![Enhanced mode demo](assets/windows-mtr-upscaled.gif)
 
-
 ## REST API operational limits (v1 plan)
 
 If you deploy the planned REST API wrapper, apply these defaults unless you have a reviewed reason to change them:
