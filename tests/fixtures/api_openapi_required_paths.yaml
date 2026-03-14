@@ -1,0 +1,36 @@
+required_paths:
+  - /api/v1/health
+  - /api/v1/probes
+  - /api/v1/probes/{id}
+required_envelope_fields:
+  - schema_version
+required_hop_fields:
+  - hop_index
+  - host
+  - sent
+  - loss_pct
+  - last_ms
+  - avg_ms
+  - best_ms
+  - worst_ms
+  - stddev_ms
+required_probe_summary_fields:
+  - sent
+  - loss_pct
+  - last_ms
+  - avg_ms
+  - best_ms
+  - worst_ms
+  - stddev_ms
+  - hop_count
+required_out_of_scope_cli_flags:
+  - --ui
+  - --latency-warn-ms
+  - --latency-bad-ms
+  - --loss-warn-pct
+  - --loss-bad-pct
+  - --enhanced-row-color
+  - --enhanced-sparklines
+  - --enhanced-summary
+  - --trippy-flags
+  - --report-wide

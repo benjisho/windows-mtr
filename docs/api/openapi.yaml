@@ -1,0 +1,405 @@
+openapi: 3.1.0
+info:
+  title: windows-mtr HTTP API
+  version: 0.1.0
+  description: |
+    Initial v1 contract for a service wrapper around windows-mtr probe/report concepts.
+
+    ## Mapping from CLI/report concepts (`USAGE.md`)
+    - Report row semantics (`Loss%`, `Snt`, `Last`, `Avg`, `Best`, `Wrst`, `StDev`) map to per-hop API fields:
+      `loss_pct`, `sent`, `last_ms`, `avg_ms`, `best_ms`, `worst_ms`, `stddev_ms`.
+    - JSON/report host identity maps to `host`, optional `ip`, and optional `asn`.
+    - `-c` maps to `count` in create-probe requests.
+    - `-m` maps to `max_hops` in create-probe requests.
+    - `-n` maps to `resolve_dns` (inverse semantics: `-n` means `resolve_dns=false`).
+
+    ## Explicitly out of scope for API v1 (CLI-only)
+    - Interactive UI presets/toggles: `--ui`, `--latency-warn-ms`, `--latency-bad-ms`,
+      `--loss-warn-pct`, `--loss-bad-pct`, `--enhanced-row-color`, `--enhanced-sparklines`,
+      `--enhanced-summary`.
+    - Raw passthrough flags (`--trippy-flags`) and direct rendering concerns (`-w/--report-wide`).
+    - Terminal interaction controls and live keybindings.
+servers:
+  - url: https://example.invalid
+    description: Placeholder server URL for contract documentation
+paths:
+  /api/v1/health:
+    get:
+      summary: Liveness and basic build metadata
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service health response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/v1/probes:
+    post:
+      summary: Start a probe job
+      operationId: createProbe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProbeRequest'
+      responses:
+        '202':
+          description: Probe accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateProbeResponse'
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/probes/{id}:
+    get:
+      summary: Fetch probe result status and report snapshot
+      operationId: getProbe
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Probe state/result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetProbeResponse'
+        '400':
+          description: Invalid probe id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Probe not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    EnvelopeMeta:
+      type: object
+      required:
+        - schema_version
+      properties:
+        schema_version:
+          type: string
+          enum: [v1]
+          description: Contract schema version for response compatibility checks.
+          example: "v1"
+        request_id:
+          type: string
+          description: Correlation identifier for tracing/logging.
+      additionalProperties: false
+    ApiError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: invalid_request
+        message:
+          type: string
+      additionalProperties: false
+    ErrorResponse:
+      type: object
+      required:
+        - meta
+        - error
+      properties:
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        error:
+          $ref: '#/components/schemas/ApiError'
+      additionalProperties: false
+    HealthData:
+      type: object
+      required:
+        - status
+        - service
+        - version
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          example: windows-mtr
+        version:
+          type: string
+          description: Service version (typically from package version)
+      additionalProperties: false
+    HealthResponse:
+      type: object
+      required:
+        - meta
+        - data
+      properties:
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        data:
+          $ref: '#/components/schemas/HealthData'
+      additionalProperties: false
+    CreateProbeRequest:
+      oneOf:
+        - $ref: '#/components/schemas/CreateProbeRequestIcmp'
+        - $ref: '#/components/schemas/CreateProbeRequestTcpUdp'
+      discriminator:
+        propertyName: protocol
+        mapping:
+          icmp: '#/components/schemas/CreateProbeRequestIcmp'
+          tcp: '#/components/schemas/CreateProbeRequestTcpUdp'
+          udp: '#/components/schemas/CreateProbeRequestTcpUdp'
+    CreateProbeRequestIcmp:
+      type: object
+      required:
+        - target
+      properties:
+        target:
+          type: string
+          description: Hostname or IP target (maps to CLI positional target).
+          example: 1.1.1.1
+        protocol:
+          type: string
+          enum: [icmp]
+          default: icmp
+        count:
+          type: integer
+          minimum: 1
+          description: Probe/report cycles (maps to `-c`).
+        max_hops:
+          type: integer
+          minimum: 1
+          maximum: 255
+          description: Maximum TTL/hops (maps to `-m`).
+        resolve_dns:
+          type: boolean
+          default: true
+          description: If false, API should return IP-only where possible (maps to `-n`).
+        include_asn:
+          type: boolean
+          default: false
+          description: Include ASN lookups when available (maps to `-b`/`-z`).
+      additionalProperties: false
+    CreateProbeRequestTcpUdp:
+      type: object
+      required:
+        - target
+        - protocol
+        - port
+      properties:
+        target:
+          type: string
+          description: Hostname or IP target (maps to CLI positional target).
+          example: 1.1.1.1
+        protocol:
+          type: string
+          enum: [tcp, udp]
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          description: Required for tcp/udp probes (maps to `-P`, `--port`).
+        count:
+          type: integer
+          minimum: 1
+          description: Probe/report cycles (maps to `-c`).
+        max_hops:
+          type: integer
+          minimum: 1
+          maximum: 255
+          description: Maximum TTL/hops (maps to `-m`).
+        resolve_dns:
+          type: boolean
+          default: true
+          description: If false, API should return IP-only where possible (maps to `-n`).
+        include_asn:
+          type: boolean
+          default: false
+          description: Include ASN lookups when available (maps to `-b`/`-z`).
+      additionalProperties: false
+    CreateProbeData:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          description: Stable probe identifier.
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+      additionalProperties: false
+    CreateProbeResponse:
+      type: object
+      required:
+        - meta
+        - data
+      properties:
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        data:
+          $ref: '#/components/schemas/CreateProbeData'
+      additionalProperties: false
+    HopResult:
+      type: object
+      required:
+        - hop_index
+        - host
+        - sent
+        - loss_pct
+        - last_ms
+        - avg_ms
+        - best_ms
+        - worst_ms
+        - stddev_ms
+      properties:
+        hop_index:
+          type: integer
+          minimum: 1
+        host:
+          type: string
+          description: Host label as rendered by report/JSON output.
+        ip:
+          type: string
+          description: IP address when known.
+        asn:
+          type: string
+          description: ASN text when ASN lookup is enabled.
+        sent:
+          type: integer
+          minimum: 0
+          description: Sent probes (maps to report `Snt`).
+        loss_pct:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Loss percentage (maps to report `Loss%`).
+        last_ms:
+          type: number
+          format: float
+          minimum: 0
+        avg_ms:
+          type: number
+          format: float
+          minimum: 0
+        best_ms:
+          type: number
+          format: float
+          minimum: 0
+        worst_ms:
+          type: number
+          format: float
+          minimum: 0
+        stddev_ms:
+          type: number
+          format: float
+          minimum: 0
+      additionalProperties: false
+    ProbeSummary:
+      type: object
+      required:
+        - sent
+        - loss_pct
+        - last_ms
+        - avg_ms
+        - best_ms
+        - worst_ms
+        - stddev_ms
+        - hop_count
+      properties:
+        sent:
+          type: integer
+          minimum: 0
+        loss_pct:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+        last_ms:
+          type: number
+          format: float
+          minimum: 0
+        avg_ms:
+          type: number
+          format: float
+          minimum: 0
+        best_ms:
+          type: number
+          format: float
+          minimum: 0
+        worst_ms:
+          type: number
+          format: float
+          minimum: 0
+        stddev_ms:
+          type: number
+          format: float
+          minimum: 0
+        hop_count:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+    ProbeResultData:
+      type: object
+      required:
+        - id
+        - target
+        - protocol
+        - status
+        - hops
+        - summary
+      properties:
+        id:
+          type: string
+        target:
+          type: string
+        protocol:
+          type: string
+          enum: [icmp, tcp, udp]
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        hops:
+          type: array
+          items:
+            $ref: '#/components/schemas/HopResult'
+        summary:
+          $ref: '#/components/schemas/ProbeSummary'
+      additionalProperties: false
+    GetProbeResponse:
+      type: object
+      required:
+        - meta
+        - data
+      properties:
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+        data:
+          $ref: '#/components/schemas/ProbeResultData'
+      additionalProperties: false

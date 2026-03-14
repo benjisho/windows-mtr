@@ -29,6 +29,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 
 [dev-dependencies]
 regex = "1.10.3"
+serde_yaml = "0.9.34"
 
 [profile.release]
 lto = true
