@@ -7,6 +7,13 @@ use tokio::time::{Instant, sleep};
 use windows_mtr::service::rest_api::RestApiConfig;
 use windows_mtr::service::rest_server::{RestServerState, build_router};
 
+fn build_http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .expect("http client should build")
+}
+
 async fn spawn_server() -> (SocketAddr, oneshot::Sender<()>) {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -82,10 +89,41 @@ async fn wait_for_probe_status(
     }
 }
 
+async fn wait_for_terminal_status_with_running_seen(
+    client: &reqwest::Client,
+    addr: SocketAddr,
+    id: &str,
+    expected_terminal: &str,
+) -> serde_json::Value {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let mut saw_running = false;
+
+    loop {
+        let probe = fetch_probe(client, addr, id).await;
+        match probe["status"].as_str() {
+            Some("running") => saw_running = true,
+            Some(status) if status == expected_terminal => {
+                assert!(
+                    saw_running,
+                    "probe reached {expected_terminal} without observing running, last={probe}"
+                );
+                return probe;
+            }
+            _ => {}
+        }
+
+        assert!(
+            Instant::now() < deadline,
+            "probe never reached status {expected_terminal}, last={probe}"
+        );
+        sleep(Duration::from_millis(15)).await;
+    }
+}
+
 #[tokio::test]
 async fn health_endpoint_returns_ok() {
     let (addr, shutdown) = spawn_server().await;
-    let client = reqwest::Client::new();
+    let client = build_http_client();
 
     let res = client
         .get(format!("http://{addr}/api/v1/health"))
@@ -103,7 +141,7 @@ async fn health_endpoint_returns_ok() {
 #[tokio::test]
 async fn create_probe_transitions_through_queued_running_and_completed() {
     let (addr, shutdown) = spawn_server().await;
-    let client = reqwest::Client::new();
+    let client = build_http_client();
 
     let created = create_probe(&client, addr, "1.1.1.1").await;
     let id = created["id"].as_str().expect("id should be a string");
@@ -115,8 +153,8 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
         "expected queued or running status, got {queued_or_running}"
     );
 
-    let _running = wait_for_probe_status(&client, addr, id, "running").await;
-    let completed = wait_for_probe_status(&client, addr, id, "completed").await;
+    let completed =
+        wait_for_terminal_status_with_running_seen(&client, addr, id, "completed").await;
 
     assert_eq!(completed["id"], id);
     assert_eq!(completed["result"]["targets"][0], "1.1.1.1");
@@ -130,7 +168,7 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
 #[tokio::test]
 async fn create_probe_failed_transition_persists_error_details() {
     let (addr, shutdown) = spawn_server().await;
-    let client = reqwest::Client::new();
+    let client = build_http_client();
 
     let created = create_probe(&client, addr, "simulate-failure").await;
     let id = created["id"].as_str().expect("id should be a string");
@@ -150,7 +188,7 @@ async fn create_probe_failed_transition_persists_error_details() {
 #[tokio::test]
 async fn create_probe_rejects_icmp_with_port_as_bad_request() {
     let (addr, shutdown) = spawn_server().await;
-    let client = reqwest::Client::new();
+    let client = build_http_client();
 
     let create_res = client
         .post(format!("http://{addr}/api/v1/probes"))
@@ -171,7 +209,7 @@ async fn create_probe_rejects_icmp_with_port_as_bad_request() {
 #[tokio::test]
 async fn create_probe_rejects_missing_tcp_port_as_unprocessable_entity() {
     let (addr, shutdown) = spawn_server().await;
-    let client = reqwest::Client::new();
+    let client = build_http_client();
 
     let create_res = client
         .post(format!("http://{addr}/api/v1/probes"))
@@ -194,7 +232,7 @@ async fn create_probe_rejects_missing_tcp_port_as_unprocessable_entity() {
 #[tokio::test]
 async fn get_probe_returns_not_found_for_unknown_id() {
     let (addr, shutdown) = spawn_server().await;
-    let client = reqwest::Client::new();
+    let client = build_http_client();
 
     let res = client
         .get(format!("http://{addr}/api/v1/probes/does-not-exist"))
