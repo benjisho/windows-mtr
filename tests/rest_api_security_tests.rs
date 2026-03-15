@@ -44,6 +44,10 @@ fn request_validation_normalizes_and_deduplicates_targets() {
         ],
         protocol: ProbeProtocol::Tcp,
         port: Some(443),
+        count: None,
+        max_hops: None,
+        resolve_dns: None,
+        include_asn: None,
         interval_seconds: Some(0.5),
         timeout_seconds: Some(1.0),
     };
@@ -61,6 +65,10 @@ fn rejects_invalid_untrusted_inputs() {
         targets: vec!["bad host".to_string()],
         protocol: ProbeProtocol::Udp,
         port: Some(53),
+        count: None,
+        max_hops: None,
+        resolve_dns: None,
+        include_asn: None,
         interval_seconds: Some(-1.0),
         timeout_seconds: Some(0.5),
     };
@@ -125,6 +133,10 @@ fn rejects_too_many_targets_per_request() {
         ],
         protocol: ProbeProtocol::Icmp,
         port: None,
+        count: None,
+        max_hops: None,
+        resolve_dns: None,
+        include_asn: None,
         interval_seconds: None,
         timeout_seconds: None,
     };
@@ -132,5 +144,90 @@ fn rejects_too_many_targets_per_request() {
     assert!(matches!(
         request.normalize_and_validate(&RestApiConfig::default()),
         Err(RestApiValidationError::TooManyTargets { .. })
+    ));
+}
+
+#[test]
+fn normalizes_defaults_for_documented_optional_fields() {
+    let request = CreateProbeApiRequest {
+        targets: vec!["example.com".to_string()],
+        protocol: ProbeProtocol::Icmp,
+        port: None,
+        count: None,
+        max_hops: None,
+        resolve_dns: None,
+        include_asn: None,
+        interval_seconds: None,
+        timeout_seconds: None,
+    };
+
+    let normalized = request
+        .normalize_and_validate(&RestApiConfig::default())
+        .expect("request should validate");
+
+    assert_eq!(normalized.count, None);
+    assert_eq!(normalized.max_hops, None);
+    assert!(normalized.resolve_dns);
+    assert!(!normalized.include_asn);
+}
+
+#[test]
+fn accepts_documented_optional_fields_within_bounds() {
+    let request = CreateProbeApiRequest {
+        targets: vec!["example.com".to_string()],
+        protocol: ProbeProtocol::Tcp,
+        port: Some(443),
+        count: Some(5),
+        max_hops: Some(255),
+        resolve_dns: Some(false),
+        include_asn: Some(true),
+        interval_seconds: Some(0.25),
+        timeout_seconds: Some(1.0),
+    };
+
+    let normalized = request
+        .normalize_and_validate(&RestApiConfig::default())
+        .expect("request should validate");
+
+    assert_eq!(normalized.count, Some(5));
+    assert_eq!(normalized.max_hops, Some(255));
+    assert!(!normalized.resolve_dns);
+    assert!(normalized.include_asn);
+}
+
+#[test]
+fn rejects_out_of_bounds_count_and_max_hops() {
+    let config = RestApiConfig::default();
+
+    let zero_count = CreateProbeApiRequest {
+        targets: vec!["example.com".to_string()],
+        protocol: ProbeProtocol::Icmp,
+        port: None,
+        count: Some(0),
+        max_hops: None,
+        resolve_dns: None,
+        include_asn: None,
+        interval_seconds: None,
+        timeout_seconds: None,
+    };
+    assert!(matches!(
+        zero_count.normalize_and_validate(&config),
+        Err(RestApiValidationError::InvalidOption(_))
+    ));
+
+    let invalid_max_hops = CreateProbeApiRequest {
+        targets: vec!["example.com".to_string()],
+        protocol: ProbeProtocol::Icmp,
+        port: None,
+        count: None,
+        max_hops: Some(256),
+        resolve_dns: None,
+        include_asn: None,
+        interval_seconds: None,
+        timeout_seconds: None,
+    };
+    assert!(matches!(
+        invalid_max_hops.normalize_and_validate(&config),
+        Err(RestApiValidationError::InvalidOption(_))
     ));
 }

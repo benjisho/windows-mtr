@@ -3,16 +3,20 @@ use serde::{Deserialize, Serialize};
 use crate::service::rest_api::{CreateProbeApiRequest, ProbeProtocol};
 use crate::service::rest_server::{ProbeExecutionResult, ProbeJob, ProbeJobStatus};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CreateProbeRequestDto {
     pub targets: Vec<String>,
     pub protocol: ApiProbeProtocol,
     pub port: Option<u16>,
+    pub count: Option<usize>,
+    pub max_hops: Option<u16>,
+    pub resolve_dns: Option<bool>,
+    pub include_asn: Option<bool>,
     pub interval_seconds: Option<f32>,
     pub timeout_seconds: Option<f32>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiProbeProtocol {
     Icmp,
@@ -36,6 +40,10 @@ impl From<CreateProbeRequestDto> for CreateProbeApiRequest {
             targets: value.targets,
             protocol: value.protocol.into(),
             port: value.port,
+            count: value.count,
+            max_hops: value.max_hops,
+            resolve_dns: value.resolve_dns,
+            include_asn: value.include_asn,
             interval_seconds: value.interval_seconds,
             timeout_seconds: value.timeout_seconds,
         }
