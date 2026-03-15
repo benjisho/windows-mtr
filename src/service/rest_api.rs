@@ -138,6 +138,12 @@ impl CreateProbeApiRequest {
             ));
         }
 
+        if matches!(self.protocol, ProbeProtocol::Icmp) && self.port.is_some() {
+            return Err(RestApiValidationError::InvalidPort(
+                "port is not allowed for icmp probes".to_string(),
+            ));
+        }
+
         if self.port == Some(0) {
             return Err(RestApiValidationError::InvalidPort(
                 "port must be between 1 and 65535".to_string(),
@@ -496,6 +502,26 @@ mod tests {
         assert!(matches!(
             request.normalize_and_validate(&RestApiConfig::default()),
             Err(RestApiValidationError::InvalidTarget(_))
+        ));
+    }
+
+    #[test]
+    fn normalize_rejects_port_for_icmp() {
+        let request = CreateProbeApiRequest {
+            targets: vec!["1.1.1.1".to_string()],
+            protocol: ProbeProtocol::Icmp,
+            port: Some(443),
+            count: None,
+            max_hops: None,
+            resolve_dns: None,
+            include_asn: None,
+            interval_seconds: None,
+            timeout_seconds: None,
+        };
+
+        assert!(matches!(
+            request.normalize_and_validate(&RestApiConfig::default()),
+            Err(RestApiValidationError::InvalidPort(_))
         ));
     }
 

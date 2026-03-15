@@ -222,6 +222,11 @@ async fn run_with_timeout<T>(
 
 fn validation_error_response(error: RestApiValidationError) -> (StatusCode, String) {
     match error {
+        RestApiValidationError::InvalidPort(message)
+            if message == "port is required for tcp/udp probes" =>
+        {
+            (StatusCode::UNPROCESSABLE_ENTITY, error.to_string())
+        }
         RestApiValidationError::ConcurrencyLimitExceeded { .. }
         | RestApiValidationError::RateLimitExceeded { .. } => {
             (StatusCode::TOO_MANY_REQUESTS, error.to_string())
