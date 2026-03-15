@@ -26,6 +26,7 @@ pub struct RestApiConfig {
     pub bind_addr: SocketAddr,
     pub allow_non_local_bind: bool,
     pub auth_strategy: AuthStrategy,
+    pub api_key: Option<String>,
     pub request_timeout: Duration,
     pub max_concurrent_probes: usize,
     pub max_targets_per_request: usize,
@@ -38,6 +39,7 @@ impl Default for RestApiConfig {
             bind_addr: SocketAddr::from(([127, 0, 0, 1], 3000)),
             allow_non_local_bind: false,
             auth_strategy: AuthStrategy::NoneLocalOnly,
+            api_key: None,
             request_timeout: Duration::from_secs(10),
             max_concurrent_probes: 8,
             max_targets_per_request: 8,
@@ -81,6 +83,17 @@ impl RestApiConfig {
         if self.auth_strategy == AuthStrategy::NoneLocalOnly && !self.bind_addr.ip().is_loopback() {
             return Err(RestApiValidationError::AuthStrategyViolation(
                 "auth_strategy=none-local-only is only valid for localhost binds".to_string(),
+            ));
+        }
+
+        if self.auth_strategy == AuthStrategy::ApiKey
+            && self
+                .api_key
+                .as_ref()
+                .is_none_or(|key| key.trim().is_empty())
+        {
+            return Err(RestApiValidationError::AuthStrategyViolation(
+                "auth_strategy=api-key requires a non-empty api_key".to_string(),
             ));
         }
 
@@ -461,6 +474,12 @@ mod tests {
         ));
 
         config.auth_strategy = AuthStrategy::ApiKey;
+        assert!(matches!(
+            config.validate_security_defaults(),
+            Err(RestApiValidationError::AuthStrategyViolation(_))
+        ));
+
+        config.api_key = Some("secret".to_string());
         assert!(config.validate_security_defaults().is_ok());
     }
 

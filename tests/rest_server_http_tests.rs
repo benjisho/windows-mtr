@@ -4,7 +4,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::time::{Instant, sleep};
-use windows_mtr::service::rest_api::RestApiConfig;
+use windows_mtr::service::rest_api::{AuthStrategy, RestApiConfig};
 use windows_mtr::service::rest_server::{RestServerState, build_router};
 
 fn build_http_client() -> reqwest::Client {
@@ -14,28 +14,33 @@ fn build_http_client() -> reqwest::Client {
         .expect("http client should build")
 }
 
-async fn spawn_server() -> (SocketAddr, oneshot::Sender<()>) {
+async fn spawn_server_with_config(mut config: RestApiConfig) -> (SocketAddr, oneshot::Sender<()>) {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("listener should bind");
     let addr = listener.local_addr().expect("local addr should resolve");
 
-    let config = RestApiConfig {
-        bind_addr: addr,
-        ..RestApiConfig::default()
-    };
+    config.bind_addr = addr;
     let state = RestServerState::new(config).expect("state should initialize");
     let app = build_router(state);
 
     let (tx, rx) = oneshot::channel();
     tokio::spawn(async move {
-        let server = axum::serve(listener, app).with_graceful_shutdown(async {
+        let server = axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(async {
             let _ = rx.await;
         });
         server.await.expect("server should run");
     });
 
     (addr, tx)
+}
+
+async fn spawn_server() -> (SocketAddr, oneshot::Sender<()>) {
+    spawn_server_with_config(RestApiConfig::default()).await
 }
 
 async fn create_probe(
@@ -225,6 +230,78 @@ async fn create_probe_rejects_missing_tcp_port_as_unprocessable_entity() {
         create_res.status(),
         reqwest::StatusCode::UNPROCESSABLE_ENTITY
     );
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn api_key_auth_rejects_missing_or_invalid_key_and_accepts_valid_key() {
+    let config = RestApiConfig {
+        auth_strategy: AuthStrategy::ApiKey,
+        api_key: Some("secret-key".to_string()),
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let missing = client
+        .get(format!("http://{addr}/api/v1/health"))
+        .send()
+        .await
+        .expect("request should succeed");
+    assert_eq!(missing.status(), reqwest::StatusCode::UNAUTHORIZED);
+
+    let missing_body: serde_json::Value = missing.json().await.expect("json body expected");
+    assert_eq!(missing_body["error"]["code"], "missing_api_key");
+
+    let invalid = client
+        .get(format!("http://{addr}/api/v1/health"))
+        .header("X-API-Key", "wrong-key")
+        .send()
+        .await
+        .expect("request should succeed");
+    assert_eq!(invalid.status(), reqwest::StatusCode::FORBIDDEN);
+
+    let invalid_body: serde_json::Value = invalid.json().await.expect("json body expected");
+    assert_eq!(invalid_body["error"]["code"], "invalid_api_key");
+
+    let ok = client
+        .get(format!("http://{addr}/api/v1/health"))
+        .header("X-API-Key", "secret-key")
+        .send()
+        .await
+        .expect("request should succeed");
+    assert_eq!(ok.status(), reqwest::StatusCode::OK);
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn mtls_auth_requires_upstream_client_identity_header() {
+    let config = RestApiConfig {
+        auth_strategy: AuthStrategy::Mtls,
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let unauthorized = client
+        .get(format!("http://{addr}/api/v1/health"))
+        .send()
+        .await
+        .expect("request should succeed");
+    assert_eq!(unauthorized.status(), reqwest::StatusCode::UNAUTHORIZED);
+
+    let body: serde_json::Value = unauthorized.json().await.expect("json body expected");
+    assert_eq!(body["error"]["code"], "missing_mtls_identity");
+
+    let authorized = client
+        .get(format!("http://{addr}/api/v1/health"))
+        .header("X-Client-Cert", "present")
+        .send()
+        .await
+        .expect("request should succeed");
+    assert_eq!(authorized.status(), reqwest::StatusCode::OK);
 
     let _ = shutdown.send(());
 }
