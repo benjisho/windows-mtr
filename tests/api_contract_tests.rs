@@ -272,14 +272,6 @@ fn openapi_create_probe_request_fields_match_rust_dto_fields() {
     );
 
     let openapi = load_openapi();
-    let icmp_fields = sorted(create_probe_request_property_names(
-        &openapi,
-        "CreateProbeRequestIcmp",
-    ));
-    assert_eq!(
-        dto_fields, icmp_fields,
-        "CreateProbeRequestIcmp properties must match Rust DTO fields"
-    );
 
     let tcp_udp_fields = sorted(create_probe_request_property_names(
         &openapi,
@@ -288,5 +280,16 @@ fn openapi_create_probe_request_fields_match_rust_dto_fields() {
     assert_eq!(
         dto_fields, tcp_udp_fields,
         "CreateProbeRequestTcpUdp properties must match Rust DTO fields"
+    );
+
+    let mut icmp_expected_fields = dto_fields.clone();
+    icmp_expected_fields.retain(|field| field != "port");
+    let icmp_fields = sorted(create_probe_request_property_names(
+        &openapi,
+        "CreateProbeRequestIcmp",
+    ));
+    assert_eq!(
+        icmp_expected_fields, icmp_fields,
+        "CreateProbeRequestIcmp properties must match Rust DTO fields except protocol-specific port"
     );
 }
