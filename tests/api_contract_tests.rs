@@ -232,3 +232,61 @@ fn openapi_contract_documents_cli_only_v1_out_of_scope() {
         );
     }
 }
+
+fn sorted(mut values: Vec<String>) -> Vec<String> {
+    values.sort();
+    values
+}
+
+fn create_probe_request_property_names(openapi: &Value, schema_name: &str) -> Vec<String> {
+    let openapi_map = as_mapping(openapi);
+    let components = as_mapping(map_get(openapi_map, "components"));
+    let schemas = as_mapping(map_get(components, "schemas"));
+    property_names(map_get(schemas, schema_name))
+}
+
+#[test]
+fn openapi_create_probe_request_fields_match_rust_dto_fields() {
+    use windows_mtr::service::api_models::{ApiProbeProtocol, CreateProbeRequestDto};
+
+    let dto = CreateProbeRequestDto {
+        targets: Vec::new(),
+        protocol: ApiProbeProtocol::Icmp,
+        port: None,
+        count: None,
+        max_hops: None,
+        resolve_dns: None,
+        include_asn: None,
+        interval_seconds: None,
+        timeout_seconds: None,
+    };
+
+    let dto_value = serde_json::to_value(dto).expect("dto should serialize");
+    let dto_fields = sorted(
+        dto_value
+            .as_object()
+            .expect("dto should serialize to object")
+            .keys()
+            .cloned()
+            .collect(),
+    );
+
+    let openapi = load_openapi();
+    let icmp_fields = sorted(create_probe_request_property_names(
+        &openapi,
+        "CreateProbeRequestIcmp",
+    ));
+    assert_eq!(
+        dto_fields, icmp_fields,
+        "CreateProbeRequestIcmp properties must match Rust DTO fields"
+    );
+
+    let tcp_udp_fields = sorted(create_probe_request_property_names(
+        &openapi,
+        "CreateProbeRequestTcpUdp",
+    ));
+    assert_eq!(
+        dto_fields, tcp_udp_fields,
+        "CreateProbeRequestTcpUdp properties must match Rust DTO fields"
+    );
+}

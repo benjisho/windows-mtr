@@ -39,6 +39,10 @@ fn api_happy_path_accepts_valid_request_and_completes_before_timeout() {
         targets: vec![" Example.COM ".to_string(), "1.1.1.1".to_string()],
         protocol: ProbeProtocol::Tcp,
         port: Some(443),
+        count: Some(3),
+        max_hops: Some(64),
+        resolve_dns: Some(false),
+        include_asn: Some(true),
         interval_seconds: Some(0.5),
         timeout_seconds: Some(1.0),
     };
@@ -49,6 +53,10 @@ fn api_happy_path_accepts_valid_request_and_completes_before_timeout() {
 
     assert_eq!(normalized.targets, vec!["example.com", "1.1.1.1"]);
     assert_eq!(normalized.port, Some(443));
+    assert_eq!(normalized.count, Some(3));
+    assert_eq!(normalized.max_hops, Some(64));
+    assert!(!normalized.resolve_dns);
+    assert!(normalized.include_asn);
 
     let (_cancel_tx, cancel_rx) = mpsc::channel();
     let (complete_tx, complete_rx) = mpsc::channel();
@@ -68,6 +76,10 @@ fn api_validation_errors_reject_invalid_payload() {
         targets: vec!["bad host".to_string()],
         protocol: ProbeProtocol::Udp,
         port: None,
+        count: Some(3),
+        max_hops: Some(64),
+        resolve_dns: Some(false),
+        include_asn: Some(true),
         interval_seconds: Some(-0.1),
         timeout_seconds: Some(0.05),
     };

@@ -93,6 +93,10 @@ pub struct CreateProbeApiRequest {
     pub targets: Vec<String>,
     pub protocol: ProbeProtocol,
     pub port: Option<u16>,
+    pub count: Option<usize>,
+    pub max_hops: Option<u16>,
+    pub resolve_dns: Option<bool>,
+    pub include_asn: Option<bool>,
     pub interval_seconds: Option<f32>,
     pub timeout_seconds: Option<f32>,
 }
@@ -102,6 +106,10 @@ pub struct NormalizedCreateProbeRequest {
     pub targets: Vec<String>,
     pub protocol: ProbeProtocol,
     pub port: Option<u16>,
+    pub count: Option<usize>,
+    pub max_hops: Option<u8>,
+    pub resolve_dns: bool,
+    pub include_asn: bool,
     pub interval_seconds: Option<f32>,
     pub timeout_seconds: Option<f32>,
 }
@@ -130,6 +138,17 @@ impl CreateProbeApiRequest {
             ));
         }
 
+        if self.port == Some(0) {
+            return Err(RestApiValidationError::InvalidPort(
+                "port must be between 1 and 65535".to_string(),
+            ));
+        }
+
+        let count = validate_optional_count(self.count)?;
+        let max_hops = validate_optional_max_hops(self.max_hops)?;
+        let resolve_dns = self.resolve_dns.unwrap_or(true);
+        let include_asn = self.include_asn.unwrap_or(false);
+
         let interval_seconds =
             validate_optional_positive("interval_seconds", self.interval_seconds)?;
         let timeout_seconds = validate_optional_positive("timeout_seconds", self.timeout_seconds)?;
@@ -156,10 +175,42 @@ impl CreateProbeApiRequest {
             targets: normalized_targets,
             protocol: self.protocol,
             port: self.port,
+            count,
+            max_hops,
+            resolve_dns,
+            include_asn,
             interval_seconds,
             timeout_seconds,
         })
     }
+}
+
+fn validate_optional_count(value: Option<usize>) -> Result<Option<usize>, RestApiValidationError> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+
+    if raw == 0 {
+        return Err(RestApiValidationError::InvalidOption(
+            "count must be greater than or equal to 1".to_string(),
+        ));
+    }
+
+    Ok(Some(raw))
+}
+
+fn validate_optional_max_hops(value: Option<u16>) -> Result<Option<u8>, RestApiValidationError> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+
+    if !(1..=255).contains(&raw) {
+        return Err(RestApiValidationError::InvalidOption(
+            "max_hops must be between 1 and 255".to_string(),
+        ));
+    }
+
+    Ok(Some(raw as u8))
 }
 
 fn validate_optional_positive(
@@ -413,6 +464,10 @@ mod tests {
             targets: vec![" Example.COM ".to_string(), "1.1.1.1".to_string()],
             protocol: ProbeProtocol::Tcp,
             port: Some(443),
+            count: None,
+            max_hops: None,
+            resolve_dns: None,
+            include_asn: None,
             interval_seconds: Some(1.0),
             timeout_seconds: Some(2.0),
         };
@@ -430,6 +485,10 @@ mod tests {
             targets: vec!["bad host".to_string()],
             protocol: ProbeProtocol::Icmp,
             port: None,
+            count: None,
+            max_hops: None,
+            resolve_dns: None,
+            include_asn: None,
             interval_seconds: None,
             timeout_seconds: None,
         };
@@ -497,6 +556,10 @@ mod tests {
             ],
             protocol: ProbeProtocol::Icmp,
             port: None,
+            count: None,
+            max_hops: None,
+            resolve_dns: None,
+            include_asn: None,
             interval_seconds: None,
             timeout_seconds: None,
         };
