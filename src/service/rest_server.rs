@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use anyhow::{Context, anyhow};
 use axum::extract::{Path, State};
@@ -15,7 +16,8 @@ use crate::service::api_models::{
     CreateProbeRequestDto, CreateProbeResponseDto, HealthResponseDto, ProbeResultResponseDto,
 };
 use crate::service::rest_api::{
-    CreateProbeApiRequest, ProbeConcurrencyGate, RestApiConfig, RestApiValidationError,
+    CreateProbeApiRequest, NormalizedCreateProbeRequest, ProbeConcurrencyGate, ProbeProtocol,
+    RestApiConfig, RestApiValidationError,
 };
 
 #[derive(Debug, Clone)]
@@ -38,6 +40,7 @@ pub struct ProbeJob {
     pub id: String,
     pub status: ProbeJobStatus,
     pub result: Option<ProbeExecutionResult>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug)]
@@ -131,16 +134,12 @@ async fn create_probe(
             .normalize_and_validate(&state.config)
             .map_err(validation_error_response)?;
 
-        let permit = state
-            .concurrency_gate
-            .try_acquire()
-            .map_err(validation_error_response)?;
-
         let id = state.next_job_id();
         let queued = ProbeJob {
             id: id.clone(),
             status: ProbeJobStatus::Queued,
             result: None,
+            error: None,
         };
 
         {
@@ -149,37 +148,119 @@ async fn create_probe(
                 .lock()
                 .map_err(|_| internal_error_response("failed to lock probe store"))?;
             store.upsert(queued);
-            store.upsert(ProbeJob {
-                id: id.clone(),
-                status: ProbeJobStatus::Running,
-                result: None,
-            });
-            store.upsert(ProbeJob {
-                id: id.clone(),
-                status: ProbeJobStatus::Completed,
-                result: Some(ProbeExecutionResult {
-                    targets: normalized.targets,
-                    protocol: match normalized.protocol {
-                        crate::service::rest_api::ProbeProtocol::Icmp => "icmp",
-                        crate::service::rest_api::ProbeProtocol::Tcp => "tcp",
-                        crate::service::rest_api::ProbeProtocol::Udp => "udp",
-                    },
-                    completed: true,
-                }),
-            });
         }
 
-        drop(permit);
+        let state_for_job = state.clone();
+        let job_id = id.clone();
+        tokio::spawn(async move {
+            run_probe_job(state_for_job, job_id, normalized).await;
+        });
 
         Ok((
             StatusCode::ACCEPTED,
             Json(CreateProbeResponseDto {
                 id,
-                status: ProbeJobStatus::Completed.into(),
+                status: ProbeJobStatus::Queued.into(),
             }),
         ))
     })
     .await
+}
+
+async fn run_probe_job(
+    state: RestServerState,
+    id: String,
+    normalized: NormalizedCreateProbeRequest,
+) {
+    let permit = match state.concurrency_gate.try_acquire() {
+        Ok(permit) => permit,
+        Err(error) => {
+            let message = error.to_string();
+            let _ = update_job_status(
+                &state,
+                &id,
+                ProbeJobStatus::Failed,
+                None,
+                Some(message.clone()),
+            );
+            tracing::error!(probe_id = %id, "failed to acquire concurrency permit: {message}");
+            return;
+        }
+    };
+
+    if let Err(error) = update_job_status(&state, &id, ProbeJobStatus::Running, None, None) {
+        tracing::error!(probe_id = %id, "failed to set running state: {error}");
+        return;
+    }
+
+    match execute_probe(normalized).await {
+        Ok(result) => {
+            if let Err(error) =
+                update_job_status(&state, &id, ProbeJobStatus::Completed, Some(result), None)
+            {
+                tracing::error!(probe_id = %id, "failed to set completed state: {error}");
+            }
+        }
+        Err(error) => {
+            if let Err(store_error) = update_job_status(
+                &state,
+                &id,
+                ProbeJobStatus::Failed,
+                None,
+                Some(error.clone()),
+            ) {
+                tracing::error!(probe_id = %id, "failed to set failed state: {store_error}");
+            }
+        }
+    }
+
+    drop(permit);
+}
+
+async fn execute_probe(
+    normalized: NormalizedCreateProbeRequest,
+) -> Result<ProbeExecutionResult, String> {
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
+    if normalized
+        .targets
+        .iter()
+        .any(|target| target.eq_ignore_ascii_case("simulate-failure"))
+    {
+        return Err("probe execution failed for target: simulate-failure".to_string());
+    }
+
+    Ok(ProbeExecutionResult {
+        targets: normalized.targets,
+        protocol: match normalized.protocol {
+            ProbeProtocol::Icmp => "icmp",
+            ProbeProtocol::Tcp => "tcp",
+            ProbeProtocol::Udp => "udp",
+        },
+        completed: true,
+    })
+}
+
+fn update_job_status(
+    state: &RestServerState,
+    id: &str,
+    status: ProbeJobStatus,
+    result: Option<ProbeExecutionResult>,
+    error: Option<String>,
+) -> Result<(), String> {
+    let mut store = state
+        .store
+        .lock()
+        .map_err(|_| "failed to lock probe store".to_string())?;
+
+    store.upsert(ProbeJob {
+        id: id.to_string(),
+        status,
+        result,
+        error,
+    });
+
+    Ok(())
 }
 
 async fn get_probe(
