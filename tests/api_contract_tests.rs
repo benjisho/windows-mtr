@@ -145,10 +145,29 @@ fn openapi_contract_enforces_protocol_port_rules() {
         "CreateProbeRequest should have ICMP and TCP/UDP variants"
     );
 
-    let tcp_udp_required = required_property_names(map_get(schemas, "CreateProbeRequestTcpUdp"));
+    let icmp_required = required_property_names(map_get(schemas, "CreateProbeRequestIcmp"));
     assert!(
-        tcp_udp_required.iter().any(|field| field == "port"),
-        "CreateProbeRequestTcpUdp must require port"
+        icmp_required.iter().any(|field| field == "targets"),
+        "CreateProbeRequestIcmp must require targets"
+    );
+    assert!(
+        !icmp_required.iter().any(|field| field == "port"),
+        "CreateProbeRequestIcmp must not require port"
+    );
+
+    let tcp_udp_required = required_property_names(map_get(schemas, "CreateProbeRequestTcpUdp"));
+    for required in ["targets", "protocol", "port"] {
+        assert!(
+            tcp_udp_required.iter().any(|field| field == required),
+            "CreateProbeRequestTcpUdp must require {required}"
+        );
+    }
+
+    assert!(
+        !tcp_udp_required
+            .iter()
+            .any(|field| field == "timeout_seconds"),
+        "CreateProbeRequestTcpUdp must not require optional tuning fields"
     );
 }
 

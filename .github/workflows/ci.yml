@@ -23,6 +23,7 @@ on:
       - 'docs/probe-parity.md'
       - 'docs/api/openapi.yaml'
       - 'scripts/check_openapi_compat.sh'
+      - 'scripts/validate_openapi_schema.py'
   pull_request:
     branches: [ master ]
     paths:
@@ -36,6 +37,7 @@ on:
       - 'docs/probe-parity.md'
       - 'docs/api/openapi.yaml'
       - 'scripts/check_openapi_compat.sh'
+      - 'scripts/validate_openapi_schema.py'
 permissions:
   contents: read
 
@@ -286,6 +288,14 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Install OpenAPI validation tooling
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check --no-input openapi-spec-validator ruamel.yaml
+
+      - name: Validate OpenAPI schema and duplicate YAML keys
+        run: python3 scripts/validate_openapi_schema.py docs/api/openapi.yaml
 
       - name: Run API contract tests
         run: cargo test --test api_contract_tests -- --nocapture
