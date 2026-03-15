@@ -1,7 +1,9 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
+use tokio::time::{Instant, sleep};
 use windows_mtr::service::rest_api::RestApiConfig;
 use windows_mtr::service::rest_server::{RestServerState, build_router};
 
@@ -29,6 +31,57 @@ async fn spawn_server() -> (SocketAddr, oneshot::Sender<()>) {
     (addr, tx)
 }
 
+async fn create_probe(
+    client: &reqwest::Client,
+    addr: SocketAddr,
+    target: &str,
+) -> serde_json::Value {
+    let create_res = client
+        .post(format!("http://{addr}/api/v1/probes"))
+        .json(&serde_json::json!({
+            "targets": [target],
+            "protocol": "icmp"
+        }))
+        .send()
+        .await
+        .expect("create probe request should succeed");
+
+    assert_eq!(create_res.status(), reqwest::StatusCode::ACCEPTED);
+    create_res.json().await.expect("json body expected")
+}
+
+async fn fetch_probe(client: &reqwest::Client, addr: SocketAddr, id: &str) -> serde_json::Value {
+    let get_res = client
+        .get(format!("http://{addr}/api/v1/probes/{id}"))
+        .send()
+        .await
+        .expect("get probe request should succeed");
+
+    assert_eq!(get_res.status(), reqwest::StatusCode::OK);
+    get_res.json().await.expect("json body expected")
+}
+
+async fn wait_for_probe_status(
+    client: &reqwest::Client,
+    addr: SocketAddr,
+    id: &str,
+    expected: &str,
+) -> serde_json::Value {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let probe = fetch_probe(client, addr, id).await;
+        if probe["status"] == expected {
+            return probe;
+        }
+
+        assert!(
+            Instant::now() < deadline,
+            "probe never reached status {expected}, last={probe}"
+        );
+        sleep(Duration::from_millis(15)).await;
+    }
+}
+
 #[tokio::test]
 async fn health_endpoint_returns_ok() {
     let (addr, shutdown) = spawn_server().await;
@@ -48,35 +101,48 @@ async fn health_endpoint_returns_ok() {
 }
 
 #[tokio::test]
-async fn create_probe_then_get_probe_by_id() {
+async fn create_probe_transitions_through_queued_running_and_completed() {
     let (addr, shutdown) = spawn_server().await;
     let client = reqwest::Client::new();
 
-    let create_res = client
-        .post(format!("http://{addr}/api/v1/probes"))
-        .json(&serde_json::json!({
-            "targets": ["1.1.1.1"],
-            "protocol": "icmp"
-        }))
-        .send()
-        .await
-        .expect("create probe request should succeed");
+    let created = create_probe(&client, addr, "1.1.1.1").await;
+    let id = created["id"].as_str().expect("id should be a string");
+    assert_eq!(created["status"], "queued");
 
-    assert_eq!(create_res.status(), reqwest::StatusCode::ACCEPTED);
-    let created: serde_json::Value = create_res.json().await.expect("json body expected");
+    let queued_or_running = fetch_probe(&client, addr, id).await;
+    assert!(
+        queued_or_running["status"] == "queued" || queued_or_running["status"] == "running",
+        "expected queued or running status, got {queued_or_running}"
+    );
+
+    let _running = wait_for_probe_status(&client, addr, id, "running").await;
+    let completed = wait_for_probe_status(&client, addr, id, "completed").await;
+
+    assert_eq!(completed["id"], id);
+    assert_eq!(completed["result"]["targets"][0], "1.1.1.1");
+    assert_eq!(completed["result"]["protocol"], "icmp");
+    assert_eq!(completed["result"]["completed"], true);
+    assert_eq!(completed["error"], serde_json::Value::Null);
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn create_probe_failed_transition_persists_error_details() {
+    let (addr, shutdown) = spawn_server().await;
+    let client = reqwest::Client::new();
+
+    let created = create_probe(&client, addr, "simulate-failure").await;
     let id = created["id"].as_str().expect("id should be a string");
 
-    let get_res = client
-        .get(format!("http://{addr}/api/v1/probes/{id}"))
-        .send()
-        .await
-        .expect("get probe request should succeed");
-
-    assert_eq!(get_res.status(), reqwest::StatusCode::OK);
-    let fetched: serde_json::Value = get_res.json().await.expect("json body expected");
-    assert_eq!(fetched["id"], id);
-    assert_eq!(fetched["status"], "completed");
-    assert_eq!(fetched["result"]["targets"][0], "1.1.1.1");
+    let failed = wait_for_probe_status(&client, addr, id, "failed").await;
+    assert_eq!(failed["result"], serde_json::Value::Null);
+    assert!(
+        failed["error"]
+            .as_str()
+            .expect("error text should exist")
+            .contains("simulate-failure")
+    );
 
     let _ = shutdown.send(());
 }

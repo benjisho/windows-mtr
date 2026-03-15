@@ -68,6 +68,7 @@ pub struct ProbeResultResponseDto {
     pub id: String,
     pub status: ApiProbeStatusDto,
     pub result: Option<ProbeExecutionResultDto>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -113,6 +114,7 @@ impl From<&ProbeJob> for ProbeResultResponseDto {
             id: value.id.clone(),
             status: value.status.into(),
             result: value.result.clone().map(Into::into),
+            error: value.error.clone(),
         }
     }
 }
