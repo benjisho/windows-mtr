@@ -82,6 +82,50 @@ async fn create_probe_then_get_probe_by_id() {
 }
 
 #[tokio::test]
+async fn create_probe_rejects_icmp_with_port_as_bad_request() {
+    let (addr, shutdown) = spawn_server().await;
+    let client = reqwest::Client::new();
+
+    let create_res = client
+        .post(format!("http://{addr}/api/v1/probes"))
+        .json(&serde_json::json!({
+            "targets": ["1.1.1.1"],
+            "protocol": "icmp",
+            "port": 443
+        }))
+        .send()
+        .await
+        .expect("create probe request should succeed");
+
+    assert_eq!(create_res.status(), reqwest::StatusCode::BAD_REQUEST);
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn create_probe_rejects_missing_tcp_port_as_unprocessable_entity() {
+    let (addr, shutdown) = spawn_server().await;
+    let client = reqwest::Client::new();
+
+    let create_res = client
+        .post(format!("http://{addr}/api/v1/probes"))
+        .json(&serde_json::json!({
+            "targets": ["1.1.1.1"],
+            "protocol": "tcp"
+        }))
+        .send()
+        .await
+        .expect("create probe request should succeed");
+
+    assert_eq!(
+        create_res.status(),
+        reqwest::StatusCode::UNPROCESSABLE_ENTITY
+    );
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
 async fn get_probe_returns_not_found_for_unknown_id() {
     let (addr, shutdown) = spawn_server().await;
     let client = reqwest::Client::new();

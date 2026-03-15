@@ -59,6 +59,20 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateProbeRequest'
+            examples:
+              icmp_valid:
+                summary: ICMP request (no port field)
+                value:
+                  targets: ["1.1.1.1", "example.com"]
+                  protocol: icmp
+                  count: 5
+              tcp_valid:
+                summary: TCP request (port required)
+                value:
+                  targets: ["1.1.1.1"]
+                  protocol: tcp
+                  port: 443
+                  timeout_seconds: 2
       responses:
         '202':
           description: Probe accepted
@@ -68,6 +82,12 @@ paths:
                 $ref: '#/components/schemas/CreateProbeResponse'
         '400':
           description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Semantically invalid probe configuration (for example, tcp/udp without a required port)
           content:
             application/json:
               schema:
@@ -251,6 +271,7 @@ components:
           type: string
           enum: [icmp]
           default: icmp
+          description: ICMP probes do not accept a `port`; including `port` is rejected as an invalid request.
         count:
           type: integer
           minimum: 1
@@ -306,7 +327,7 @@ components:
           type: integer
           minimum: 1
           maximum: 65535
-          description: Required for tcp/udp probes (maps to `-P`, `--port`).
+          description: Required for tcp/udp probes (maps to `-P`, `--port`); not allowed for icmp probes.
         count:
           type: integer
           minimum: 1
