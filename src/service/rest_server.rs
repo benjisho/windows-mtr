@@ -183,13 +183,13 @@ async fn run_probe_job(
                 None,
                 Some(message.clone()),
             );
-            tracing::error!(probe_id = %id, "failed to acquire concurrency permit: {message}");
+            eprintln!("probe {id}: failed to acquire concurrency permit: {message}");
             return;
         }
     };
 
     if let Err(error) = update_job_status(&state, &id, ProbeJobStatus::Running, None, None) {
-        tracing::error!(probe_id = %id, "failed to set running state: {error}");
+        eprintln!("probe {id}: failed to set running state: {error}");
         return;
     }
 
@@ -198,7 +198,7 @@ async fn run_probe_job(
             if let Err(error) =
                 update_job_status(&state, &id, ProbeJobStatus::Completed, Some(result), None)
             {
-                tracing::error!(probe_id = %id, "failed to set completed state: {error}");
+                eprintln!("probe {id}: failed to set completed state: {error}");
             }
         }
         Err(error) => {
@@ -209,7 +209,7 @@ async fn run_probe_job(
                 None,
                 Some(error.clone()),
             ) {
-                tracing::error!(probe_id = %id, "failed to set failed state: {store_error}");
+                eprintln!("probe {id}: failed to set failed state: {store_error}");
             }
         }
     }
@@ -303,7 +303,7 @@ async fn run_with_timeout<T>(
 
 fn validation_error_response(error: RestApiValidationError) -> (StatusCode, String) {
     match error {
-        RestApiValidationError::InvalidPort(message)
+        RestApiValidationError::InvalidPort(ref message)
             if message == "port is required for tcp/udp probes" =>
         {
             (StatusCode::UNPROCESSABLE_ENTITY, error.to_string())
