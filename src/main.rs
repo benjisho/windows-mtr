@@ -325,3 +325,33 @@ fn main() -> anyhow::Result<()> {
     .context("failed to run embedded trippy")?;
     process::exit(result.exit_code);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn cli_accepts_api_mode_without_host() {
+        let cli = Cli::try_parse_from(["mtr", "--api"]).expect("api mode should parse");
+        assert!(cli.api);
+        assert!(cli.trace.host.is_none());
+    }
+
+    #[test]
+    fn cli_parses_api_bind_override() {
+        let cli = Cli::try_parse_from(["mtr", "--api", "--api-bind", "127.0.0.1:4000"])
+            .expect("api bind should parse");
+        assert_eq!(cli.api_bind, Some("127.0.0.1:4000".parse().unwrap()));
+    }
+
+    #[test]
+    fn probe_mode_requires_host_argument() {
+        let cli = Cli::try_parse_from(["mtr"]).expect("empty CLI should still parse");
+        let err = build_probe_request(&cli.trace).expect_err("probe mode should require host");
+        assert!(
+            err.to_string()
+                .contains("missing host argument (or run with --api)")
+        );
+    }
+}

@@ -42,12 +42,13 @@ For v1, no custom background job draining protocol is introduced beyond request 
 
 ### 4) Process model / binary layout
 
-Run the API as a **separate binary** (recommended path):
+Run the API inside the existing **`mtr` binary** behind explicit CLI flags:
 
-- Keep `mtr` as the current CLI binary with unchanged behavior.
-- Add API serving as a distinct executable in a future implementation phase.
+- Keep probe CLI mode as the default startup path.
+- Enable REST API serving only when `--api` is passed.
+- Allow bind override via `--api-bind <ADDR>` while preserving localhost defaults and security validation.
 
-This preserves CLI compatibility and avoids surprising behavior from additional mode flags in the main binary startup path.
+This preserves CLI compatibility by making API behavior explicit and opt-in while avoiding a second deployable executable.
 
 ## Minimal dependency set in `Cargo.toml`
 
@@ -69,14 +70,15 @@ No additional persistence, auth, or distributed systems crates are added in v1 t
 
 ### Positive
 
-- Preserves existing CLI behavior and invocation contracts.
+- Preserves existing CLI behavior and invocation contracts in default mode.
 - Uses common, well-maintained Rust async/web stack.
 - Keeps implementation straightforward for future API endpoints.
 - Provides deterministic server lifecycle behavior on shutdown.
+- Avoids maintaining a separate API-only binary artifact.
 
 ### Trade-offs
 
-- Separate binary adds one more deliverable artifact.
+- CLI now contains an additional explicit startup mode (`--api`), which must remain clearly documented.
 - Initial API implementation remains intentionally narrow and does not solve multi-node/stateful orchestration concerns.
 
 ## Explicit non-goals for v1 API

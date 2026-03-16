@@ -98,7 +98,7 @@ Windows MTR is built with enterprise-level security practices:
 
 ### REST API security and operational limits (v1 plan)
 
-For planned REST API deployments, the security baseline is:
+For REST API mode (`mtr --api`), the security baseline is:
 
 - Default bind address: `127.0.0.1:3000` (localhost only)
 - Non-local bind requires explicit opt-in + authentication (`X-API-Key` or mTLS)
@@ -227,6 +227,16 @@ mtr --json -c 20 8.8.8.8 > network-report.json
 mtr -T -P 443 example.com
 ```
 
+### REST API mode (same binary)
+
+```bash
+# Start API server on localhost (default 127.0.0.1:3000)
+mtr --api
+
+# Start API server on a specific bind address
+mtr --api --api-bind 127.0.0.1:4000
+```
+
 ### Full Usage Examples
 
 Visit our [detailed usage guide](USAGE.md) for comprehensive examples.
@@ -328,7 +338,7 @@ Quick snapshot:
 
 - ✅ Released: Core MTR functionality, MSI installer, IPv6, Docker, JSON output, DNS cache TTL.
 - 🚧 In progress: Security hardening gates (`cargo-audit` in CI, fuzz harness pending).
-- 📅 Planned / 🛣️ Roadmap: REST API, SNMP integration, ETW observability, versioned JSON schema + CSV export, runtime cleanup.
+- 📅 Planned / 🛣️ Roadmap: SNMP integration, ETW observability, versioned JSON schema + CSV export, runtime cleanup.
 
 ## 🤝 Contributing
 
