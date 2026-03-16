@@ -235,6 +235,80 @@ async fn create_probe_rejects_missing_tcp_port_as_unprocessable_entity() {
 }
 
 #[tokio::test]
+async fn create_probe_rejects_oversized_payload_with_413() {
+    let config = RestApiConfig {
+        max_payload_bytes: 32,
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let oversized_targets = ["a".repeat(64)];
+    let create_res = client
+        .post(format!("http://{addr}/api/v1/probes"))
+        .json(&serde_json::json!({
+            "targets": oversized_targets,
+            "protocol": "icmp"
+        }))
+        .send()
+        .await
+        .expect("create probe request should succeed");
+
+    assert_eq!(create_res.status(), reqwest::StatusCode::PAYLOAD_TOO_LARGE);
+
+    let body: serde_json::Value = create_res.json().await.expect("json body expected");
+    assert_eq!(body["error"]["code"], "payload_too_large");
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn create_probe_rejects_burst_traffic_with_429() {
+    let config = RestApiConfig {
+        request_timeout: Duration::from_secs(1),
+        max_concurrent_probes: 2,
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let url = format!("http://{addr}/api/v1/probes");
+    let payload = serde_json::json!({
+        "targets": ["1.1.1.1"],
+        "protocol": "icmp"
+    });
+
+    let first = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("first create probe request should succeed");
+    assert_eq!(first.status(), reqwest::StatusCode::ACCEPTED);
+
+    let second = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("second create probe request should succeed");
+    assert_eq!(second.status(), reqwest::StatusCode::ACCEPTED);
+
+    let third = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("third create probe request should succeed");
+    assert_eq!(third.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+
+    let body: serde_json::Value = third.json().await.expect("json body expected");
+    assert_eq!(body["error"]["code"], "rate_limited");
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
 async fn api_key_auth_rejects_missing_or_invalid_key_and_accepts_valid_key() {
     let config = RestApiConfig {
         auth_strategy: AuthStrategy::ApiKey,

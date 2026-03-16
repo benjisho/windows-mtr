@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, anyhow};
-use axum::extract::{ConnectInfo, Path, State};
+use axum::body::{Body, to_bytes};
+use axum::extract::{ConnectInfo, Path, Request, State};
 use axum::http::{HeaderMap, StatusCode};
+use axum::middleware::{Next, from_fn_with_state};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use tokio::net::TcpListener;
@@ -16,8 +18,9 @@ use crate::service::api_models::{
     CreateProbeRequestDto, CreateProbeResponseDto, HealthResponseDto, ProbeResultResponseDto,
 };
 use crate::service::rest_api::{
-    AuthStrategy, CreateProbeApiRequest, NormalizedCreateProbeRequest, ProbeConcurrencyGate,
-    ProbeProtocol, RestApiConfig, RestApiValidationError,
+    AuthStrategy, CreateProbeApiRequest, FixedWindowRateLimiter, NormalizedCreateProbeRequest,
+    ProbeConcurrencyGate, ProbeProtocol, RestApiConfig, RestApiValidationError,
+    validate_payload_size,
 };
 
 const API_KEY_HEADER: &str = "X-API-Key";
@@ -120,6 +123,7 @@ impl ProbeStore {
 pub struct RestServerState {
     pub config: RestApiConfig,
     pub concurrency_gate: Arc<ProbeConcurrencyGate>,
+    probe_rate_limiter: Arc<Mutex<FixedWindowRateLimiter>>,
     store: Arc<Mutex<ProbeStore>>,
     next_id: Arc<AtomicU64>,
 }
@@ -127,10 +131,16 @@ pub struct RestServerState {
 impl RestServerState {
     pub fn new(config: RestApiConfig) -> Result<Self, RestApiValidationError> {
         let gate = Arc::new(ProbeConcurrencyGate::new(config.max_concurrent_probes)?);
+        let limiter = Arc::new(Mutex::new(FixedWindowRateLimiter::new(
+            config.max_concurrent_probes,
+            config.request_timeout,
+            Instant::now(),
+        )?));
 
         Ok(Self {
             config,
             concurrency_gate: gate,
+            probe_rate_limiter: limiter,
             store: Arc::new(Mutex::new(ProbeStore {
                 jobs: HashMap::new(),
             })),
@@ -145,11 +155,49 @@ impl RestServerState {
 }
 
 pub fn build_router(state: RestServerState) -> Router {
+    let probe_guard_state = state.clone();
+
     Router::new()
         .route("/api/v1/health", get(get_health))
-        .route("/api/v1/probes", post(create_probe))
+        .route(
+            "/api/v1/probes",
+            post(create_probe).route_layer(from_fn_with_state(
+                probe_guard_state,
+                enforce_probe_request_guards,
+            )),
+        )
         .route("/api/v1/probes/{id}", get(get_probe))
         .with_state(state)
+}
+
+async fn enforce_probe_request_guards(
+    State(state): State<RestServerState>,
+    request: Request,
+    next: Next,
+) -> Result<axum::response::Response, (StatusCode, Json<ErrorEnvelope>)> {
+    {
+        let mut limiter = state
+            .probe_rate_limiter
+            .lock()
+            .map_err(|_| internal_error_response("failed to lock probe rate limiter"))?;
+        limiter
+            .allow(Instant::now())
+            .map_err(validation_error_response)?;
+    }
+
+    let (parts, body) = request.into_parts();
+    let payload = to_bytes(body, state.config.max_payload_bytes + 1)
+        .await
+        .map_err(|_| {
+            validation_error_response(RestApiValidationError::OversizedPayload(
+                "request body exceeds configured payload limit".to_string(),
+            ))
+        })?;
+
+    validate_payload_size(payload.len(), &state.config).map_err(validation_error_response)?;
+
+    let request = Request::from_parts(parts, Body::from(payload));
+    Ok(next.run(request).await)
 }
 
 pub async fn run_rest_api_server(config: RestApiConfig) -> anyhow::Result<()> {
