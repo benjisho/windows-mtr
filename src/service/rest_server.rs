@@ -14,8 +14,10 @@ use tokio::net::TcpListener;
 use tokio::signal;
 use tokio::time::timeout;
 
+use crate::api_error::ApiError;
 use crate::service::api_models::{
-    CreateProbeRequestDto, CreateProbeResponseDto, HealthResponseDto, ProbeResultResponseDto,
+    ApiResponseMetaDto, CreateProbeDataDto, CreateProbeRequestDto, CreateProbeResponseDto,
+    HealthDataDto, HealthResponseDto, ProbeResultResponseDto,
 };
 use crate::service::rest_api::{
     AuthStrategy, CreateProbeApiRequest, FixedWindowRateLimiter, NormalizedCreateProbeRequest,
@@ -25,16 +27,7 @@ use crate::service::rest_api::{
 
 const API_KEY_HEADER: &str = "X-API-Key";
 
-#[derive(Debug, Clone, serde::Serialize)]
-struct ErrorEnvelope {
-    error: AuthErrorBody,
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-struct AuthErrorBody {
-    code: &'static str,
-    message: String,
-}
+type ApiResult<T> = Result<T, ApiError>;
 
 #[derive(Debug, Clone)]
 enum RequestAuthError {
@@ -44,39 +37,27 @@ enum RequestAuthError {
 }
 
 impl RequestAuthError {
-    fn into_response(self) -> (StatusCode, Json<ErrorEnvelope>) {
+    fn into_api_error(self) -> ApiError {
         match self {
-            Self::MissingApiKeyHeader => (
-                StatusCode::UNAUTHORIZED,
-                Json(ErrorEnvelope {
-                    error: AuthErrorBody {
-                        code: "missing_api_key",
-                        message: format!(
-                            "missing required authentication header: {API_KEY_HEADER}"
-                        ),
-                    },
-                }),
-            ),
-            Self::InvalidApiKey => (
-                StatusCode::FORBIDDEN,
-                Json(ErrorEnvelope {
-                    error: AuthErrorBody {
-                        code: "invalid_api_key",
-                        message: "provided API key is invalid".to_string(),
-                    },
-                }),
-            ),
-            Self::MissingMtlsIdentity => (
-                StatusCode::UNAUTHORIZED,
-                Json(ErrorEnvelope {
-                    error: AuthErrorBody {
-                        code: "missing_mtls_identity",
-                        message:
-                            "mTLS is configured but request identity was not provided by upstream"
-                                .to_string(),
-                    },
-                }),
-            ),
+            Self::MissingApiKeyHeader => ApiError {
+                status: StatusCode::UNAUTHORIZED,
+                code: "missing_api_key",
+                title: "Authentication required",
+                detail: format!("missing required authentication header: {API_KEY_HEADER}"),
+            },
+            Self::InvalidApiKey => ApiError {
+                status: StatusCode::FORBIDDEN,
+                code: "invalid_api_key",
+                title: "Forbidden",
+                detail: "provided API key is invalid".to_string(),
+            },
+            Self::MissingMtlsIdentity => ApiError {
+                status: StatusCode::UNAUTHORIZED,
+                code: "missing_mtls_identity",
+                title: "Authentication required",
+                detail: "mTLS is configured but request identity was not provided by upstream"
+                    .to_string(),
+            },
         }
     }
 }
@@ -174,7 +155,7 @@ async fn enforce_probe_request_guards(
     State(state): State<RestServerState>,
     request: Request,
     next: Next,
-) -> Result<axum::response::Response, (StatusCode, Json<ErrorEnvelope>)> {
+) -> ApiResult<axum::response::Response> {
     {
         let mut limiter = state
             .probe_rate_limiter
@@ -229,12 +210,18 @@ async fn get_health(
     ConnectInfo(remote_addr): ConnectInfo<std::net::SocketAddr>,
     State(state): State<RestServerState>,
     headers: HeaderMap,
-) -> Result<Json<HealthResponseDto>, (StatusCode, Json<ErrorEnvelope>)> {
+) -> ApiResult<Json<HealthResponseDto>> {
     enforce_request_auth(&state.config, remote_addr, &headers)?;
     Ok(Json(HealthResponseDto {
-        status: "ok",
-        service: "windows-mtr",
-        version: env!("CARGO_PKG_VERSION"),
+        meta: ApiResponseMetaDto {
+            schema_version: "v1",
+            request_id: None,
+        },
+        data: HealthDataDto {
+            status: "ok",
+            service: "windows-mtr",
+            version: env!("CARGO_PKG_VERSION"),
+        },
     }))
 }
 
@@ -243,7 +230,7 @@ async fn create_probe(
     State(state): State<RestServerState>,
     headers: HeaderMap,
     Json(payload): Json<CreateProbeRequestDto>,
-) -> Result<(StatusCode, Json<CreateProbeResponseDto>), (StatusCode, Json<ErrorEnvelope>)> {
+) -> ApiResult<(StatusCode, Json<CreateProbeResponseDto>)> {
     enforce_request_auth(&state.config, remote_addr, &headers)?;
 
     run_with_timeout(state.config.request_timeout, async move {
@@ -277,8 +264,14 @@ async fn create_probe(
         Ok((
             StatusCode::ACCEPTED,
             Json(CreateProbeResponseDto {
-                id,
-                status: ProbeJobStatus::Queued.into(),
+                meta: ApiResponseMetaDto {
+                    schema_version: "v1",
+                    request_id: None,
+                },
+                data: CreateProbeDataDto {
+                    id,
+                    status: ProbeJobStatus::Queued.into(),
+                },
             }),
         ))
     })
@@ -386,15 +379,16 @@ async fn get_probe(
     State(state): State<RestServerState>,
     headers: HeaderMap,
     Path(id): Path<String>,
-) -> Result<Json<ProbeResultResponseDto>, (StatusCode, Json<ErrorEnvelope>)> {
+) -> ApiResult<Json<ProbeResultResponseDto>> {
     enforce_request_auth(&state.config, remote_addr, &headers)?;
 
     run_with_timeout(state.config.request_timeout, async move {
-        if id.trim().is_empty() {
+        if id.trim().is_empty() || id.chars().any(char::is_whitespace) {
             return Err(error_response(
                 StatusCode::BAD_REQUEST,
                 "invalid_probe_id",
-                "probe id must not be empty".to_string(),
+                "Invalid probe id",
+                "probe id must not be empty or contain whitespace".to_string(),
             ));
         }
 
@@ -406,6 +400,7 @@ async fn get_probe(
             error_response(
                 StatusCode::NOT_FOUND,
                 "probe_not_found",
+                "Probe not found",
                 format!("probe not found: {id}"),
             )
         })?;
@@ -417,19 +412,20 @@ async fn get_probe(
 
 async fn run_with_timeout<T>(
     duration: std::time::Duration,
-    future: impl std::future::Future<Output = Result<T, (StatusCode, Json<ErrorEnvelope>)>>,
-) -> Result<T, (StatusCode, Json<ErrorEnvelope>)> {
+    future: impl std::future::Future<Output = ApiResult<T>>,
+) -> ApiResult<T> {
     match timeout(duration, future).await {
         Ok(result) => result,
         Err(_) => Err(error_response(
             StatusCode::REQUEST_TIMEOUT,
             "request_timeout",
+            "Request timed out",
             format!("request processing exceeded timeout of {duration:?}"),
         )),
     }
 }
 
-fn validation_error_response(error: RestApiValidationError) -> (StatusCode, Json<ErrorEnvelope>) {
+fn validation_error_response(error: RestApiValidationError) -> ApiError {
     match error {
         RestApiValidationError::InvalidPort(ref message)
             if message == "port is required for tcp/udp probes" =>
@@ -437,6 +433,7 @@ fn validation_error_response(error: RestApiValidationError) -> (StatusCode, Json
             error_response(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 "invalid_request",
+                "Invalid request",
                 error.to_string(),
             )
         }
@@ -444,25 +441,29 @@ fn validation_error_response(error: RestApiValidationError) -> (StatusCode, Json
         | RestApiValidationError::RateLimitExceeded { .. } => error_response(
             StatusCode::TOO_MANY_REQUESTS,
             "rate_limited",
+            "Rate limited",
             error.to_string(),
         ),
         RestApiValidationError::OversizedPayload(_) => error_response(
             StatusCode::PAYLOAD_TOO_LARGE,
             "payload_too_large",
+            "Payload too large",
             error.to_string(),
         ),
         _ => error_response(
             StatusCode::BAD_REQUEST,
             "invalid_request",
+            "Invalid request",
             error.to_string(),
         ),
     }
 }
 
-fn internal_error_response(message: &str) -> (StatusCode, Json<ErrorEnvelope>) {
+fn internal_error_response(message: &str) -> ApiError {
     error_response(
         StatusCode::INTERNAL_SERVER_ERROR,
         "internal_error",
+        "Internal server error",
         message.to_string(),
     )
 }
@@ -470,33 +471,34 @@ fn internal_error_response(message: &str) -> (StatusCode, Json<ErrorEnvelope>) {
 fn error_response(
     status: StatusCode,
     code: &'static str,
-    message: String,
-) -> (StatusCode, Json<ErrorEnvelope>) {
-    (
+    title: &'static str,
+    detail: String,
+) -> ApiError {
+    ApiError {
         status,
-        Json(ErrorEnvelope {
-            error: AuthErrorBody { code, message },
-        }),
-    )
+        code,
+        title,
+        detail,
+    }
 }
 
 fn enforce_request_auth(
     config: &RestApiConfig,
     remote_addr: std::net::SocketAddr,
     headers: &HeaderMap,
-) -> Result<(), (StatusCode, Json<ErrorEnvelope>)> {
+) -> ApiResult<()> {
     let request_is_loopback = remote_addr.ip().is_loopback();
 
     match config.auth_strategy {
         AuthStrategy::NoneLocalOnly if request_is_loopback => Ok(()),
-        AuthStrategy::NoneLocalOnly => Err(RequestAuthError::MissingApiKeyHeader.into_response()),
+        AuthStrategy::NoneLocalOnly => Err(RequestAuthError::MissingApiKeyHeader.into_api_error()),
         AuthStrategy::ApiKey => {
             let provided = headers
                 .get(API_KEY_HEADER)
                 .and_then(|value| value.to_str().ok())
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
-                .ok_or_else(|| RequestAuthError::MissingApiKeyHeader.into_response())?;
+                .ok_or_else(|| RequestAuthError::MissingApiKeyHeader.into_api_error())?;
 
             let expected = config
                 .api_key
@@ -506,6 +508,7 @@ fn enforce_request_auth(
                     error_response(
                         StatusCode::INTERNAL_SERVER_ERROR,
                         "auth_configuration_error",
+                        "Internal server error",
                         "auth_strategy=api-key requires configured api_key".to_string(),
                     )
                 })?;
@@ -513,14 +516,14 @@ fn enforce_request_auth(
             if provided == expected {
                 Ok(())
             } else {
-                Err(RequestAuthError::InvalidApiKey.into_response())
+                Err(RequestAuthError::InvalidApiKey.into_api_error())
             }
         }
         AuthStrategy::Mtls => headers
             .get("X-Client-Cert")
             .or_else(|| headers.get("X-SSL-Client-Verify"))
             .map(|_| ())
-            .ok_or_else(|| RequestAuthError::MissingMtlsIdentity.into_response()),
+            .ok_or_else(|| RequestAuthError::MissingMtlsIdentity.into_api_error()),
     }
 }
 
