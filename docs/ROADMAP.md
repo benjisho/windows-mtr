@@ -25,7 +25,7 @@ For release-by-release details, see the [changelog](../CHANGELOG.md).
 | CI matrix coverage (Windows + Ubuntu, MSRV + stable) | ✅ Released | v1.2.x |
 | CodeQL workflow for Rust | ✅ Released | v1.2.x |
 | Container publishing to GHCR + Docker Hub | ✅ Released | v1.2.x |
-| REST API | 📅 Planned | H2 2026 |
+| REST API | ✅ Released | v1.2.x (released in the H2 2026 delivery window) |
 | SNMP Integration | 📅 Planned | H2 2026 |
 | Native Ratatui UI (tabs, hop table, charts) | ✅ Released (`--ui native`) | H2 2026 |
 | ETW + Windows observability integrations | 🛣️ Roadmap | H2 2026 |

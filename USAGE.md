@@ -137,7 +137,7 @@ mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.
 ![Default mode demo](assets/windows-mtr-m.gif)
 ![Enhanced mode demo](assets/windows-mtr-upscaled.gif)
 
-## REST API startup and operational limits (v1)
+## REST API startup and operational limits (v1, implemented)
 
 Use API mode from the main binary and keep these defaults unless you have a reviewed reason to change them:
 
@@ -156,7 +156,7 @@ mtr --api --api-bind 127.0.0.1:4000
 - Max targets per request: `8`
 - Max request body size: `16 KiB`
 
-Authentication decision for v1:
+Authentication enforcement in v1:
 - Local-only bind: `none-local-only` is acceptable
 - Non-local bind: require `X-API-Key` or mTLS
 
