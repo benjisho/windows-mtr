@@ -31,6 +31,12 @@ fn non_local_bind_requires_opt_in_and_auth() {
     ));
 
     config.auth_strategy = AuthStrategy::ApiKey;
+    assert!(matches!(
+        config.validate_security_defaults(),
+        Err(RestApiValidationError::AuthStrategyViolation(_))
+    ));
+
+    config.api_key = Some("test-api-key".to_string());
     assert!(config.validate_security_defaults().is_ok());
 }
 
