@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document defines baseline security assumptions and controls for the planned windows-mtr REST API v1.
+This document defines baseline security assumptions and controls for the implemented windows-mtr REST API v1.
 
 ## Assets
 
