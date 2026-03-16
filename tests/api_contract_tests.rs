@@ -252,6 +252,57 @@ fn openapi_contract_documents_cli_only_v1_out_of_scope() {
     }
 }
 
+#[test]
+fn openapi_contract_response_schemas_require_meta_and_data_envelope() {
+    let openapi = load_openapi();
+    let openapi_map = as_mapping(&openapi);
+    let components = as_mapping(map_get(openapi_map, "components"));
+    let schemas = as_mapping(map_get(components, "schemas"));
+
+    for schema_name in ["HealthResponse", "CreateProbeResponse", "GetProbeResponse"] {
+        let required = required_property_names(map_get(schemas, schema_name));
+        assert!(
+            required.iter().any(|field| field == "meta"),
+            "{schema_name} must require meta"
+        );
+        assert!(
+            required.iter().any(|field| field == "data"),
+            "{schema_name} must require data"
+        );
+    }
+}
+
+#[test]
+fn openapi_contract_documents_runtime_emitted_probe_response_codes() {
+    let openapi = load_openapi();
+    let openapi_map = as_mapping(&openapi);
+    let paths = as_mapping(map_get(openapi_map, "paths"));
+
+    let post_probe = as_mapping(map_get(
+        as_mapping(map_get(paths, "/api/v1/probes")),
+        "post",
+    ));
+    let post_responses = as_mapping(map_get(post_probe, "responses"));
+    for status in ["202", "400", "413", "422", "429"] {
+        assert!(
+            map_get_optional(post_responses, status).is_some(),
+            "POST /api/v1/probes must document {status}"
+        );
+    }
+
+    let get_probe = as_mapping(map_get(
+        as_mapping(map_get(paths, "/api/v1/probes/{id}")),
+        "get",
+    ));
+    let get_responses = as_mapping(map_get(get_probe, "responses"));
+    for status in ["200", "400", "404"] {
+        assert!(
+            map_get_optional(get_responses, status).is_some(),
+            "GET /api/v1/probes/{{id}} must document {status}"
+        );
+    }
+}
+
 fn sorted(mut values: Vec<String>) -> Vec<String> {
     values.sort();
     values

@@ -52,6 +52,19 @@ impl From<CreateProbeRequestDto> for CreateProbeApiRequest {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct HealthResponseDto {
+    pub meta: ApiResponseMetaDto,
+    pub data: HealthDataDto,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ApiResponseMetaDto {
+    pub schema_version: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HealthDataDto {
     pub status: &'static str,
     pub service: &'static str,
     pub version: &'static str,
@@ -59,12 +72,24 @@ pub struct HealthResponseDto {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CreateProbeResponseDto {
+    pub meta: ApiResponseMetaDto,
+    pub data: CreateProbeDataDto,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CreateProbeDataDto {
     pub id: String,
     pub status: ApiProbeStatusDto,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ProbeResultResponseDto {
+    pub meta: ApiResponseMetaDto,
+    pub data: ProbeResultDataDto,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProbeResultDataDto {
     pub id: String,
     pub status: ApiProbeStatusDto,
     pub result: Option<ProbeExecutionResultDto>,
@@ -111,10 +136,16 @@ impl From<ProbeJobStatus> for ApiProbeStatusDto {
 impl From<&ProbeJob> for ProbeResultResponseDto {
     fn from(value: &ProbeJob) -> Self {
         Self {
-            id: value.id.clone(),
-            status: value.status.into(),
-            result: value.result.clone().map(Into::into),
-            error: value.error.clone(),
+            meta: ApiResponseMetaDto {
+                schema_version: "v1",
+                request_id: None,
+            },
+            data: ProbeResultDataDto {
+                id: value.id.clone(),
+                status: value.status.into(),
+                result: value.result.clone().map(Into::into),
+                error: value.error.clone(),
+            },
         }
     }
 }

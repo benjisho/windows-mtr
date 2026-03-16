@@ -43,6 +43,20 @@ async fn spawn_server() -> (SocketAddr, oneshot::Sender<()>) {
     spawn_server_with_config(RestApiConfig::default()).await
 }
 
+fn assert_meta(body: &serde_json::Value) {
+    assert_eq!(body["meta"]["schema_version"], "v1");
+    assert!(body["meta"]["request_id"].is_null());
+}
+
+fn assert_error_shape(body: &serde_json::Value, status: u16, code: &str) {
+    assert_meta(body);
+    assert_eq!(body["error"]["status"], status);
+    assert_eq!(body["error"]["code"], code);
+    assert!(body["error"]["type"].is_string());
+    assert!(body["error"]["title"].is_string());
+    assert!(body["error"]["detail"].is_string());
+}
+
 async fn create_probe(
     client: &reqwest::Client,
     addr: SocketAddr,
@@ -82,7 +96,7 @@ async fn wait_for_probe_status(
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
         let probe = fetch_probe(client, addr, id).await;
-        if probe["status"] == expected {
+        if probe["data"]["status"] == expected {
             return probe;
         }
 
@@ -105,7 +119,7 @@ async fn wait_for_terminal_status_with_running_seen(
 
     loop {
         let probe = fetch_probe(client, addr, id).await;
-        match probe["status"].as_str() {
+        match probe["data"]["status"].as_str() {
             Some("running") => saw_running = true,
             Some(status) if status == expected_terminal => {
                 assert!(
@@ -138,7 +152,9 @@ async fn health_endpoint_returns_ok() {
 
     assert_eq!(res.status(), reqwest::StatusCode::OK);
     let body: serde_json::Value = res.json().await.expect("json body expected");
-    assert_eq!(body["status"], "ok");
+    assert_meta(&body);
+    assert_eq!(body["data"]["status"], "ok");
+    assert_eq!(body["data"]["service"], "windows-mtr");
 
     let _ = shutdown.send(());
 }
@@ -149,23 +165,28 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
     let client = build_http_client();
 
     let created = create_probe(&client, addr, "1.1.1.1").await;
-    let id = created["id"].as_str().expect("id should be a string");
-    assert_eq!(created["status"], "queued");
+    assert_meta(&created);
+    let id = created["data"]["id"]
+        .as_str()
+        .expect("id should be a string");
+    assert_eq!(created["data"]["status"], "queued");
 
     let queued_or_running = fetch_probe(&client, addr, id).await;
     assert!(
-        queued_or_running["status"] == "queued" || queued_or_running["status"] == "running",
+        queued_or_running["data"]["status"] == "queued"
+            || queued_or_running["data"]["status"] == "running",
         "expected queued or running status, got {queued_or_running}"
     );
 
     let completed =
         wait_for_terminal_status_with_running_seen(&client, addr, id, "completed").await;
 
-    assert_eq!(completed["id"], id);
-    assert_eq!(completed["result"]["targets"][0], "1.1.1.1");
-    assert_eq!(completed["result"]["protocol"], "icmp");
-    assert_eq!(completed["result"]["completed"], true);
-    assert_eq!(completed["error"], serde_json::Value::Null);
+    assert_meta(&completed);
+    assert_eq!(completed["data"]["id"], id);
+    assert_eq!(completed["data"]["result"]["targets"][0], "1.1.1.1");
+    assert_eq!(completed["data"]["result"]["protocol"], "icmp");
+    assert_eq!(completed["data"]["result"]["completed"], true);
+    assert_eq!(completed["data"]["error"], serde_json::Value::Null);
 
     let _ = shutdown.send(());
 }
@@ -176,12 +197,16 @@ async fn create_probe_failed_transition_persists_error_details() {
     let client = build_http_client();
 
     let created = create_probe(&client, addr, "simulate-failure").await;
-    let id = created["id"].as_str().expect("id should be a string");
+    assert_meta(&created);
+    let id = created["data"]["id"]
+        .as_str()
+        .expect("id should be a string");
 
     let failed = wait_for_probe_status(&client, addr, id, "failed").await;
-    assert_eq!(failed["result"], serde_json::Value::Null);
+    assert_meta(&failed);
+    assert_eq!(failed["data"]["result"], serde_json::Value::Null);
     assert!(
-        failed["error"]
+        failed["data"]["error"]
             .as_str()
             .expect("error text should exist")
             .contains("simulate-failure")
@@ -207,6 +232,8 @@ async fn create_probe_rejects_icmp_with_port_as_bad_request() {
         .expect("create probe request should succeed");
 
     assert_eq!(create_res.status(), reqwest::StatusCode::BAD_REQUEST);
+    let body: serde_json::Value = create_res.json().await.expect("json body expected");
+    assert_error_shape(&body, 400, "invalid_request");
 
     let _ = shutdown.send(());
 }
@@ -230,6 +257,8 @@ async fn create_probe_rejects_missing_tcp_port_as_unprocessable_entity() {
         create_res.status(),
         reqwest::StatusCode::UNPROCESSABLE_ENTITY
     );
+    let body: serde_json::Value = create_res.json().await.expect("json body expected");
+    assert_error_shape(&body, 422, "invalid_request");
 
     let _ = shutdown.send(());
 }
@@ -257,7 +286,7 @@ async fn create_probe_rejects_oversized_payload_with_413() {
     assert_eq!(create_res.status(), reqwest::StatusCode::PAYLOAD_TOO_LARGE);
 
     let body: serde_json::Value = create_res.json().await.expect("json body expected");
-    assert_eq!(body["error"]["code"], "payload_too_large");
+    assert_error_shape(&body, 413, "payload_too_large");
 
     let _ = shutdown.send(());
 }
@@ -303,7 +332,7 @@ async fn create_probe_rejects_burst_traffic_with_429() {
     assert_eq!(third.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
 
     let body: serde_json::Value = third.json().await.expect("json body expected");
-    assert_eq!(body["error"]["code"], "rate_limited");
+    assert_error_shape(&body, 429, "rate_limited");
 
     let _ = shutdown.send(());
 }
@@ -326,7 +355,7 @@ async fn api_key_auth_rejects_missing_or_invalid_key_and_accepts_valid_key() {
     assert_eq!(missing.status(), reqwest::StatusCode::UNAUTHORIZED);
 
     let missing_body: serde_json::Value = missing.json().await.expect("json body expected");
-    assert_eq!(missing_body["error"]["code"], "missing_api_key");
+    assert_error_shape(&missing_body, 401, "missing_api_key");
 
     let invalid = client
         .get(format!("http://{addr}/api/v1/health"))
@@ -337,7 +366,7 @@ async fn api_key_auth_rejects_missing_or_invalid_key_and_accepts_valid_key() {
     assert_eq!(invalid.status(), reqwest::StatusCode::FORBIDDEN);
 
     let invalid_body: serde_json::Value = invalid.json().await.expect("json body expected");
-    assert_eq!(invalid_body["error"]["code"], "invalid_api_key");
+    assert_error_shape(&invalid_body, 403, "invalid_api_key");
 
     let ok = client
         .get(format!("http://{addr}/api/v1/health"))
@@ -367,7 +396,7 @@ async fn mtls_auth_requires_upstream_client_identity_header() {
     assert_eq!(unauthorized.status(), reqwest::StatusCode::UNAUTHORIZED);
 
     let body: serde_json::Value = unauthorized.json().await.expect("json body expected");
-    assert_eq!(body["error"]["code"], "missing_mtls_identity");
+    assert_error_shape(&body, 401, "missing_mtls_identity");
 
     let authorized = client
         .get(format!("http://{addr}/api/v1/health"))
@@ -376,6 +405,24 @@ async fn mtls_auth_requires_upstream_client_identity_header() {
         .await
         .expect("request should succeed");
     assert_eq!(authorized.status(), reqwest::StatusCode::OK);
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn get_probe_rejects_whitespace_id_as_bad_request() {
+    let (addr, shutdown) = spawn_server().await;
+    let client = build_http_client();
+
+    let res = client
+        .get(format!("http://{addr}/api/v1/probes/%20"))
+        .send()
+        .await
+        .expect("get request should succeed");
+
+    assert_eq!(res.status(), reqwest::StatusCode::BAD_REQUEST);
+    let body: serde_json::Value = res.json().await.expect("json body expected");
+    assert_error_shape(&body, 400, "invalid_probe_id");
 
     let _ = shutdown.send(());
 }
@@ -392,6 +439,8 @@ async fn get_probe_returns_not_found_for_unknown_id() {
         .expect("get request should succeed");
 
     assert_eq!(res.status(), reqwest::StatusCode::NOT_FOUND);
+    let body: serde_json::Value = res.json().await.expect("json body expected");
+    assert_error_shape(&body, 404, "probe_not_found");
 
     let _ = shutdown.send(());
 }
