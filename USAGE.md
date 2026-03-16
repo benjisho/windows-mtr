@@ -137,9 +137,17 @@ mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.
 ![Default mode demo](assets/windows-mtr-m.gif)
 ![Enhanced mode demo](assets/windows-mtr-upscaled.gif)
 
-## REST API operational limits (v1 plan)
+## REST API startup and operational limits (v1)
 
-If you deploy the planned REST API wrapper, apply these defaults unless you have a reviewed reason to change them:
+Use API mode from the main binary and keep these defaults unless you have a reviewed reason to change them:
+
+```bash
+# Start API server on default localhost bind
+mtr --api
+
+# Override bind address (security validation still applies)
+mtr --api --api-bind 127.0.0.1:4000
+```
 
 - Bind to `127.0.0.1:3000` by default
 - Require explicit opt-in for non-local bind addresses
