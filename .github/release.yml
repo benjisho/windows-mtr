@@ -4,7 +4,8 @@
 # Controls how GitHub groups merged PRs in automatically generated changelogs.
 # Used when `gh release create --generate-notes` targets this repository.
 #
-# Keep labels aligned with `.github/label-taxonomy.yml` to avoid drift.
+# Labels in categories are intentionally aligned with `.github/labeler.yml`
+# (path labels) and `.github/label-taxonomy.yml` (title-prefix labels).
 # Docs: https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
 # =============================================================================
 
