@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::env;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -24,8 +25,12 @@ use crate::service::rest_api::{
     ProbeConcurrencyGate, ProbeProtocol, RestApiConfig, RestApiValidationError,
     validate_payload_size,
 };
+use crate::service::{
+    EnhancedUiConfig, ProbeRequest, UiMode, build_probe_plan, run_embedded_trippy,
+};
 
 const API_KEY_HEADER: &str = "X-API-Key";
+const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -331,25 +336,94 @@ async fn run_probe_job(
 async fn execute_probe(
     normalized: NormalizedCreateProbeRequest,
 ) -> Result<ProbeExecutionResult, String> {
-    tokio::time::sleep(Duration::from_millis(20)).await;
+    let current_exe = env::current_exe()
+        .map_err(|error| format!("failed to locate current executable: {error}"))?;
 
-    if normalized
+    let host = normalized
         .targets
-        .iter()
-        .any(|target| target.eq_ignore_ascii_case("simulate-failure"))
-    {
-        return Err("probe execution failed for target: simulate-failure".to_string());
+        .first()
+        .cloned()
+        .ok_or_else(|| "at least one target is required".to_string())?;
+
+    let request = normalized_to_probe_request(normalized, host);
+    let plan = build_probe_plan(&request)
+        .map_err(|error| format!("failed to build probe plan: {error}"))?;
+
+    let protocol = if request.tcp {
+        "tcp"
+    } else if request.udp {
+        "udp"
+    } else {
+        "icmp"
+    };
+
+    let targets = vec![plan.validated_host.clone()];
+    let trippy_args = plan.trippy_args;
+
+    let result = tokio::task::spawn_blocking(move || {
+        run_embedded_trippy(
+            &current_exe,
+            &trippy_args,
+            plan.json_output,
+            EMBEDDED_TRIPPY_ENV,
+        )
+    })
+    .await
+    .map_err(|error| format!("probe task panicked: {error}"))?
+    .map_err(|error| format!("probe execution failed: {error}"))?;
+
+    if result.exit_code != 0 {
+        return Err(format!(
+            "probe execution failed with exit code {}",
+            result.exit_code
+        ));
     }
 
     Ok(ProbeExecutionResult {
-        targets: normalized.targets,
-        protocol: match normalized.protocol {
-            ProbeProtocol::Icmp => "icmp",
-            ProbeProtocol::Tcp => "tcp",
-            ProbeProtocol::Udp => "udp",
-        },
+        targets,
+        protocol,
         completed: true,
     })
+}
+
+fn normalized_to_probe_request(
+    normalized: NormalizedCreateProbeRequest,
+    host: String,
+) -> ProbeRequest {
+    ProbeRequest {
+        host,
+        tcp: matches!(normalized.protocol, ProbeProtocol::Tcp),
+        udp: matches!(normalized.protocol, ProbeProtocol::Udp),
+        port: normalized.port,
+        source_port: None,
+        report: true,
+        json_output: None,
+        count: normalized.count.or(Some(1)),
+        interval_seconds: normalized.interval_seconds,
+        timeout_seconds: normalized.timeout_seconds,
+        report_wide: false,
+        no_dns: !normalized.resolve_dns,
+        max_hops: normalized.max_hops,
+        show_asn: normalized.include_asn,
+        dns_lookup_as_info: normalized.include_asn,
+        packet_size: None,
+        src: None,
+        interface: None,
+        ecmp: None,
+        dns_cache_ttl_seconds: None,
+        trippy_flags: None,
+        ui_mode: UiMode::Default,
+        enhanced_ui: EnhancedUiConfig {
+            latency_warn_ms: 100.0,
+            latency_bad_ms: 250.0,
+            loss_warn_pct: 2.0,
+            loss_bad_pct: 5.0,
+            row_coloring: true,
+            sparklines: true,
+            summary: true,
+        },
+        has_enhanced_overrides: false,
+    }
 }
 
 fn update_job_status(

@@ -57,23 +57,37 @@ fn assert_error_shape(body: &serde_json::Value, status: u16, code: &str) {
     assert!(body["error"]["detail"].is_string());
 }
 
-async fn create_probe(
+async fn create_probe_payload(
     client: &reqwest::Client,
     addr: SocketAddr,
-    target: &str,
+    payload: serde_json::Value,
 ) -> serde_json::Value {
     let create_res = client
         .post(format!("http://{addr}/api/v1/probes"))
-        .json(&serde_json::json!({
-            "targets": [target],
-            "protocol": "icmp"
-        }))
+        .json(&payload)
         .send()
         .await
         .expect("create probe request should succeed");
 
     assert_eq!(create_res.status(), reqwest::StatusCode::ACCEPTED);
     create_res.json().await.expect("json body expected")
+}
+
+async fn create_probe(
+    client: &reqwest::Client,
+    addr: SocketAddr,
+    target: &str,
+) -> serde_json::Value {
+    create_probe_payload(
+        client,
+        addr,
+        serde_json::json!({
+            "targets": [target],
+            "protocol": "icmp",
+            "count": 1
+        }),
+    )
+    .await
 }
 
 async fn fetch_probe(client: &reqwest::Client, addr: SocketAddr, id: &str) -> serde_json::Value {
@@ -93,7 +107,7 @@ async fn wait_for_probe_status(
     id: &str,
     expected: &str,
 ) -> serde_json::Value {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         let probe = fetch_probe(client, addr, id).await;
         if probe["data"]["status"] == expected {
@@ -114,7 +128,7 @@ async fn wait_for_terminal_status_with_running_seen(
     id: &str,
     expected_terminal: &str,
 ) -> serde_json::Value {
-    let deadline = Instant::now() + Duration::from_secs(2);
+    let deadline = Instant::now() + Duration::from_secs(10);
     let mut saw_running = false;
 
     loop {
@@ -164,7 +178,7 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
     let (addr, shutdown) = spawn_server().await;
     let client = build_http_client();
 
-    let created = create_probe(&client, addr, "1.1.1.1").await;
+    let created = create_probe(&client, addr, "127.0.0.1").await;
     assert_meta(&created);
     let id = created["data"]["id"]
         .as_str()
@@ -183,7 +197,7 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
 
     assert_meta(&completed);
     assert_eq!(completed["data"]["id"], id);
-    assert_eq!(completed["data"]["result"]["targets"][0], "1.1.1.1");
+    assert_eq!(completed["data"]["result"]["targets"][0], "127.0.0.1");
     assert_eq!(completed["data"]["result"]["protocol"], "icmp");
     assert_eq!(completed["data"]["result"]["completed"], true);
     assert_eq!(completed["data"]["error"], serde_json::Value::Null);
@@ -196,7 +210,7 @@ async fn create_probe_failed_transition_persists_error_details() {
     let (addr, shutdown) = spawn_server().await;
     let client = build_http_client();
 
-    let created = create_probe(&client, addr, "simulate-failure").await;
+    let created = create_probe(&client, addr, "definitely-not-a-real-host.invalid").await;
     assert_meta(&created);
     let id = created["data"]["id"]
         .as_str()
@@ -209,7 +223,7 @@ async fn create_probe_failed_transition_persists_error_details() {
         failed["data"]["error"]
             .as_str()
             .expect("error text should exist")
-            .contains("simulate-failure")
+            .contains("definitely-not-a-real-host.invalid")
     );
 
     let _ = shutdown.send(());
