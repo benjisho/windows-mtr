@@ -40,6 +40,7 @@ enum RequestAuthError {
     MissingApiKeyHeader,
     InvalidApiKey,
     MissingMtlsIdentity,
+    UntrustedMtlsIngress,
 }
 
 impl RequestAuthError {
@@ -62,6 +63,13 @@ impl RequestAuthError {
                 code: "missing_mtls_identity",
                 title: "Authentication required",
                 detail: "mTLS is configured but request identity was not provided by upstream"
+                    .to_string(),
+            },
+            Self::UntrustedMtlsIngress => ApiError {
+                status: StatusCode::FORBIDDEN,
+                code: "untrusted_mtls_ingress",
+                title: "Forbidden",
+                detail: "mTLS identity headers are accepted only from trusted loopback ingress"
                     .to_string(),
             },
         }
@@ -630,11 +638,17 @@ fn enforce_request_auth(
                 Err(RequestAuthError::InvalidApiKey.into_api_error())
             }
         }
-        AuthStrategy::Mtls => headers
-            .get("X-Client-Cert")
-            .or_else(|| headers.get("X-SSL-Client-Verify"))
-            .map(|_| ())
-            .ok_or_else(|| RequestAuthError::MissingMtlsIdentity.into_api_error()),
+        AuthStrategy::Mtls => {
+            if !request_is_loopback {
+                return Err(RequestAuthError::UntrustedMtlsIngress.into_api_error());
+            }
+
+            headers
+                .get("X-Client-Cert")
+                .or_else(|| headers.get("X-SSL-Client-Verify"))
+                .map(|_| ())
+                .ok_or_else(|| RequestAuthError::MissingMtlsIdentity.into_api_error())
+        }
     }
 }
 

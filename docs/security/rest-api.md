@@ -12,7 +12,7 @@ This document defines baseline security assumptions and controls for the impleme
 
 ## Trust boundaries
 
-- **Inbound HTTP boundary**: every request payload and header is untrusted.
+- **Inbound HTTP boundary**: every request payload and header is untrusted unless it is injected by a trusted local ingress.
 - **Network target boundary**: target hostnames/IPs/ports are attacker-controlled input.
 - **Execution boundary**: probe runtime can generate privileged network activity and must be constrained.
 
@@ -23,7 +23,7 @@ This document defines baseline security assumptions and controls for the impleme
 2. **Non-local deployments**: explicit authentication is required.
    - Choose one of:
      - **API key** (`X-API-Key`) for simple service-to-service deployments.
-     - **mTLS** for environments with certificate-based workload identity.
+     - **mTLS** for environments with certificate-based workload identity via a trusted ingress that terminates TLS.
 3. **Prohibited**: non-local bind with no authentication.
 
 ## Secure defaults
@@ -79,6 +79,23 @@ All untrusted request fields MUST be validated before probe execution:
 - Add perimeter controls (firewall/ingress allow-list) even when auth is enabled.
 - Monitor 413/429 rates for abuse or client misconfiguration.
 
+## Trusted ingress requirements for `--api-auth mtls`
+
+In v1.x, windows-mtr does **not** terminate TLS itself. `--api-auth mtls` is designed for a trusted reverse proxy / ingress pattern:
+
+1. External clients establish mTLS to the ingress.
+2. The ingress validates client certificates and rejects unauthenticated clients.
+3. The ingress forwards requests to windows-mtr over loopback/private transport and injects identity headers (`X-Client-Cert` or `X-SSL-Client-Verify`).
+4. windows-mtr accepts those identity headers **only** from loopback ingress sources.
+
+Header sanitization is mandatory at ingress boundaries:
+
+- Strip inbound `X-Client-Cert` and `X-SSL-Client-Verify` from untrusted external requests before auth evaluation.
+- Re-add those headers only after successful client certificate validation.
+- Deny direct client access to the backend listener so callers cannot bypass ingress policy.
+
+For native TLS in windows-mtr (direct TLS+mTLS termination in-process), track that as a separate v1.x implementation path. Do not overload current header-based ingress mode.
+
 ## CLI examples for secure remote bind
 
 ```bash
@@ -88,7 +105,7 @@ mtr --api
 # Remote bind with API key loaded from environment (preferred)
 WINDOWS_MTR_API_KEY='replace-me' mtr --api --api-bind 0.0.0.0:4000 --api-auth api-key --api-key-env WINDOWS_MTR_API_KEY
 
-# Remote bind with mTLS (identity header provided by trusted TLS terminator)
+# Remote bind with mTLS (identity headers supplied by trusted local ingress)
 mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 ```
 
