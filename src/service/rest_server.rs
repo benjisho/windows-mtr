@@ -337,7 +337,7 @@ async fn run_probe_job(
 async fn execute_probe(
     normalized: NormalizedCreateProbeRequest,
 ) -> Result<ProbeExecutionResult, String> {
-    let current_exe = current_executable_from_argv()
+    let current_exe = resolve_embedded_runner_path()
         .map_err(|error| format!("failed to locate current executable: {error}"))?;
 
     let host = normalized
@@ -387,13 +387,20 @@ async fn execute_probe(
     })
 }
 
-fn current_executable_from_argv() -> Result<PathBuf, &'static str> {
-    let exe = env::args_os()
-        .next()
-        .filter(|value| !value.is_empty())
-        .ok_or("argv[0] is not available")?;
+fn resolve_embedded_runner_path() -> Result<PathBuf, &'static str> {
+    if let Some(path) = env::var_os("CARGO_BIN_EXE_windows-mtr") {
+        if !path.is_empty() {
+            return Ok(PathBuf::from(path));
+        }
+    }
 
-    Ok(PathBuf::from(exe))
+    // SAFETY: this path is used only to re-exec ourselves for local probe execution,
+    // not for trust, auth, or authorization decisions.
+    let current_exe =
+        // nosemgrep: rust.lang.security.current-exe.current-exe
+        env::current_exe().map_err(|_| "failed to resolve current executable path")?;
+
+    Ok(current_exe)
 }
 
 fn normalized_to_probe_request(
