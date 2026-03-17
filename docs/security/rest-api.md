@@ -79,7 +79,6 @@ All untrusted request fields MUST be validated before probe execution:
 - Add perimeter controls (firewall/ingress allow-list) even when auth is enabled.
 - Monitor 413/429 rates for abuse or client misconfiguration.
 
-
 ## CLI examples for secure remote bind
 
 ```bash
