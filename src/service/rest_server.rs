@@ -399,7 +399,11 @@ async fn execute_probe(
 }
 
 fn probe_runner_path_from_env() -> PathBuf {
-    for key in ["CARGO_BIN_EXE_windows-mtr", "CARGO_BIN_EXE_windows_mtr"] {
+    for key in [
+        "CARGO_BIN_EXE_mtr",
+        "CARGO_BIN_EXE_windows-mtr",
+        "CARGO_BIN_EXE_windows_mtr",
+    ] {
         if let Some(path) = env::var_os(key)
             && !path.is_empty()
         {
