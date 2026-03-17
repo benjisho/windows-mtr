@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::env;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -336,12 +337,8 @@ async fn run_probe_job(
 async fn execute_probe(
     normalized: NormalizedCreateProbeRequest,
 ) -> Result<ProbeExecutionResult, String> {
-    // SAFETY: this path is used only to re-exec ourselves for local probe execution,
-    // not for trust, auth, or authorization decisions.
-    let current_exe =
-        // nosemgrep: rust.lang.security.current-exe.current-exe
-        env::current_exe()
-            .map_err(|error| format!("failed to locate current executable: {error}"))?;
+    let current_exe = current_executable_from_argv()
+        .map_err(|error| format!("failed to locate current executable: {error}"))?;
 
     let host = normalized
         .targets
@@ -388,6 +385,15 @@ async fn execute_probe(
         protocol,
         completed: true,
     })
+}
+
+fn current_executable_from_argv() -> Result<PathBuf, &'static str> {
+    let exe = env::args_os()
+        .next()
+        .filter(|value| !value.is_empty())
+        .ok_or("argv[0] is not available")?;
+
+    Ok(PathBuf::from(exe))
 }
 
 fn normalized_to_probe_request(
