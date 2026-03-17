@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use anyhow::{Context, anyhow};
 use axum::body::{Body, to_bytes};
@@ -336,8 +336,12 @@ async fn run_probe_job(
 async fn execute_probe(
     normalized: NormalizedCreateProbeRequest,
 ) -> Result<ProbeExecutionResult, String> {
-    let current_exe = env::current_exe()
-        .map_err(|error| format!("failed to locate current executable: {error}"))?;
+    // SAFETY: this path is used only to re-exec ourselves for local probe execution,
+    // not for trust, auth, or authorization decisions.
+    let current_exe =
+        // nosemgrep: rust.lang.security.current-exe.current-exe
+        env::current_exe()
+            .map_err(|error| format!("failed to locate current executable: {error}"))?;
 
     let host = normalized
         .targets
