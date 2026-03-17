@@ -89,7 +89,8 @@ async fn create_probe(
         addr,
         serde_json::json!({
             "targets": [target],
-            "protocol": "icmp",
+            "protocol": "tcp",
+            "port": 443,
             "count": 1
         }),
     )
@@ -204,7 +205,7 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
     assert_meta(&completed);
     assert_eq!(completed["data"]["id"], id);
     assert_eq!(completed["data"]["result"]["targets"][0], "127.0.0.1");
-    assert_eq!(completed["data"]["result"]["protocol"], "icmp");
+    assert_eq!(completed["data"]["result"]["protocol"], "tcp");
     assert_eq!(completed["data"]["result"]["completed"], true);
     assert_eq!(completed["data"]["error"], serde_json::Value::Null);
 
