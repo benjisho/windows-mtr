@@ -101,7 +101,7 @@ Windows MTR is built with enterprise-level security practices:
 For REST API mode (`mtr --api`), the enforced security baseline is:
 
 - Default bind address: `127.0.0.1:3000` (localhost only, enforced)
-- Non-local bind requires explicit opt-in + authentication (`X-API-Key` or mTLS)
+- Non-local bind requires explicit auth strategy (`--api-auth api-key|mtls`) and secure key handling (`--api-key-env` preferred for `api-key`)
 - Default request timeout: `10s`
 - Max concurrent probes: `8`
 - Max targets per request: `8`
@@ -233,8 +233,14 @@ mtr -T -P 443 example.com
 # Start API server on localhost (default 127.0.0.1:3000)
 mtr --api
 
-# Start API server on a specific bind address
+# Start API server on a specific localhost bind
 mtr --api --api-bind 127.0.0.1:4000
+
+# Secure remote bind with API key from environment (preferred)
+WINDOWS_MTR_API_KEY='replace-me' mtr --api --api-bind 0.0.0.0:4000 --api-auth api-key --api-key-env WINDOWS_MTR_API_KEY
+
+# Secure remote bind with mTLS identity forwarding
+mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 ```
 
 ### Full Usage Examples

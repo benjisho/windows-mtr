@@ -3,7 +3,7 @@ use clap::{Args, Parser, ValueEnum};
 use std::env;
 use std::net::{IpAddr, SocketAddr};
 use std::process;
-use windows_mtr::service::rest_api::RestApiConfig;
+use windows_mtr::service::rest_api::{AuthStrategy, RestApiConfig};
 use windows_mtr::service::rest_server::run_rest_api_server;
 use windows_mtr::service::{
     EnhancedUiConfig, JsonOutput, ProbeError, ProbeRequest, UiMode, build_probe_plan,
@@ -35,6 +35,22 @@ struct Cli {
     /// Bind address for API mode
     #[arg(long = "api-bind", value_name = "ADDR")]
     api_bind: Option<SocketAddr>,
+
+    /// REST API authentication strategy [none-local-only|api-key|mtls]
+    #[arg(long = "api-auth", value_enum, value_name = "STRATEGY")]
+    api_auth: Option<ApiAuthPreset>,
+
+    /// Inline API key for `--api-auth api-key` (prefer --api-key-env for safety)
+    #[arg(long = "api-key", value_name = "KEY", conflicts_with = "api_key_env")]
+    api_key: Option<String>,
+
+    /// Environment variable name that stores API key for `--api-auth api-key`
+    #[arg(
+        long = "api-key-env",
+        value_name = "ENV_VAR",
+        conflicts_with = "api_key"
+    )]
+    api_key_env: Option<String>,
 
     #[command(flatten)]
     trace: TraceCli,
@@ -179,6 +195,13 @@ enum OnOff {
     Off,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum ApiAuthPreset {
+    ApiKey,
+    Mtls,
+    NoneLocalOnly,
+}
+
 impl OnOff {
     fn as_bool(self) -> bool {
         matches!(self, Self::On)
@@ -201,6 +224,65 @@ fn should_print_banner(args: &Cli) -> bool {
 
 fn print_banner() {
     println!("windows-mtr by Benji Shohet (benjisho) — https://github.com/benjisho/windows-mtr");
+}
+
+fn auth_strategy_from_cli(value: ApiAuthPreset) -> AuthStrategy {
+    match value {
+        ApiAuthPreset::ApiKey => AuthStrategy::ApiKey,
+        ApiAuthPreset::Mtls => AuthStrategy::Mtls,
+        ApiAuthPreset::NoneLocalOnly => AuthStrategy::NoneLocalOnly,
+    }
+}
+
+fn api_key_from_cli(args: &Cli) -> anyhow::Result<Option<String>> {
+    if let Some(env_name) = &args.api_key_env {
+        let raw = env::var(env_name).with_context(|| {
+            format!(
+                "--api-key-env was set to `{env_name}`, but that environment variable is not present"
+            )
+        })?;
+
+        let key = raw.trim().to_string();
+        if key.is_empty() {
+            anyhow::bail!(
+                "--api-key-env was set to `{env_name}`, but that environment variable is empty"
+            );
+        }
+
+        return Ok(Some(key));
+    }
+
+    Ok(args.api_key.clone())
+}
+
+fn apply_rest_api_cli_overrides(args: &Cli, config: &mut RestApiConfig) -> anyhow::Result<()> {
+    if let Some(bind) = args.api_bind {
+        config.bind_addr = bind;
+    }
+
+    if let Some(auth) = args.api_auth {
+        config.auth_strategy = auth_strategy_from_cli(auth);
+    }
+
+    if !config.bind_addr.ip().is_loopback() {
+        config.allow_non_local_bind = true;
+    }
+
+    let api_key = api_key_from_cli(args)?;
+    if api_key.is_some() && config.auth_strategy != AuthStrategy::ApiKey {
+        anyhow::bail!(
+            "API key input (--api-key/--api-key-env) requires '--api-auth api-key'; current strategy is '{:?}'",
+            config.auth_strategy
+        );
+    }
+    if config.auth_strategy == AuthStrategy::ApiKey && api_key.is_none() {
+        anyhow::bail!(
+            "'--api-auth api-key' requires key input via '--api-key-env <ENV_VAR>' (preferred) or '--api-key <KEY>'"
+        );
+    }
+
+    config.api_key = api_key;
+    Ok(())
 }
 
 fn ui_mode_from_cli(ui: UiPreset) -> UiMode {
@@ -282,13 +364,12 @@ fn main() -> anyhow::Result<()> {
 
     if args.api {
         let mut config = RestApiConfig::default();
-        if let Some(bind) = args.api_bind {
-            config.bind_addr = bind;
-        }
+        apply_rest_api_cli_overrides(&args, &mut config)?;
+
         config
             .validate_security_defaults()
             .map_err(|e| anyhow::anyhow!(
-                "invalid REST API security configuration: {e}. Action: keep localhost defaults or set --api-bind with a secure auth strategy in config"
+                "invalid REST API security configuration: {e}. Action: for remote binds, set '--api-bind 0.0.0.0:PORT --api-auth api-key --api-key-env <ENV_VAR>' or '--api-auth mtls'; keep default localhost when unauthenticated"
             ))?;
 
         let runtime = tokio::runtime::Runtime::new().context("failed to start tokio runtime")?;
@@ -343,6 +424,64 @@ mod tests {
         let cli = Cli::try_parse_from(["mtr", "--api", "--api-bind", "127.0.0.1:4000"])
             .expect("api bind should parse");
         assert_eq!(cli.api_bind, Some("127.0.0.1:4000".parse().unwrap()));
+    }
+
+    #[test]
+    fn cli_parses_api_auth_with_api_key_env() {
+        let cli = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-bind",
+            "0.0.0.0:4000",
+            "--api-auth",
+            "api-key",
+            "--api-key-env",
+            "WINDOWS_MTR_API_KEY",
+        ])
+        .expect("api auth flags should parse");
+
+        assert_eq!(cli.api_auth, Some(ApiAuthPreset::ApiKey));
+        assert_eq!(cli.api_key_env.as_deref(), Some("WINDOWS_MTR_API_KEY"));
+    }
+
+    #[test]
+    fn cli_rejects_api_key_sources_used_together() {
+        let err = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-auth",
+            "api-key",
+            "--api-key",
+            "secret",
+            "--api-key-env",
+            "WINDOWS_MTR_API_KEY",
+        ])
+        .expect_err("clap should reject conflicting API key inputs");
+
+        assert!(err.to_string().contains("cannot be used with"));
+    }
+
+    #[test]
+    fn api_mode_rejects_non_api_key_auth_with_key_input() {
+        let cli =
+            Cli::try_parse_from(["mtr", "--api", "--api-auth", "mtls", "--api-key", "secret"])
+                .expect("flags should parse for validation test");
+
+        let mut config = RestApiConfig::default();
+        let err = apply_rest_api_cli_overrides(&cli, &mut config)
+            .expect_err("key input with mtls should fail validation");
+        assert!(err.to_string().contains("requires '--api-auth api-key'"));
+    }
+
+    #[test]
+    fn api_mode_rejects_missing_api_key_for_api_key_auth() {
+        let cli = Cli::try_parse_from(["mtr", "--api", "--api-auth", "api-key"])
+            .expect("flags should parse for validation test");
+
+        let mut config = RestApiConfig::default();
+        let err = apply_rest_api_cli_overrides(&cli, &mut config)
+            .expect_err("api-key auth without key should fail validation");
+        assert!(err.to_string().contains("requires key input"));
     }
 
     #[test]

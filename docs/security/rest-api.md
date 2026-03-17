@@ -79,6 +79,20 @@ All untrusted request fields MUST be validated before probe execution:
 - Add perimeter controls (firewall/ingress allow-list) even when auth is enabled.
 - Monitor 413/429 rates for abuse or client misconfiguration.
 
+
+## CLI examples for secure remote bind
+
+```bash
+# Local-only default (no auth required)
+mtr --api
+
+# Remote bind with API key loaded from environment (preferred)
+WINDOWS_MTR_API_KEY='replace-me' mtr --api --api-bind 0.0.0.0:4000 --api-auth api-key --api-key-env WINDOWS_MTR_API_KEY
+
+# Remote bind with mTLS (identity header provided by trusted TLS terminator)
+mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
+```
+
 ## Industry baseline alignment
 
 This v1 model aligns with common API hardening guidance:
