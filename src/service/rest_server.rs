@@ -81,6 +81,14 @@ pub struct ProbeExecutionResult {
     pub targets: Vec<String>,
     pub protocol: &'static str,
     pub completed: bool,
+    pub target_results: Vec<ProbeTargetExecutionResult>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProbeTargetExecutionResult {
+    pub target: String,
+    pub success: bool,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -359,50 +367,93 @@ async fn execute_probe(
     normalized: NormalizedCreateProbeRequest,
     probe_runner_path: Arc<PathBuf>,
 ) -> Result<ProbeExecutionResult, String> {
-    let host = normalized
-        .targets
-        .first()
-        .cloned()
-        .ok_or_else(|| "at least one target is required".to_string())?;
+    if normalized.targets.is_empty() {
+        return Err("at least one target is required".to_string());
+    }
 
-    let request = normalized_to_probe_request(normalized, host);
-    let plan = build_probe_plan(&request)
-        .map_err(|error| format!("failed to build probe plan: {error}"))?;
-
-    let protocol = if request.tcp {
-        "tcp"
-    } else if request.udp {
-        "udp"
-    } else {
-        "icmp"
+    let protocol = match normalized.protocol {
+        ProbeProtocol::Tcp => "tcp",
+        ProbeProtocol::Udp => "udp",
+        ProbeProtocol::Icmp => "icmp",
     };
 
-    let targets = vec![plan.validated_host.clone()];
-    let trippy_args = plan.trippy_args;
+    let mut targets = Vec::with_capacity(normalized.targets.len());
+    let mut target_results = Vec::with_capacity(normalized.targets.len());
 
-    let result = tokio::task::spawn_blocking(move || {
-        run_embedded_trippy(
-            probe_runner_path.as_ref(),
-            &trippy_args,
-            plan.json_output,
-            EMBEDDED_TRIPPY_ENV,
-        )
-    })
-    .await
-    .map_err(|error| format!("probe task panicked: {error}"))?
-    .map_err(|error| format!("probe execution failed: {error}"))?;
+    for host in &normalized.targets {
+        let request = normalized_to_probe_request(&normalized, host.clone());
+        let plan = match build_probe_plan(&request) {
+            Ok(plan) => plan,
+            Err(error) => {
+                target_results.push(ProbeTargetExecutionResult {
+                    target: host.clone(),
+                    success: false,
+                    error: Some(format!("failed to build probe plan: {error}")),
+                });
+                targets.push(host.clone());
+                continue;
+            }
+        };
 
-    if result.exit_code != 0 {
-        return Err(format!(
-            "probe execution failed with exit code {}",
-            result.exit_code
-        ));
+        let validated_target = plan.validated_host.clone();
+        let trippy_args = plan.trippy_args;
+        let json_output = plan.json_output;
+        let runner_path = probe_runner_path.clone();
+
+        let probe_result = tokio::task::spawn_blocking(move || {
+            run_embedded_trippy(
+                runner_path.as_ref(),
+                &trippy_args,
+                json_output,
+                EMBEDDED_TRIPPY_ENV,
+            )
+        })
+        .await;
+
+        match probe_result {
+            Ok(Ok(result)) if result.exit_code == 0 => {
+                targets.push(validated_target.clone());
+                target_results.push(ProbeTargetExecutionResult {
+                    target: validated_target,
+                    success: true,
+                    error: None,
+                });
+            }
+            Ok(Ok(result)) => {
+                targets.push(validated_target.clone());
+                target_results.push(ProbeTargetExecutionResult {
+                    target: validated_target,
+                    success: false,
+                    error: Some(format!(
+                        "probe execution failed with exit code {}",
+                        result.exit_code
+                    )),
+                });
+            }
+            Ok(Err(error)) => {
+                targets.push(validated_target.clone());
+                target_results.push(ProbeTargetExecutionResult {
+                    target: validated_target,
+                    success: false,
+                    error: Some(format!("probe execution failed: {error}")),
+                });
+            }
+            Err(error) => {
+                targets.push(validated_target.clone());
+                target_results.push(ProbeTargetExecutionResult {
+                    target: validated_target,
+                    success: false,
+                    error: Some(format!("probe task panicked: {error}")),
+                });
+            }
+        }
     }
 
     Ok(ProbeExecutionResult {
         targets,
         protocol,
-        completed: true,
+        completed: target_results.iter().all(|result| result.success),
+        target_results,
     })
 }
 
@@ -432,7 +483,7 @@ fn probe_runner_path_from_current_exe() -> Result<PathBuf, &'static str> {
 }
 
 fn normalized_to_probe_request(
-    normalized: NormalizedCreateProbeRequest,
+    normalized: &NormalizedCreateProbeRequest,
     host: String,
 ) -> ProbeRequest {
     ProbeRequest {

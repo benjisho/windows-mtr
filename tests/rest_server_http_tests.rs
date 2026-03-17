@@ -245,6 +245,18 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
             assert_eq!(terminal["data"]["result"]["targets"][0], "127.0.0.1");
             assert_eq!(terminal["data"]["result"]["protocol"], "tcp");
             assert_eq!(terminal["data"]["result"]["completed"], true);
+            assert_eq!(
+                terminal["data"]["result"]["target_results"][0]["target"],
+                "127.0.0.1"
+            );
+            assert_eq!(
+                terminal["data"]["result"]["target_results"][0]["success"],
+                true
+            );
+            assert_eq!(
+                terminal["data"]["result"]["target_results"][0]["error"],
+                serde_json::Value::Null
+            );
             assert_eq!(terminal["data"]["error"], serde_json::Value::Null);
         }
         Some("failed") => {
@@ -258,6 +270,97 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
         }
         status => panic!("unexpected terminal status: {status:?}, probe={terminal}"),
     }
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn create_probe_multi_target_response_includes_all_targets() {
+    let (addr, shutdown) = spawn_server().await;
+    let client = build_http_client();
+
+    let created = create_probe_payload(
+        &client,
+        addr,
+        serde_json::json!({
+            "targets": ["127.0.0.1", "localhost"],
+            "protocol": "icmp",
+            "count": 1
+        }),
+    )
+    .await;
+
+    let id = created["data"]["id"]
+        .as_str()
+        .expect("id should be a string");
+
+    let terminal = wait_for_probe_status(&client, addr, id, "completed").await;
+    let target_results = terminal["data"]["result"]["target_results"]
+        .as_array()
+        .expect("target_results should be an array");
+
+    assert_eq!(target_results.len(), 2);
+    assert_eq!(target_results[0]["target"], "127.0.0.1");
+    assert_eq!(target_results[1]["target"], "localhost");
+
+    assert!(target_results[0]["success"].is_boolean());
+    assert!(target_results[1]["success"].is_boolean());
+
+    assert_eq!(
+        terminal["data"]["result"]["targets"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn create_probe_multi_target_response_tracks_per_target_failures() {
+    let (addr, shutdown) = spawn_server().await;
+    let client = build_http_client();
+
+    let created = create_probe_payload(
+        &client,
+        addr,
+        serde_json::json!({
+            "targets": ["127.0.0.1", "definitely-not-a-real-host.invalid"],
+            "protocol": "icmp",
+            "count": 1
+        }),
+    )
+    .await;
+
+    let id = created["data"]["id"]
+        .as_str()
+        .expect("id should be a string");
+
+    let terminal = wait_for_probe_status(&client, addr, id, "completed").await;
+
+    assert_eq!(terminal["data"]["result"]["completed"], false);
+    assert_eq!(terminal["data"]["error"], serde_json::Value::Null);
+
+    let target_results = terminal["data"]["result"]["target_results"]
+        .as_array()
+        .expect("target_results should be an array");
+    assert_eq!(target_results.len(), 2);
+
+    assert_eq!(target_results[0]["target"], "127.0.0.1");
+    assert!(target_results[0]["success"].is_boolean());
+
+    assert_eq!(
+        target_results[1]["target"],
+        "definitely-not-a-real-host.invalid"
+    );
+    assert_eq!(target_results[1]["success"], false);
+    assert!(
+        target_results[1]["error"]
+            .as_str()
+            .unwrap()
+            .contains("definitely-not-a-real-host.invalid")
+    );
 
     let _ = shutdown.send(());
 }

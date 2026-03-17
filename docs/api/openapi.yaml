@@ -482,42 +482,66 @@ components:
           type: integer
           minimum: 0
       additionalProperties: false
+    ProbeTargetExecutionResult:
+      type: object
+      required:
+        - target
+        - success
+      properties:
+        target:
+          type: string
+          description: Normalized target value that was executed.
+        success:
+          type: boolean
+          description: Whether probe execution succeeded for this target.
+        error:
+          type: string
+          nullable: true
+          description: Failure details for this target when success is false.
+      additionalProperties: false
+    ProbeExecutionResult:
+      type: object
+      required:
+        - targets
+        - protocol
+        - completed
+        - target_results
+      properties:
+        targets:
+          type: array
+          items:
+            type: string
+          description: Deterministic ordered list of normalized targets processed by this job.
+        protocol:
+          type: string
+          enum: [icmp, tcp, udp]
+        completed:
+          type: boolean
+          description: True only when all target executions succeeded.
+        target_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProbeTargetExecutionResult'
+          description: Per-target probe execution outcome in request order.
+      additionalProperties: false
     ProbeResultData:
       type: object
       required:
         - id
-        - target
-        - protocol
         - status
-        - hops
-        - summary
       properties:
         id:
           type: string
-        target:
-          type: string
-        protocol:
-          type: string
-          enum: [icmp, tcp, udp]
-        port:
-          type: integer
-          minimum: 1
-          maximum: 65535
         status:
           type: string
-          enum: [pending, running, completed, failed]
-        started_at:
+          enum: [queued, running, completed, failed]
+        result:
+          allOf:
+            - $ref: '#/components/schemas/ProbeExecutionResult'
+          nullable: true
+        error:
           type: string
-          format: date-time
-        completed_at:
-          type: string
-          format: date-time
-        hops:
-          type: array
-          items:
-            $ref: '#/components/schemas/HopResult'
-        summary:
-          $ref: '#/components/schemas/ProbeSummary'
+          nullable: true
       additionalProperties: false
     GetProbeResponse:
       type: object
