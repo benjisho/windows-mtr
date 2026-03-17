@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::service::rest_api::{CreateProbeApiRequest, ProbeProtocol};
-use crate::service::rest_server::{ProbeExecutionResult, ProbeJob, ProbeJobStatus};
+use crate::service::rest_server::{
+    ProbeExecutionResult, ProbeJob, ProbeJobStatus, ProbeTargetExecutionResult,
+};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CreateProbeRequestDto {
@@ -101,6 +103,24 @@ pub struct ProbeExecutionResultDto {
     pub targets: Vec<String>,
     pub protocol: &'static str,
     pub completed: bool,
+    pub target_results: Vec<ProbeTargetExecutionResultDto>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProbeTargetExecutionResultDto {
+    pub target: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+impl From<ProbeTargetExecutionResult> for ProbeTargetExecutionResultDto {
+    fn from(value: ProbeTargetExecutionResult) -> Self {
+        Self {
+            target: value.target,
+            success: value.success,
+            error: value.error,
+        }
+    }
 }
 
 impl From<ProbeExecutionResult> for ProbeExecutionResultDto {
@@ -109,6 +129,7 @@ impl From<ProbeExecutionResult> for ProbeExecutionResultDto {
             targets: value.targets,
             protocol: value.protocol,
             completed: value.completed,
+            target_results: value.target_results.into_iter().map(Into::into).collect(),
         }
     }
 }
