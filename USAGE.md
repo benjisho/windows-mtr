@@ -145,8 +145,14 @@ Use API mode from the main binary and keep these defaults unless you have a revi
 # Start API server on default localhost bind
 mtr --api
 
-# Override bind address (security validation still applies)
+# Override bind address on localhost
 mtr --api --api-bind 127.0.0.1:4000
+
+# Secure remote bind with API key from environment (preferred)
+WINDOWS_MTR_API_KEY='replace-me' mtr --api --api-bind 0.0.0.0:4000 --api-auth api-key --api-key-env WINDOWS_MTR_API_KEY
+
+# Secure remote bind with mTLS
+mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 ```
 
 - Bind to `127.0.0.1:3000` by default
@@ -158,7 +164,8 @@ mtr --api --api-bind 127.0.0.1:4000
 
 Authentication enforcement in v1:
 - Local-only bind: `none-local-only` is acceptable
-- Non-local bind: require `X-API-Key` or mTLS
+- Non-local bind: require explicit `--api-auth api-key|mtls`
+- For `api-key`, prefer `--api-key-env <ENV_VAR>` over inline `--api-key` to avoid exposing secrets in shell history
 
 Input validation before probe execution:
 - Hostnames/IPs normalized and validated
