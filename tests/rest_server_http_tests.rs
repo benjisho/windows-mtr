@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use tokio::net::TcpListener;
@@ -6,6 +7,10 @@ use tokio::sync::oneshot;
 use tokio::time::{Instant, sleep};
 use windows_mtr::service::rest_api::{AuthStrategy, RestApiConfig};
 use windows_mtr::service::rest_server::{RestServerState, build_router};
+
+fn probe_runner_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_mtr"))
+}
 
 fn build_http_client() -> reqwest::Client {
     reqwest::Client::builder()
@@ -21,7 +26,8 @@ async fn spawn_server_with_config(mut config: RestApiConfig) -> (SocketAddr, one
     let addr = listener.local_addr().expect("local addr should resolve");
 
     config.bind_addr = addr;
-    let state = RestServerState::new(config).expect("state should initialize");
+    let state = RestServerState::new_with_probe_runner(config, probe_runner_path())
+        .expect("state should initialize");
     let app = build_router(state);
 
     let (tx, rx) = oneshot::channel();
