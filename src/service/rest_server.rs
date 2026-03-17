@@ -113,10 +113,18 @@ pub struct RestServerState {
     probe_rate_limiter: Arc<Mutex<FixedWindowRateLimiter>>,
     store: Arc<Mutex<ProbeStore>>,
     next_id: Arc<AtomicU64>,
+    probe_runner_path: Arc<PathBuf>,
 }
 
 impl RestServerState {
     pub fn new(config: RestApiConfig) -> Result<Self, RestApiValidationError> {
+        Self::new_with_probe_runner(config, probe_runner_path_from_env())
+    }
+
+    pub fn new_with_probe_runner(
+        config: RestApiConfig,
+        probe_runner_path: PathBuf,
+    ) -> Result<Self, RestApiValidationError> {
         let gate = Arc::new(ProbeConcurrencyGate::new(config.max_concurrent_probes)?);
         let limiter = Arc::new(Mutex::new(FixedWindowRateLimiter::new(
             config.max_concurrent_probes,
@@ -132,6 +140,7 @@ impl RestServerState {
                 jobs: HashMap::new(),
             })),
             next_id: Arc::new(AtomicU64::new(1)),
+            probe_runner_path: Arc::new(probe_runner_path),
         })
     }
 
@@ -193,8 +202,12 @@ pub async fn run_rest_api_server(config: RestApiConfig) -> anyhow::Result<()> {
         .map_err(|e| anyhow!("REST API configuration error: {e}"))
         .context("failed to validate REST API security defaults")?;
 
-    let state = RestServerState::new(config.clone())
-        .map_err(|e| anyhow!("failed to initialize REST API runtime state: {e}"))?;
+    let state = RestServerState::new_with_probe_runner(
+        config.clone(),
+        probe_runner_path_from_current_exe()
+            .map_err(|e| anyhow!("failed to resolve probe runner path: {e}"))?,
+    )
+    .map_err(|e| anyhow!("failed to initialize REST API runtime state: {e}"))?;
     let app = build_router(state);
 
     let listener = TcpListener::bind(config.bind_addr)
@@ -310,7 +323,7 @@ async fn run_probe_job(
         return;
     }
 
-    match execute_probe(normalized).await {
+    match execute_probe(normalized, state.probe_runner_path.clone()).await {
         Ok(result) => {
             if let Err(error) =
                 update_job_status(&state, &id, ProbeJobStatus::Completed, Some(result), None)
@@ -336,10 +349,8 @@ async fn run_probe_job(
 
 async fn execute_probe(
     normalized: NormalizedCreateProbeRequest,
+    probe_runner_path: Arc<PathBuf>,
 ) -> Result<ProbeExecutionResult, String> {
-    let current_exe = resolve_embedded_runner_path()
-        .map_err(|error| format!("failed to locate current executable: {error}"))?;
-
     let host = normalized
         .targets
         .first()
@@ -363,7 +374,7 @@ async fn execute_probe(
 
     let result = tokio::task::spawn_blocking(move || {
         run_embedded_trippy(
-            &current_exe,
+            probe_runner_path.as_ref(),
             &trippy_args,
             plan.json_output,
             EMBEDDED_TRIPPY_ENV,
@@ -387,20 +398,25 @@ async fn execute_probe(
     })
 }
 
-fn resolve_embedded_runner_path() -> Result<PathBuf, &'static str> {
-    if let Some(path) = env::var_os("CARGO_BIN_EXE_windows-mtr") {
-        if !path.is_empty() {
-            return Ok(PathBuf::from(path));
+fn probe_runner_path_from_env() -> PathBuf {
+    for key in ["CARGO_BIN_EXE_windows-mtr", "CARGO_BIN_EXE_windows_mtr"] {
+        if let Some(path) = env::var_os(key) {
+            if !path.is_empty() {
+                return PathBuf::from(path);
+            }
         }
     }
 
+    PathBuf::from("windows-mtr")
+}
+
+fn probe_runner_path_from_current_exe() -> Result<PathBuf, &'static str> {
     // SAFETY: this path is used only to re-exec ourselves for local probe execution,
     // not for trust, auth, or authorization decisions.
-    let current_exe =
+    let path =
         // nosemgrep: rust.lang.security.current-exe.current-exe
         env::current_exe().map_err(|_| "failed to resolve current executable path")?;
-
-    Ok(current_exe)
+    Ok(path)
 }
 
 fn normalized_to_probe_request(
