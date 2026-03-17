@@ -8,7 +8,7 @@ use axum::http::Request;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::time::{Instant, sleep};
-use tower::ServiceExt;
+use tower::util::ServiceExt;
 use windows_mtr::service::rest_api::{AuthStrategy, RestApiConfig};
 use windows_mtr::service::rest_server::{RestServerState, build_router};
 
@@ -81,12 +81,13 @@ async fn request_health_with_connect_info(
         request_builder = request_builder.header(name, value);
     }
 
-    let request = request_builder
+    let mut request = request_builder
         .body(Body::empty())
         .expect("request should build");
+    request.extensions_mut().insert(ConnectInfo(remote_addr));
 
     let response = app
-        .oneshot(request.with_extension(ConnectInfo(remote_addr)))
+        .oneshot(request)
         .await
         .expect("router should handle request");
 
