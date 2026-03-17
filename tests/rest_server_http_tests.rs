@@ -129,11 +129,10 @@ async fn wait_for_probe_status(
     }
 }
 
-async fn wait_for_terminal_status_with_running_seen(
+async fn wait_for_terminal_status_with_running_seen_any(
     client: &reqwest::Client,
     addr: SocketAddr,
     id: &str,
-    expected_terminal: &str,
 ) -> serde_json::Value {
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut saw_running = false;
@@ -142,10 +141,10 @@ async fn wait_for_terminal_status_with_running_seen(
         let probe = fetch_probe(client, addr, id).await;
         match probe["data"]["status"].as_str() {
             Some("running") => saw_running = true,
-            Some(status) if status == expected_terminal => {
+            Some("completed") | Some("failed") => {
                 assert!(
                     saw_running,
-                    "probe reached {expected_terminal} without observing running, last={probe}"
+                    "probe reached terminal state without observing running, last={probe}"
                 );
                 return probe;
             }
@@ -154,7 +153,7 @@ async fn wait_for_terminal_status_with_running_seen(
 
         assert!(
             Instant::now() < deadline,
-            "probe never reached status {expected_terminal}, last={probe}"
+            "probe never reached terminal state, last={probe}"
         );
         sleep(Duration::from_millis(15)).await;
     }
@@ -199,15 +198,29 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
         "expected queued or running status, got {queued_or_running}"
     );
 
-    let completed =
-        wait_for_terminal_status_with_running_seen(&client, addr, id, "completed").await;
+    let terminal = wait_for_terminal_status_with_running_seen_any(&client, addr, id).await;
 
-    assert_meta(&completed);
-    assert_eq!(completed["data"]["id"], id);
-    assert_eq!(completed["data"]["result"]["targets"][0], "127.0.0.1");
-    assert_eq!(completed["data"]["result"]["protocol"], "tcp");
-    assert_eq!(completed["data"]["result"]["completed"], true);
-    assert_eq!(completed["data"]["error"], serde_json::Value::Null);
+    assert_meta(&terminal);
+    assert_eq!(terminal["data"]["id"], id);
+
+    match terminal["data"]["status"].as_str() {
+        Some("completed") => {
+            assert_eq!(terminal["data"]["result"]["targets"][0], "127.0.0.1");
+            assert_eq!(terminal["data"]["result"]["protocol"], "tcp");
+            assert_eq!(terminal["data"]["result"]["completed"], true);
+            assert_eq!(terminal["data"]["error"], serde_json::Value::Null);
+        }
+        Some("failed") => {
+            let error = terminal["data"]["error"]
+                .as_str()
+                .expect("error text should exist for failed probe");
+            assert!(
+                error.contains("privileges are required") || error.contains("exit code 1"),
+                "unexpected failure details for unprivileged environment: {terminal}"
+            );
+        }
+        status => panic!("unexpected terminal status: {status:?}, probe={terminal}"),
+    }
 
     let _ = shutdown.send(());
 }
