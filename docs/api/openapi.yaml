@@ -15,8 +15,9 @@ info:
 
     ## Authentication strategy decision (v1)
     - **Default**: `none-local-only` when bound to loopback only.
-    - **Required for non-local bind**: `api_key` or `mTLS`.
+    - **Required for non-local bind**: `api_key` or ingress-terminated `mTLS`.
     - Deployments exposing the API beyond localhost MUST NOT run without authentication.
+    - In v1.x, `mTLS` is ingress-terminated and represented to windows-mtr via trusted identity headers; native TLS termination is tracked separately.
 
     ## Mapping from CLI/report concepts (`USAGE.md`)
     - Report row semantics (`Loss%`, `Snt`, `Last`, `Avg`, `Best`, `Wrst`, `StDev`) map to per-hop API fields:
@@ -142,7 +143,7 @@ components:
       description: Required for non-local deployments unless mTLS is enforced by the ingress.
     MutualTLS:
       type: mutualTLS
-      description: Optional alternative authentication strategy for non-local deployments.
+      description: Optional alternative for non-local deployments when mTLS is terminated at trusted ingress and identity headers are sanitized before forwarding. Native TLS termination is not part of v1.x.
   schemas:
     EnvelopeMeta:
       type: object
