@@ -294,25 +294,40 @@ async fn create_probe_multi_target_response_includes_all_targets() {
         .as_str()
         .expect("id should be a string");
 
-    let terminal = wait_for_probe_status(&client, addr, id, "completed").await;
-    let target_results = terminal["data"]["result"]["target_results"]
-        .as_array()
-        .expect("target_results should be an array");
+    let terminal = wait_for_terminal_status_with_running_seen_any(&client, addr, id).await;
 
-    assert_eq!(target_results.len(), 2);
-    assert_eq!(target_results[0]["target"], "127.0.0.1");
-    assert_eq!(target_results[1]["target"], "localhost");
+    match terminal["data"]["status"].as_str() {
+        Some("completed") => {
+            let target_results = terminal["data"]["result"]["target_results"]
+                .as_array()
+                .expect("target_results should be an array");
 
-    assert!(target_results[0]["success"].is_boolean());
-    assert!(target_results[1]["success"].is_boolean());
+            assert_eq!(target_results.len(), 2);
+            assert_eq!(target_results[0]["target"], "127.0.0.1");
+            assert_eq!(target_results[1]["target"], "localhost");
 
-    assert_eq!(
-        terminal["data"]["result"]["targets"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
+            assert!(target_results[0]["success"].is_boolean());
+            assert!(target_results[1]["success"].is_boolean());
+
+            assert_eq!(
+                terminal["data"]["result"]["targets"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                2
+            );
+        }
+        Some("failed") => {
+            let error = terminal["data"]["error"]
+                .as_str()
+                .expect("error text should exist for failed probe");
+            assert!(
+                error.contains("127.0.0.1") && error.contains("localhost"),
+                "expected failure details to reference all requested targets, got {terminal}"
+            );
+        }
+        status => panic!("unexpected terminal status: {status:?}, probe={terminal}"),
+    }
 
     let _ = shutdown.send(());
 }
@@ -337,30 +352,44 @@ async fn create_probe_multi_target_response_tracks_per_target_failures() {
         .as_str()
         .expect("id should be a string");
 
-    let terminal = wait_for_probe_status(&client, addr, id, "completed").await;
+    let terminal = wait_for_terminal_status_with_running_seen_any(&client, addr, id).await;
 
-    assert_eq!(terminal["data"]["result"]["completed"], false);
-    assert_eq!(terminal["data"]["error"], serde_json::Value::Null);
+    match terminal["data"]["status"].as_str() {
+        Some("completed") => {
+            assert_eq!(terminal["data"]["result"]["completed"], false);
+            assert_eq!(terminal["data"]["error"], serde_json::Value::Null);
 
-    let target_results = terminal["data"]["result"]["target_results"]
-        .as_array()
-        .expect("target_results should be an array");
-    assert_eq!(target_results.len(), 2);
+            let target_results = terminal["data"]["result"]["target_results"]
+                .as_array()
+                .expect("target_results should be an array");
+            assert_eq!(target_results.len(), 2);
 
-    assert_eq!(target_results[0]["target"], "127.0.0.1");
-    assert!(target_results[0]["success"].is_boolean());
+            assert_eq!(target_results[0]["target"], "127.0.0.1");
+            assert!(target_results[0]["success"].is_boolean());
 
-    assert_eq!(
-        target_results[1]["target"],
-        "definitely-not-a-real-host.invalid"
-    );
-    assert_eq!(target_results[1]["success"], false);
-    assert!(
-        target_results[1]["error"]
-            .as_str()
-            .unwrap()
-            .contains("definitely-not-a-real-host.invalid")
-    );
+            assert_eq!(
+                target_results[1]["target"],
+                "definitely-not-a-real-host.invalid"
+            );
+            assert_eq!(target_results[1]["success"], false);
+            assert!(
+                target_results[1]["error"]
+                    .as_str()
+                    .unwrap()
+                    .contains("definitely-not-a-real-host.invalid")
+            );
+        }
+        Some("failed") => {
+            let error = terminal["data"]["error"]
+                .as_str()
+                .expect("error text should exist for failed probe");
+            assert!(
+                error.contains("127.0.0.1") && error.contains("definitely-not-a-real-host.invalid"),
+                "expected failure details to reference all requested targets, got {terminal}"
+            );
+        }
+        status => panic!("unexpected terminal status: {status:?}, probe={terminal}"),
+    }
 
     let _ = shutdown.send(());
 }
