@@ -143,7 +143,7 @@ jobs:
 
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-${{ matrix.os }}-msrv-${{ needs.resolve-msrv.outputs.msrv }}"
@@ -192,7 +192,7 @@ jobs:
 
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-windows-latest-stable"
@@ -237,7 +237,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: false
           shared-key: "rust-${{ matrix.os }}-probe-parity"
@@ -370,7 +370,7 @@ jobs:
 
       # Use advanced caching
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: false # Only save cache for master branch builds
           # Restore from the trusted Windows stable cache populated on master.
@@ -480,7 +480,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: false
           shared-key: "rust-ubuntu-latest-smoke"
@@ -514,7 +514,7 @@ jobs:
           targets: x86_64-pc-windows-msvc
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/master' }}
           shared-key: "rust-ubuntu-latest-stable"
@@ -565,7 +565,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: false
           shared-key: "rust-${{ matrix.os }}-probe-smoke"
@@ -600,7 +600,7 @@ jobs:
           toolchain: stable
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: false
           shared-key: "rust-ubuntu-latest-probe-smoke-elevated"
