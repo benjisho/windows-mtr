@@ -449,10 +449,26 @@ async fn execute_probe(
         }
     }
 
+    let completed = target_results.iter().all(|result| result.success);
+    if !target_results.is_empty() && target_results.iter().all(|result| !result.success) {
+        let error_details = target_results
+            .iter()
+            .map(|result| {
+                let detail = result
+                    .error
+                    .as_deref()
+                    .unwrap_or("unknown probe execution error");
+                format!("{}: {detail}", result.target)
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        return Err(format!("all target probes failed: {error_details}"));
+    }
+
     Ok(ProbeExecutionResult {
         targets,
         protocol,
-        completed: target_results.iter().all(|result| result.success),
+        completed,
         target_results,
     })
 }
