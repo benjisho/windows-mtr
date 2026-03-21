@@ -628,6 +628,28 @@ async fn api_key_auth_rejects_missing_or_invalid_key_and_accepts_valid_key() {
 }
 
 #[tokio::test]
+async fn none_local_only_auth_rejects_non_loopback_requests_with_strategy_violation() {
+    let config = RestApiConfig {
+        auth_strategy: AuthStrategy::NoneLocalOnly,
+        ..RestApiConfig::default()
+    };
+
+    let (status, body) = request_health_with_connect_info(
+        config,
+        SocketAddr::from((IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10)), 43120)),
+        None,
+    )
+    .await;
+
+    assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
+    assert_error_shape(&body, 403, "auth_strategy_violation");
+    assert_eq!(
+        body["error"]["detail"],
+        "auth strategy none-local-only permits requests only from loopback addresses"
+    );
+}
+
+#[tokio::test]
 async fn mtls_auth_accepts_identity_header_from_loopback_ingress() {
     let config = RestApiConfig {
         auth_strategy: AuthStrategy::Mtls,
