@@ -143,8 +143,8 @@ impl RestServerState {
     ) -> Result<Self, RestApiValidationError> {
         let gate = Arc::new(ProbeConcurrencyGate::new(config.max_concurrent_probes)?);
         let limiter = Arc::new(Mutex::new(FixedWindowRateLimiter::new(
-            config.max_concurrent_probes,
-            config.request_timeout,
+            config.max_requests_per_window,
+            config.rate_limit_window,
             Instant::now(),
         )?));
 

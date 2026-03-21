@@ -497,8 +497,8 @@ async fn create_probe_rejects_oversized_payload_with_413() {
 #[tokio::test]
 async fn create_probe_rejects_burst_traffic_with_429() {
     let config = RestApiConfig {
-        request_timeout: Duration::from_secs(1),
-        max_concurrent_probes: 2,
+        max_requests_per_window: 2,
+        rate_limit_window: Duration::from_secs(60),
         ..RestApiConfig::default()
     };
     let (addr, shutdown) = spawn_server_with_config(config).await;
@@ -536,6 +536,51 @@ async fn create_probe_rejects_burst_traffic_with_429() {
 
     let body: serde_json::Value = third.json().await.expect("json body expected");
     assert_error_shape(&body, 429, "rate_limited");
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn create_probe_allows_requests_after_rate_limit_window_resets() {
+    let config = RestApiConfig {
+        max_requests_per_window: 1,
+        rate_limit_window: Duration::from_millis(100),
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let url = format!("http://{addr}/api/v1/probes");
+    let payload = serde_json::json!({
+        "targets": ["1.1.1.1"],
+        "protocol": "icmp"
+    });
+
+    let first = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("first create probe request should succeed");
+    assert_eq!(first.status(), reqwest::StatusCode::ACCEPTED);
+
+    let second = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("second create probe request should succeed");
+    assert_eq!(second.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+
+    tokio::time::sleep(Duration::from_millis(125)).await;
+
+    let third = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("third create probe request should succeed after window reset");
+    assert_eq!(third.status(), reqwest::StatusCode::ACCEPTED);
 
     let _ = shutdown.send(());
 }

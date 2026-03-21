@@ -41,6 +41,26 @@ fn non_local_bind_requires_opt_in_and_auth() {
 }
 
 #[test]
+fn rejects_invalid_rate_limit_configuration() {
+    let mut config = RestApiConfig {
+        max_requests_per_window: 0,
+        ..RestApiConfig::default()
+    };
+
+    assert!(matches!(
+        config.validate_security_defaults(),
+        Err(RestApiValidationError::InvalidRateLimit(_))
+    ));
+
+    config.max_requests_per_window = 1;
+    config.rate_limit_window = Duration::from_secs(0);
+    assert!(matches!(
+        config.validate_security_defaults(),
+        Err(RestApiValidationError::InvalidRateLimit(_))
+    ));
+}
+
+#[test]
 fn request_validation_normalizes_and_deduplicates_targets() {
     let request = CreateProbeApiRequest {
         targets: vec![

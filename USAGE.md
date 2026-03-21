@@ -151,6 +151,9 @@ mtr --api --api-bind 127.0.0.1:4000
 # Secure remote bind with API key from environment (preferred)
 WINDOWS_MTR_API_KEY='replace-me' mtr --api --api-bind 0.0.0.0:4000 --api-auth api-key --api-key-env WINDOWS_MTR_API_KEY
 
+# Tune REST API request rate limiting
+mtr --api --api-max-requests-per-window 20 --api-rate-limit-window-seconds 30
+
 # Secure remote bind with mTLS
 mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 ```
@@ -159,6 +162,8 @@ mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 - Require explicit opt-in for non-local bind addresses
 - Request timeout: `10s`
 - Max concurrent probes: `8`
+- Max requests per rate-limit window: `8`
+- Rate-limit window duration: `10s`
 - Max targets per request: `8`
 - Max request body size: `16 KiB`
 
