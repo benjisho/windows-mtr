@@ -6,6 +6,8 @@
 mtr [options] <hostname-or-ip>
 ```
 
+> On Windows portable downloads, replace `mtr` with your actual executable name (for example `windows-mtr-x86_64.exe`).
+
 ## Core Options
 
 | Option | Description |
