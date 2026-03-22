@@ -687,6 +687,25 @@ async fn mtls_auth_rejects_identity_header_from_untrusted_non_loopback_ingress()
 }
 
 #[tokio::test]
+async fn mtls_auth_accepts_identity_header_from_configured_trusted_ingress_ip() {
+    let config = RestApiConfig {
+        auth_strategy: AuthStrategy::Mtls,
+        trusted_mtls_ingress_ips: vec![IpAddr::V4(Ipv4Addr::new(10, 10, 10, 10))],
+        ..RestApiConfig::default()
+    };
+
+    let (status, body) = request_health_with_connect_info(
+        config,
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 10, 10, 10)), 54321),
+        Some(("X-Client-Cert", "subject=CN=test-client")),
+    )
+    .await;
+
+    assert_eq!(status, axum::http::StatusCode::OK);
+    assert_eq!(body["data"]["status"], "ok");
+}
+
+#[tokio::test]
 async fn mtls_auth_requires_upstream_client_identity_header() {
     let config = RestApiConfig {
         auth_strategy: AuthStrategy::Mtls,

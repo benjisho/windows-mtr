@@ -93,7 +93,10 @@ In v1.x, windows-mtr does **not** terminate TLS itself. `--api-auth mtls` is des
 1. External clients establish mTLS to the ingress.
 2. The ingress validates client certificates and rejects unauthenticated clients.
 3. The ingress forwards requests to windows-mtr over loopback/private transport and injects identity headers (`X-Client-Cert` or `X-SSL-Client-Verify`).
-4. windows-mtr accepts those identity headers **only** from loopback ingress sources.
+4. windows-mtr accepts those identity headers only from trusted ingress source IPs.
+
+Trusted ingress source IPs can be configured with repeatable `--api-mtls-trusted-ingress <IP>` flags.
+By default this allow-list contains only loopback (`127.0.0.1`, `::1`).
 
 Header sanitization is mandatory at ingress boundaries:
 

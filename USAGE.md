@@ -154,8 +154,14 @@ WINDOWS_MTR_API_KEY='replace-me' mtr --api --api-bind 0.0.0.0:4000 --api-auth ap
 # Tune REST API request rate limiting
 mtr --api --api-max-requests-per-window 20 --api-rate-limit-window-seconds 30
 
+# Tune REST API completed-job retention controls
+mtr --api --api-max-completed-jobs 512 --api-completed-job-ttl-seconds 1200
+
 # Secure remote bind with mTLS
 mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
+
+# mTLS ingress trust list (header-based mode) for non-loopback trusted reverse proxy hops
+mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls --api-mtls-trusted-ingress 10.0.0.10
 ```
 
 - Bind to `127.0.0.1:3000` by default
@@ -166,11 +172,14 @@ mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 - Rate-limit window duration: `10s`
 - Max targets per request: `8`
 - Max request body size: `16 KiB`
+- Max retained completed jobs: `1024`
+- Completed job TTL: `15m`
 
 Authentication enforcement in v1:
 - Local-only bind: `none-local-only` is acceptable
 - Non-local bind: require explicit `--api-auth api-key|mtls`
 - For `api-key`, prefer `--api-key-env <ENV_VAR>` over inline `--api-key` to avoid exposing secrets in shell history
+- For `mtls` header mode, trusted ingress IP sources are configurable via repeatable `--api-mtls-trusted-ingress <IP>`
 
 Input validation before probe execution:
 - Hostnames/IPs normalized and validated
