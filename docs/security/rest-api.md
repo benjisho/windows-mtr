@@ -36,6 +36,8 @@ This document defines baseline security assumptions and controls for the impleme
 - Rate-limit window duration default: `10s`.
 - Max targets per request default: `8`.
 - Max payload size default: `16KiB`.
+- Completed probe job retention cap default: `1024`.
+- Completed probe job TTL default: `15m`.
 
 ## Input validation and normalization requirements
 
@@ -59,6 +61,7 @@ All untrusted request fields MUST be validated before probe execution:
 - **Concurrency limiting**: reject probe starts when in-flight probe count exceeds limit.
 - **Payload limiting**: reject oversized request bodies with 413.
 - **Target cardinality limiting**: reject requests with too many targets.
+- **Result-store retention**: prune expired/old terminal probe jobs to bound memory growth.
 
 ## Threats and mitigations
 
@@ -73,11 +76,13 @@ All untrusted request fields MUST be validated before probe execution:
 - API key leakage in logs or process env if deployed improperly.
 - Operator misconfiguration of network ACLs around non-local deployments.
 - Legitimate but high-cost probes can still consume available concurrency budget.
+- Header-based mTLS trust still depends on ingress sanitization correctness.
 
 ## Operational guidance
 
 - Keep v1 local-only unless an integration requires remote access.
 - Prefer mTLS over API keys in production.
+- API keys are verified with constant-time comparison in-process to reduce timing side-channels.
 - Add perimeter controls (firewall/ingress allow-list) even when auth is enabled.
 - Monitor 413/429 rates for abuse or client misconfiguration.
 

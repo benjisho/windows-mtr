@@ -374,6 +374,13 @@ pub fn run_embedded_trippy(
             .output()
             .context("failed to launch embedded trippy runner")?;
 
+        if !output.status.success() {
+            anyhow::bail!(
+                "embedded trippy exited with status {}",
+                output.status.code().unwrap_or(2)
+            );
+        }
+
         match format {
             JsonOutput::Compact => {
                 let value: serde_json::Value = serde_json::from_slice(&output.stdout)
