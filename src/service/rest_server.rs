@@ -12,6 +12,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use subtle::ConstantTimeEq;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tokio::time::timeout;
@@ -157,6 +158,7 @@ impl ProbeStore {
     fn upsert(&mut self, job: ProbeJob) {
         self.prune(Instant::now());
         self.jobs.insert(job.id.clone(), job);
+        self.prune(Instant::now());
     }
 
     fn get(&self, id: &str) -> Option<ProbeJob> {
@@ -773,16 +775,7 @@ fn enforce_request_auth(
 }
 
 fn constant_time_equals(a: &[u8], b: &[u8]) -> bool {
-    let mut diff = a.len() ^ b.len();
-    let max_len = a.len().max(b.len());
-
-    for i in 0..max_len {
-        let lhs = *a.get(i).unwrap_or(&0);
-        let rhs = *b.get(i).unwrap_or(&0);
-        diff |= usize::from(lhs ^ rhs);
-    }
-
-    diff == 0
+    a.ct_eq(b).into()
 }
 
 async fn shutdown_signal() {
@@ -850,5 +843,33 @@ mod tests {
 
         assert!(!store.jobs.contains_key("old-completed"));
         assert!(store.jobs.contains_key("new-completed"));
+    }
+
+    #[test]
+    fn probe_store_enforces_completed_job_cap_after_insert() {
+        let mut store = ProbeStore {
+            jobs: HashMap::new(),
+            max_completed_jobs: 1,
+            completed_job_ttl: std::time::Duration::from_secs(60),
+        };
+
+        store.upsert(ProbeJob {
+            id: "completed-1".to_string(),
+            status: ProbeJobStatus::Completed,
+            result: None,
+            error: None,
+            finished_at: Some(Instant::now()),
+        });
+
+        store.upsert(ProbeJob {
+            id: "completed-2".to_string(),
+            status: ProbeJobStatus::Completed,
+            result: None,
+            error: None,
+            finished_at: Some(Instant::now()),
+        });
+
+        assert_eq!(store.jobs.len(), 1);
+        assert!(store.jobs.contains_key("completed-2"));
     }
 }
