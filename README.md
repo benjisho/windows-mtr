@@ -108,6 +108,8 @@ For REST API mode (`mtr --api`), the enforced security baseline is:
 - Rate-limit window duration: `10s`
 - Max targets per request: `8`
 - Max payload size: `16 KiB`
+- Max retained completed jobs: `1024`
+- Completed job TTL: `15m`
 
 See [docs/security/rest-api.md](docs/security/rest-api.md) for the full threat model and controls.
 

@@ -761,7 +761,12 @@ fn enforce_request_auth(
             }
         }
         AuthStrategy::Mtls => {
-            if !request_is_loopback {
+            let ingress_is_trusted = config
+                .trusted_mtls_ingress_ips
+                .iter()
+                .any(|ip| *ip == remote_addr.ip());
+
+            if !ingress_is_trusted {
                 return Err(RequestAuthError::UntrustedMtlsIngress.into_api_error());
             }
 

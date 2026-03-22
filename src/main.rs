@@ -61,6 +61,18 @@ struct Cli {
     #[arg(long = "api-rate-limit-window-seconds", value_name = "SECONDS")]
     api_rate_limit_window_seconds: Option<u64>,
 
+    /// Maximum completed/failed probe jobs retained in API in-memory store
+    #[arg(long = "api-max-completed-jobs", value_name = "COUNT")]
+    api_max_completed_jobs: Option<usize>,
+
+    /// TTL in seconds for completed/failed probe jobs retained in API in-memory store
+    #[arg(long = "api-completed-job-ttl-seconds", value_name = "SECONDS")]
+    api_completed_job_ttl_seconds: Option<u64>,
+
+    /// Trusted ingress source IP(s) allowed to forward mTLS identity headers (repeatable)
+    #[arg(long = "api-mtls-trusted-ingress", value_name = "IP")]
+    api_mtls_trusted_ingress: Vec<IpAddr>,
+
     #[command(flatten)]
     trace: TraceCli,
 }
@@ -300,6 +312,18 @@ fn apply_rest_api_cli_overrides(args: &Cli, config: &mut RestApiConfig) -> anyho
         config.rate_limit_window = Duration::from_secs(window_seconds);
     }
 
+    if let Some(max_completed_jobs) = args.api_max_completed_jobs {
+        config.max_completed_jobs = max_completed_jobs;
+    }
+
+    if let Some(completed_job_ttl_seconds) = args.api_completed_job_ttl_seconds {
+        config.completed_job_ttl = Duration::from_secs(completed_job_ttl_seconds);
+    }
+
+    if !args.api_mtls_trusted_ingress.is_empty() {
+        config.trusted_mtls_ingress_ips = args.api_mtls_trusted_ingress.clone();
+    }
+
     Ok(())
 }
 
@@ -461,6 +485,47 @@ mod tests {
     }
 
     #[test]
+    fn cli_parses_retention_controls() {
+        let cli = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-max-completed-jobs",
+            "512",
+            "--api-completed-job-ttl-seconds",
+            "1200",
+        ])
+        .expect("retention options should parse");
+
+        assert_eq!(cli.api_max_completed_jobs, Some(512));
+        assert_eq!(cli.api_completed_job_ttl_seconds, Some(1200));
+    }
+
+    #[test]
+    fn cli_parses_mtls_trusted_ingress_controls() {
+        let cli = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-auth",
+            "mtls",
+            "--api-mtls-trusted-ingress",
+            "127.0.0.1",
+            "--api-mtls-trusted-ingress",
+            "10.0.0.10",
+        ])
+        .expect("mTLS trusted ingress options should parse");
+
+        assert_eq!(cli.api_mtls_trusted_ingress.len(), 2);
+        assert_eq!(
+            cli.api_mtls_trusted_ingress[0],
+            "127.0.0.1".parse::<IpAddr>().unwrap()
+        );
+        assert_eq!(
+            cli.api_mtls_trusted_ingress[1],
+            "10.0.0.10".parse::<IpAddr>().unwrap()
+        );
+    }
+
+    #[test]
     fn cli_parses_api_auth_with_api_key_env() {
         let cli = Cli::try_parse_from([
             "mtr",
@@ -524,6 +589,46 @@ mod tests {
 
         assert_eq!(config.max_requests_per_window, 20);
         assert_eq!(config.rate_limit_window, Duration::from_secs(30));
+    }
+
+    #[test]
+    fn api_mode_applies_retention_overrides() {
+        let cli = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-max-completed-jobs",
+            "512",
+            "--api-completed-job-ttl-seconds",
+            "1200",
+        ])
+        .expect("flags should parse for retention override validation");
+
+        let mut config = RestApiConfig::default();
+        apply_rest_api_cli_overrides(&cli, &mut config).expect("overrides should apply");
+
+        assert_eq!(config.max_completed_jobs, 512);
+        assert_eq!(config.completed_job_ttl, Duration::from_secs(1200));
+    }
+
+    #[test]
+    fn api_mode_applies_mtls_trusted_ingress_overrides() {
+        let cli = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-auth",
+            "mtls",
+            "--api-mtls-trusted-ingress",
+            "10.10.10.10",
+        ])
+        .expect("flags should parse for mTLS ingress override validation");
+
+        let mut config = RestApiConfig::default();
+        apply_rest_api_cli_overrides(&cli, &mut config).expect("overrides should apply");
+
+        assert_eq!(
+            config.trusted_mtls_ingress_ips,
+            vec!["10.10.10.10".parse::<IpAddr>().unwrap()]
+        );
     }
 
     #[test]

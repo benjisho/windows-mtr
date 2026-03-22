@@ -35,6 +35,7 @@ pub struct RestApiConfig {
     pub max_payload_bytes: usize,
     pub max_completed_jobs: usize,
     pub completed_job_ttl: Duration,
+    pub trusted_mtls_ingress_ips: Vec<IpAddr>,
 }
 
 impl Default for RestApiConfig {
@@ -52,6 +53,10 @@ impl Default for RestApiConfig {
             max_payload_bytes: 16 * 1024,
             max_completed_jobs: 1024,
             completed_job_ttl: Duration::from_secs(15 * 60),
+            trusted_mtls_ingress_ips: vec![
+                IpAddr::from([127, 0, 0, 1]),
+                "::1".parse().expect("valid localhost ipv6 literal"),
+            ],
         }
     }
 }
@@ -124,6 +129,12 @@ impl RestApiConfig {
         {
             return Err(RestApiValidationError::AuthStrategyViolation(
                 "auth_strategy=api-key requires a non-empty api_key".to_string(),
+            ));
+        }
+
+        if self.auth_strategy == AuthStrategy::Mtls && self.trusted_mtls_ingress_ips.is_empty() {
+            return Err(RestApiValidationError::AuthStrategyViolation(
+                "auth_strategy=mtls requires at least one trusted ingress IP".to_string(),
             ));
         }
 
@@ -661,6 +672,20 @@ mod tests {
         assert!(matches!(
             config.validate_security_defaults(),
             Err(RestApiValidationError::InvalidOption(_))
+        ));
+    }
+
+    #[test]
+    fn mtls_requires_at_least_one_trusted_ingress_ip() {
+        let config = RestApiConfig {
+            auth_strategy: AuthStrategy::Mtls,
+            trusted_mtls_ingress_ips: Vec::new(),
+            ..RestApiConfig::default()
+        };
+
+        assert!(matches!(
+            config.validate_security_defaults(),
+            Err(RestApiValidationError::AuthStrategyViolation(_))
         ));
     }
 }
