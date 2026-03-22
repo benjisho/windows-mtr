@@ -33,6 +33,8 @@ pub struct RestApiConfig {
     pub rate_limit_window: Duration,
     pub max_targets_per_request: usize,
     pub max_payload_bytes: usize,
+    pub max_completed_jobs: usize,
+    pub completed_job_ttl: Duration,
 }
 
 impl Default for RestApiConfig {
@@ -48,6 +50,8 @@ impl Default for RestApiConfig {
             rate_limit_window: Duration::from_secs(10),
             max_targets_per_request: 8,
             max_payload_bytes: 16 * 1024,
+            max_completed_jobs: 1024,
+            completed_job_ttl: Duration::from_secs(15 * 60),
         }
     }
 }
@@ -93,6 +97,16 @@ impl RestApiConfig {
         if self.max_payload_bytes == 0 {
             return Err(RestApiValidationError::OversizedPayload(
                 "max_payload_bytes must be at least 1".to_string(),
+            ));
+        }
+        if self.max_completed_jobs == 0 {
+            return Err(RestApiValidationError::InvalidOption(
+                "max_completed_jobs must be at least 1".to_string(),
+            ));
+        }
+        if self.completed_job_ttl.is_zero() {
+            return Err(RestApiValidationError::InvalidOption(
+                "completed_job_ttl must be greater than zero".to_string(),
             ));
         }
 
@@ -628,6 +642,25 @@ mod tests {
         assert!(matches!(
             request.normalize_and_validate(&RestApiConfig::default()),
             Err(RestApiValidationError::TooManyTargets { .. })
+        ));
+    }
+
+    #[test]
+    fn retention_defaults_require_positive_limits() {
+        let mut config = RestApiConfig {
+            max_completed_jobs: 0,
+            ..RestApiConfig::default()
+        };
+        assert!(matches!(
+            config.validate_security_defaults(),
+            Err(RestApiValidationError::InvalidOption(_))
+        ));
+
+        config.max_completed_jobs = 1;
+        config.completed_job_ttl = Duration::ZERO;
+        assert!(matches!(
+            config.validate_security_defaults(),
+            Err(RestApiValidationError::InvalidOption(_))
         ));
     }
 }

@@ -114,15 +114,48 @@ pub struct ProbeJob {
     pub status: ProbeJobStatus,
     pub result: Option<ProbeExecutionResult>,
     pub error: Option<String>,
+    pub finished_at: Option<Instant>,
 }
 
 #[derive(Debug)]
 struct ProbeStore {
     jobs: HashMap<String, ProbeJob>,
+    max_completed_jobs: usize,
+    completed_job_ttl: std::time::Duration,
 }
 
 impl ProbeStore {
+    fn prune(&mut self, now: Instant) {
+        self.jobs.retain(|_, job| match job.finished_at {
+            Some(finished_at) => now.duration_since(finished_at) < self.completed_job_ttl,
+            None => true,
+        });
+
+        let terminal_count = self
+            .jobs
+            .values()
+            .filter(|job| job.finished_at.is_some())
+            .count();
+
+        if terminal_count <= self.max_completed_jobs {
+            return;
+        }
+
+        let mut completed = self
+            .jobs
+            .iter()
+            .filter_map(|(id, job)| job.finished_at.map(|finished_at| (id.clone(), finished_at)))
+            .collect::<Vec<_>>();
+        completed.sort_by_key(|(_, finished_at)| *finished_at);
+
+        let to_remove = terminal_count.saturating_sub(self.max_completed_jobs);
+        for (id, _) in completed.into_iter().take(to_remove) {
+            self.jobs.remove(&id);
+        }
+    }
+
     fn upsert(&mut self, job: ProbeJob) {
+        self.prune(Instant::now());
         self.jobs.insert(job.id.clone(), job);
     }
 
@@ -150,6 +183,8 @@ impl RestServerState {
         config: RestApiConfig,
         probe_runner_path: PathBuf,
     ) -> Result<Self, RestApiValidationError> {
+        let max_completed_jobs = config.max_completed_jobs;
+        let completed_job_ttl = config.completed_job_ttl;
         let gate = Arc::new(ProbeConcurrencyGate::new(config.max_concurrent_probes)?);
         let limiter = Arc::new(Mutex::new(FixedWindowRateLimiter::new(
             config.max_requests_per_window,
@@ -163,6 +198,8 @@ impl RestServerState {
             probe_rate_limiter: limiter,
             store: Arc::new(Mutex::new(ProbeStore {
                 jobs: HashMap::new(),
+                max_completed_jobs,
+                completed_job_ttl,
             })),
             next_id: Arc::new(AtomicU64::new(1)),
             probe_runner_path: Arc::new(probe_runner_path),
@@ -289,6 +326,7 @@ async fn create_probe(
             status: ProbeJobStatus::Queued,
             result: None,
             error: None,
+            finished_at: None,
         };
 
         {
@@ -564,6 +602,10 @@ fn update_job_status(
         status,
         result,
         error,
+        finished_at: match status {
+            ProbeJobStatus::Completed | ProbeJobStatus::Failed => Some(Instant::now()),
+            ProbeJobStatus::Queued | ProbeJobStatus::Running => None,
+        },
     });
 
     Ok(())
@@ -710,7 +752,7 @@ fn enforce_request_auth(
                     )
                 })?;
 
-            if provided == expected {
+            if constant_time_equals(provided.as_bytes(), expected.as_bytes()) {
                 Ok(())
             } else {
                 Err(RequestAuthError::InvalidApiKey.into_api_error())
@@ -728,6 +770,19 @@ fn enforce_request_auth(
                 .ok_or_else(|| RequestAuthError::MissingMtlsIdentity.into_api_error())
         }
     }
+}
+
+fn constant_time_equals(a: &[u8], b: &[u8]) -> bool {
+    let mut diff = a.len() ^ b.len();
+    let max_len = a.len().max(b.len());
+
+    for i in 0..max_len {
+        let lhs = *a.get(i).unwrap_or(&0);
+        let rhs = *b.get(i).unwrap_or(&0);
+        diff |= usize::from(lhs ^ rhs);
+    }
+
+    diff == 0
 }
 
 async fn shutdown_signal() {
@@ -751,5 +806,49 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn constant_time_equals_handles_equal_and_mismatched_inputs() {
+        assert!(constant_time_equals(b"secret-key", b"secret-key"));
+        assert!(!constant_time_equals(b"secret-key", b"secret-kez"));
+        assert!(!constant_time_equals(b"secret-key", b"secret-key-extended"));
+    }
+
+    #[test]
+    fn probe_store_prunes_expired_and_old_completed_jobs() {
+        let mut store = ProbeStore {
+            jobs: HashMap::new(),
+            max_completed_jobs: 1,
+            completed_job_ttl: std::time::Duration::from_millis(50),
+        };
+
+        let old = Instant::now() - std::time::Duration::from_millis(100);
+        store.jobs.insert(
+            "old-completed".to_string(),
+            ProbeJob {
+                id: "old-completed".to_string(),
+                status: ProbeJobStatus::Completed,
+                result: None,
+                error: None,
+                finished_at: Some(old),
+            },
+        );
+
+        store.upsert(ProbeJob {
+            id: "new-completed".to_string(),
+            status: ProbeJobStatus::Completed,
+            result: None,
+            error: None,
+            finished_at: Some(Instant::now()),
+        });
+
+        assert!(!store.jobs.contains_key("old-completed"));
+        assert!(store.jobs.contains_key("new-completed"));
     }
 }

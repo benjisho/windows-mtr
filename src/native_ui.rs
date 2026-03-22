@@ -17,7 +17,9 @@ use serde_json::Value;
 use std::env;
 use std::io::{self, Stdout};
 use std::process::Command;
-use std::time::{Duration, Instant};
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
 
@@ -126,21 +128,33 @@ fn run_ui_loop(
     trippy_args: &[String],
 ) -> anyhow::Result<i32> {
     let mut app = NativeUiApp::new(target);
-    let mut last_tick = Instant::now() - Duration::from_millis(900);
-    let tick_rate = Duration::from_millis(900);
+    let tick_rate = Duration::from_millis(250);
+    let poll_rate = Duration::from_millis(900);
+    let (snapshot_tx, snapshot_rx) = mpsc::channel::<anyhow::Result<Vec<HopStat>>>();
+    let poll_args = trippy_args.to_vec();
+    let poll_target = target.to_string();
+
+    thread::spawn(move || {
+        loop {
+            let result = fetch_hops_snapshot(&poll_args, &poll_target);
+            if snapshot_tx.send(result).is_err() {
+                break;
+            }
+            thread::sleep(poll_rate);
+        }
+    });
 
     loop {
-        if last_tick.elapsed() >= tick_rate {
-            match fetch_hops_snapshot(trippy_args, target) {
+        while let Ok(snapshot) = snapshot_rx.try_recv() {
+            match snapshot {
                 Ok(hops) => app.ingest_snapshot(hops),
                 Err(err) => app.last_error = Some(err.to_string()),
             }
-            last_tick = Instant::now();
         }
 
         terminal.draw(|f| draw_ui(f, &app))?;
 
-        if event::poll(Duration::from_millis(100)).context("failed to poll terminal events")?
+        if event::poll(tick_rate).context("failed to poll terminal events")?
             && let Event::Key(key) = event::read().context("failed to read terminal event")?
         {
             match key.code {
