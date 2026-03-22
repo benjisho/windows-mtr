@@ -104,6 +104,8 @@ For REST API mode (`mtr --api`), the enforced security baseline is:
 - Non-local bind requires explicit auth strategy (`--api-auth api-key|mtls`) and secure key handling (`--api-key-env` preferred for `api-key`)
 - Default request timeout: `10s`
 - Max concurrent probes: `8`
+- Max requests per rate-limit window: `8`
+- Rate-limit window duration: `10s`
 - Max targets per request: `8`
 - Max payload size: `16 KiB`
 
@@ -238,6 +240,9 @@ mtr --api --api-bind 127.0.0.1:4000
 
 # Secure remote bind with API key from environment (preferred)
 WINDOWS_MTR_API_KEY='replace-me' mtr --api --api-bind 0.0.0.0:4000 --api-auth api-key --api-key-env WINDOWS_MTR_API_KEY
+
+# Tune REST API rate limiting (defaults: 8 requests per 10-second window)
+mtr --api --api-max-requests-per-window 20 --api-rate-limit-window-seconds 30
 
 # Secure remote bind with mTLS identity forwarding
 mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls

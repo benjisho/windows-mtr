@@ -3,6 +3,7 @@ use clap::{Args, Parser, ValueEnum};
 use std::env;
 use std::net::{IpAddr, SocketAddr};
 use std::process;
+use std::time::Duration;
 use windows_mtr::service::rest_api::{AuthStrategy, RestApiConfig};
 use windows_mtr::service::rest_server::run_rest_api_server;
 use windows_mtr::service::{
@@ -51,6 +52,14 @@ struct Cli {
         conflicts_with = "api_key"
     )]
     api_key_env: Option<String>,
+
+    /// Maximum number of REST API requests allowed per fixed window
+    #[arg(long = "api-max-requests-per-window", value_name = "COUNT")]
+    api_max_requests_per_window: Option<usize>,
+
+    /// Fixed rate-limit window duration in seconds for REST API requests
+    #[arg(long = "api-rate-limit-window-seconds", value_name = "SECONDS")]
+    api_rate_limit_window_seconds: Option<u64>,
 
     #[command(flatten)]
     trace: TraceCli,
@@ -282,6 +291,15 @@ fn apply_rest_api_cli_overrides(args: &Cli, config: &mut RestApiConfig) -> anyho
     }
 
     config.api_key = api_key;
+
+    if let Some(max_requests) = args.api_max_requests_per_window {
+        config.max_requests_per_window = max_requests;
+    }
+
+    if let Some(window_seconds) = args.api_rate_limit_window_seconds {
+        config.rate_limit_window = Duration::from_secs(window_seconds);
+    }
+
     Ok(())
 }
 
@@ -427,6 +445,22 @@ mod tests {
     }
 
     #[test]
+    fn cli_parses_rate_limit_controls() {
+        let cli = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-max-requests-per-window",
+            "20",
+            "--api-rate-limit-window-seconds",
+            "30",
+        ])
+        .expect("rate limit options should parse");
+
+        assert_eq!(cli.api_max_requests_per_window, Some(20));
+        assert_eq!(cli.api_rate_limit_window_seconds, Some(30));
+    }
+
+    #[test]
     fn cli_parses_api_auth_with_api_key_env() {
         let cli = Cli::try_parse_from([
             "mtr",
@@ -471,6 +505,25 @@ mod tests {
         let err = apply_rest_api_cli_overrides(&cli, &mut config)
             .expect_err("key input with mtls should fail validation");
         assert!(err.to_string().contains("requires '--api-auth api-key'"));
+    }
+
+    #[test]
+    fn api_mode_applies_rate_limit_overrides() {
+        let cli = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-max-requests-per-window",
+            "20",
+            "--api-rate-limit-window-seconds",
+            "30",
+        ])
+        .expect("flags should parse for override validation");
+
+        let mut config = RestApiConfig::default();
+        apply_rest_api_cli_overrides(&cli, &mut config).expect("overrides should apply");
+
+        assert_eq!(config.max_requests_per_window, 20);
+        assert_eq!(config.rate_limit_window, Duration::from_secs(30));
     }
 
     #[test]

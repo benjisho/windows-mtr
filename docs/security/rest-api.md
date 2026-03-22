@@ -32,6 +32,8 @@ This document defines baseline security assumptions and controls for the impleme
 - Non-local bind requires explicit opt-in.
 - Request timeout default: `10s`.
 - Max concurrent probes default: `8`.
+- Max requests per fixed rate-limit window default: `8`.
+- Rate-limit window duration default: `10s`.
 - Max targets per request default: `8`.
 - Max payload size default: `16KiB`.
 
@@ -104,6 +106,9 @@ mtr --api
 
 # Remote bind with API key loaded from environment (preferred)
 WINDOWS_MTR_API_KEY='replace-me' mtr --api --api-bind 0.0.0.0:4000 --api-auth api-key --api-key-env WINDOWS_MTR_API_KEY
+
+# Tune rate-limiting behavior for trusted clients
+mtr --api --api-max-requests-per-window 20 --api-rate-limit-window-seconds 30
 
 # Remote bind with mTLS (identity headers supplied by trusted local ingress)
 mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls

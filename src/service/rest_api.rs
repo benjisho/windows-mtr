@@ -29,6 +29,8 @@ pub struct RestApiConfig {
     pub api_key: Option<String>,
     pub request_timeout: Duration,
     pub max_concurrent_probes: usize,
+    pub max_requests_per_window: usize,
+    pub rate_limit_window: Duration,
     pub max_targets_per_request: usize,
     pub max_payload_bytes: usize,
 }
@@ -42,6 +44,8 @@ impl Default for RestApiConfig {
             api_key: None,
             request_timeout: Duration::from_secs(10),
             max_concurrent_probes: 8,
+            max_requests_per_window: 8,
+            rate_limit_window: Duration::from_secs(10),
             max_targets_per_request: 8,
             max_payload_bytes: 16 * 1024,
         }
@@ -65,6 +69,18 @@ impl RestApiConfig {
         if self.max_concurrent_probes == 0 {
             return Err(RestApiValidationError::InvalidConcurrencyLimit(
                 "max_concurrent_probes must be at least 1".to_string(),
+            ));
+        }
+
+        if self.max_requests_per_window == 0 {
+            return Err(RestApiValidationError::InvalidRateLimit(
+                "max_requests_per_window must be at least 1".to_string(),
+            ));
+        }
+
+        if self.rate_limit_window.is_zero() {
+            return Err(RestApiValidationError::InvalidRateLimit(
+                "rate_limit_window must be greater than zero".to_string(),
             ));
         }
 

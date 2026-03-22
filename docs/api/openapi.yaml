@@ -50,6 +50,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+        '401':
+          description: Authentication required (for example missing API key or missing mTLS identity)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Authentication/authorization policy denied (for example `auth_strategy_violation`, invalid API key, or untrusted mTLS ingress)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /api/v1/probes:
     post:
       summary: Start a probe job
@@ -81,6 +93,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreateProbeResponse'
+        '401':
+          description: Authentication required (for example missing API key or missing mTLS identity)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Authentication/authorization policy denied (for example `auth_strategy_violation`, invalid API key, or untrusted mTLS ingress)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Invalid request payload
           content:
@@ -122,6 +146,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetProbeResponse'
+        '401':
+          description: Authentication required (for example missing API key or missing mTLS identity)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Authentication/authorization policy denied (for example `auth_strategy_violation`, invalid API key, or untrusted mTLS ingress)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Invalid probe id
           content:

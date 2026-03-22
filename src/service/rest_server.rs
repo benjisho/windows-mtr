@@ -41,6 +41,7 @@ enum RequestAuthError {
     InvalidApiKey,
     MissingMtlsIdentity,
     UntrustedMtlsIngress,
+    NoneLocalOnlyRemoteAccessDenied,
 }
 
 impl RequestAuthError {
@@ -71,6 +72,14 @@ impl RequestAuthError {
                 title: "Forbidden",
                 detail: "mTLS identity headers are accepted only from trusted loopback ingress"
                     .to_string(),
+            },
+            Self::NoneLocalOnlyRemoteAccessDenied => ApiError {
+                status: StatusCode::FORBIDDEN,
+                code: "auth_strategy_violation",
+                title: "Remote access not allowed for none-local-only",
+                detail:
+                    "auth strategy none-local-only permits requests only from loopback addresses"
+                        .to_string(),
             },
         }
     }
@@ -143,8 +152,8 @@ impl RestServerState {
     ) -> Result<Self, RestApiValidationError> {
         let gate = Arc::new(ProbeConcurrencyGate::new(config.max_concurrent_probes)?);
         let limiter = Arc::new(Mutex::new(FixedWindowRateLimiter::new(
-            config.max_concurrent_probes,
-            config.request_timeout,
+            config.max_requests_per_window,
+            config.rate_limit_window,
             Instant::now(),
         )?));
 
@@ -677,7 +686,9 @@ fn enforce_request_auth(
 
     match config.auth_strategy {
         AuthStrategy::NoneLocalOnly if request_is_loopback => Ok(()),
-        AuthStrategy::NoneLocalOnly => Err(RequestAuthError::MissingApiKeyHeader.into_api_error()),
+        AuthStrategy::NoneLocalOnly => {
+            Err(RequestAuthError::NoneLocalOnlyRemoteAccessDenied.into_api_error())
+        }
         AuthStrategy::ApiKey => {
             let provided = headers
                 .get(API_KEY_HEADER)

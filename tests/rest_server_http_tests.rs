@@ -497,8 +497,8 @@ async fn create_probe_rejects_oversized_payload_with_413() {
 #[tokio::test]
 async fn create_probe_rejects_burst_traffic_with_429() {
     let config = RestApiConfig {
-        request_timeout: Duration::from_secs(1),
-        max_concurrent_probes: 2,
+        max_requests_per_window: 2,
+        rate_limit_window: Duration::from_secs(60),
         ..RestApiConfig::default()
     };
     let (addr, shutdown) = spawn_server_with_config(config).await;
@@ -536,6 +536,51 @@ async fn create_probe_rejects_burst_traffic_with_429() {
 
     let body: serde_json::Value = third.json().await.expect("json body expected");
     assert_error_shape(&body, 429, "rate_limited");
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn create_probe_allows_requests_after_rate_limit_window_resets() {
+    let config = RestApiConfig {
+        max_requests_per_window: 1,
+        rate_limit_window: Duration::from_millis(100),
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let url = format!("http://{addr}/api/v1/probes");
+    let payload = serde_json::json!({
+        "targets": ["1.1.1.1"],
+        "protocol": "icmp"
+    });
+
+    let first = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("first create probe request should succeed");
+    assert_eq!(first.status(), reqwest::StatusCode::ACCEPTED);
+
+    let second = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("second create probe request should succeed");
+    assert_eq!(second.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+
+    tokio::time::sleep(Duration::from_millis(125)).await;
+
+    let third = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("third create probe request should succeed after window reset");
+    assert_eq!(third.status(), reqwest::StatusCode::ACCEPTED);
 
     let _ = shutdown.send(());
 }
@@ -580,6 +625,28 @@ async fn api_key_auth_rejects_missing_or_invalid_key_and_accepts_valid_key() {
     assert_eq!(ok.status(), reqwest::StatusCode::OK);
 
     let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn none_local_only_auth_rejects_non_loopback_requests_with_strategy_violation() {
+    let config = RestApiConfig {
+        auth_strategy: AuthStrategy::NoneLocalOnly,
+        ..RestApiConfig::default()
+    };
+
+    let (status, body) = request_health_with_connect_info(
+        config,
+        SocketAddr::from((IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10)), 43120)),
+        None,
+    )
+    .await;
+
+    assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
+    assert_error_shape(&body, 403, "auth_strategy_violation");
+    assert_eq!(
+        body["error"]["detail"],
+        "auth strategy none-local-only permits requests only from loopback addresses"
+    );
 }
 
 #[tokio::test]
