@@ -243,6 +243,13 @@ fn should_print_banner(args: &Cli) -> bool {
     !args.api && json_output_from_cli(&args.trace).is_none()
 }
 
+fn should_print_interactive_troubleshooting_hint(request: &ProbeRequest, exit_code: i32) -> bool {
+    request.ui_mode == UiMode::Default
+        && !request.report
+        && request.json_output.is_none()
+        && exit_code != 0
+}
+
 fn print_banner() {
     println!("windows-mtr by Benji Shohet (benjisho) — https://github.com/benjisho/windows-mtr");
 }
@@ -446,6 +453,16 @@ fn main() -> anyhow::Result<()> {
         EMBEDDED_TRIPPY_ENV,
     )
     .context("failed to run embedded trippy")?;
+
+    if should_print_interactive_troubleshooting_hint(&request, result.exit_code) {
+        eprintln!(
+            "windows-mtr interactive mode exited with code {}.\n\
+             Try report mode to validate probe execution: `mtr -r -c 5 {}`.\n\
+             If report mode also fails, verify Administrator privileges and local firewall/security policy.",
+            result.exit_code, plan.validated_host
+        );
+    }
+
     process::exit(result.exit_code);
 }
 
@@ -459,6 +476,47 @@ mod tests {
         let cli = Cli::try_parse_from(["mtr", "--api"]).expect("api mode should parse");
         assert!(cli.api);
         assert!(cli.trace.host.is_none());
+    }
+
+    #[test]
+    fn interactive_troubleshooting_hint_only_for_default_interactive_failures() {
+        let request = ProbeRequest {
+            host: "8.8.8.8".to_string(),
+            tcp: false,
+            udp: false,
+            port: None,
+            source_port: None,
+            report: false,
+            json_output: None,
+            count: None,
+            interval_seconds: None,
+            timeout_seconds: None,
+            report_wide: false,
+            no_dns: false,
+            max_hops: None,
+            show_asn: false,
+            dns_lookup_as_info: false,
+            packet_size: None,
+            src: None,
+            interface: None,
+            ecmp: None,
+            dns_cache_ttl_seconds: None,
+            trippy_flags: None,
+            ui_mode: UiMode::Default,
+            enhanced_ui: EnhancedUiConfig {
+                latency_warn_ms: 100.0,
+                latency_bad_ms: 250.0,
+                loss_warn_pct: 2.0,
+                loss_bad_pct: 5.0,
+                row_coloring: true,
+                sparklines: true,
+                summary: true,
+            },
+            has_enhanced_overrides: false,
+        };
+
+        assert!(should_print_interactive_troubleshooting_hint(&request, 1));
+        assert!(!should_print_interactive_troubleshooting_hint(&request, 0));
     }
 
     #[test]

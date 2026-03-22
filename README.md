@@ -130,7 +130,7 @@ See [docs/security/rest-api.md](docs/security/rest-api.md) for the full threat m
 
 1. Download `windows-mtr-x86_64.exe` (direct executable) or `windows-mtr-official-x86_64.zip` (official portable bundle) from [GitHub Releases](https://github.com/benjisho/windows-mtr/releases)
 2. Extract the ZIP file if you chose the portable bundle
-3. Run `mtr.exe` directly - no installation required
+3. Run the downloaded executable directly (for example `windows-mtr-x86_64.exe 8.8.8.8`) or rename it to `mtr.exe` for shorter commands
 
 #### System Requirements
 
@@ -200,6 +200,9 @@ Windows MTR requires administrator privileges to run properly, as it needs to se
 ```bash
 mtr 8.8.8.8
 ```
+
+> [!TIP]
+> If you downloaded a standalone `.exe` and did not install via MSI, use that filename directly (for example `windows-mtr-x86_64.exe 8.8.8.8`) unless you renamed it to `mtr.exe`.
 
 ### Native Ratatui UI (live hops + table + charts)
 
