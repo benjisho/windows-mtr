@@ -49,6 +49,8 @@ Controls:
 - `←` switch to previous tab
 - `q` quit
 
+When probe snapshots fail repeatedly, the help footer surfaces the latest poll error and live troubleshooting hints (run with Administrator privileges, review firewall policy, or try report mode with `-r`).
+
 `--ui native` accepts the standard probe and output tuning options, and renders them in the native Ratatui view.
 
 ## Enhanced UI options
