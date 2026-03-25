@@ -22,6 +22,8 @@ use std::thread;
 use std::time::Duration;
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
+const TROUBLESHOOTING_FAILURE_THRESHOLD: u32 = 3;
+const MAX_INLINE_ERROR_CHARS: usize = 96;
 
 #[derive(Clone)]
 struct HopStat {
@@ -40,6 +42,7 @@ pub struct NativeUiApp {
     latency_history: Vec<(f64, f64)>,
     loss_history: Vec<(f64, f64)>,
     last_error: Option<String>,
+    consecutive_poll_failures: u32,
 }
 
 impl NativeUiApp {
@@ -51,17 +54,20 @@ impl NativeUiApp {
             latency_history: Vec::new(),
             loss_history: Vec::new(),
             last_error: None,
+            consecutive_poll_failures: 0,
         }
     }
 
     fn ingest_snapshot(&mut self, hops: Vec<HopStat>) {
         if hops.is_empty() {
             self.last_error = Some("No hop data returned by trippy JSON report".to_string());
+            self.consecutive_poll_failures = self.consecutive_poll_failures.saturating_add(1);
             return;
         }
 
         self.hops = hops;
         self.last_error = None;
+        self.consecutive_poll_failures = 0;
 
         let latest_latency = self.hops.last().map(|h| h.avg_ms).unwrap_or_default();
         let latest_loss = self.hops.last().map(|h| h.loss_pct).unwrap_or_default();
@@ -76,6 +82,11 @@ impl NativeUiApp {
         if self.loss_history.len() > 120 {
             self.loss_history.remove(0);
         }
+    }
+
+    fn ingest_error(&mut self, err: anyhow::Error) {
+        self.last_error = Some(err.to_string());
+        self.consecutive_poll_failures = self.consecutive_poll_failures.saturating_add(1);
     }
 
     fn next_tab(&mut self) {
@@ -148,7 +159,7 @@ fn run_ui_loop(
         while let Ok(snapshot) = snapshot_rx.try_recv() {
             match snapshot {
                 Ok(hops) => app.ingest_snapshot(hops),
-                Err(err) => app.last_error = Some(err.to_string()),
+                Err(err) => app.ingest_error(err),
             }
         }
 
@@ -386,13 +397,48 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
         _ => render_loss_chart(frame, app, chunks[1]),
     }
 
-    let help_text = match &app.last_error {
-        Some(err) => format!("Controls: ←/→ or Tab switch tabs • q quits • Last poll error: {err}"),
-        None => "Controls: ←/→ or Tab switch tabs • q quits".to_string(),
-    };
+    let help_text = build_help_text(app);
     let help =
         Paragraph::new(help_text).block(Block::default().borders(Borders::ALL).title("Help"));
     frame.render_widget(help, chunks[2]);
+}
+
+fn build_help_text(app: &NativeUiApp) -> String {
+    let base = "Controls: ←/→ or Tab switch tabs • q quits";
+    let mut notes = Vec::new();
+
+    if let Some(err) = &app.last_error {
+        notes.push(format!(
+            "Last poll error: {}",
+            truncate_error_for_footer(err)
+        ));
+    }
+
+    if app.hops.is_empty() && app.consecutive_poll_failures >= TROUBLESHOOTING_FAILURE_THRESHOLD {
+        notes.push(
+            "No hops yet. Try running as Administrator, checking firewall policy, or using report mode (-r)."
+                .to_string(),
+        );
+    }
+
+    if notes.is_empty() {
+        base.to_string()
+    } else {
+        format!("{base} • {}", notes.join(" • "))
+    }
+}
+
+fn truncate_error_for_footer(err: &str) -> String {
+    let mut chars = err.chars();
+    let truncated = chars
+        .by_ref()
+        .take(MAX_INLINE_ERROR_CHARS)
+        .collect::<String>();
+    if chars.next().is_some() {
+        format!("{truncated}…")
+    } else {
+        truncated
+    }
 }
 
 fn render_hop_table(
@@ -400,6 +446,17 @@ fn render_hop_table(
     app: &NativeUiApp,
     area: ratatui::layout::Rect,
 ) {
+    if app.hops.is_empty() {
+        let empty_text = empty_state_text(app);
+        let empty = Paragraph::new(empty_text).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Hop table (awaiting data)"),
+        );
+        frame.render_widget(empty, area);
+        return;
+    }
+
     let rows = app.hops.iter().map(|hop| {
         Row::new(vec![
             hop.hop.to_string(),
@@ -432,6 +489,26 @@ fn render_hop_table(
     .block(Block::default().borders(Borders::ALL).title("Hop table"));
 
     frame.render_widget(table, area);
+}
+
+fn empty_state_text(app: &NativeUiApp) -> String {
+    let mut lines = vec!["Awaiting hop data from embedded probe…".to_string()];
+
+    if let Some(err) = &app.last_error {
+        lines.push(format!(
+            "Last poll error: {}",
+            truncate_error_for_footer(err)
+        ));
+    }
+
+    if app.consecutive_poll_failures >= TROUBLESHOOTING_FAILURE_THRESHOLD {
+        lines.push(
+            "Try: run as Administrator, review firewall/security policy, or validate with `mtr -r -c 5 <target>`."
+                .to_string(),
+        );
+    }
+
+    lines.join("\n")
 }
 
 fn render_latency_chart(
@@ -598,5 +675,57 @@ mod tests {
         assert_eq!(hops[1].best_ms, 15.0);
         assert_eq!(hops[1].avg_ms, 20.0);
         assert_eq!(hops[1].worst_ms, 25.0);
+    }
+
+    #[test]
+    fn build_help_text_includes_live_troubleshooting_when_ui_has_no_data() {
+        let mut app = NativeUiApp::new("example.com");
+        app.ingest_error(anyhow!("poll failed"));
+        app.ingest_error(anyhow!("poll failed"));
+        app.ingest_error(anyhow!("poll failed"));
+
+        let help = build_help_text(&app);
+        assert!(help.contains("Last poll error: poll failed"));
+        assert!(help.contains("No hops yet."));
+        assert!(help.contains("report mode (-r)"));
+    }
+
+    #[test]
+    fn build_help_text_is_compact_when_data_stream_is_healthy() {
+        let mut app = NativeUiApp::new("example.com");
+        app.ingest_snapshot(vec![HopStat {
+            hop: 1,
+            host: "1.1.1.1".to_string(),
+            loss_pct: 0.0,
+            best_ms: 1.0,
+            avg_ms: 2.0,
+            worst_ms: 3.0,
+        }]);
+
+        assert_eq!(
+            build_help_text(&app),
+            "Controls: ←/→ or Tab switch tabs • q quits"
+        );
+    }
+
+    #[test]
+    fn truncate_error_for_footer_limits_width() {
+        let err = "x".repeat(MAX_INLINE_ERROR_CHARS + 8);
+        let truncated = truncate_error_for_footer(&err);
+        assert!(truncated.ends_with('…'));
+        assert_eq!(truncated.chars().count(), MAX_INLINE_ERROR_CHARS + 1);
+    }
+
+    #[test]
+    fn empty_state_text_includes_actionable_hint_after_repeated_failures() {
+        let mut app = NativeUiApp::new("example.com");
+        app.ingest_error(anyhow!("socket permission denied"));
+        app.ingest_error(anyhow!("socket permission denied"));
+        app.ingest_error(anyhow!("socket permission denied"));
+
+        let text = empty_state_text(&app);
+        assert!(text.contains("Awaiting hop data"));
+        assert!(text.contains("socket permission denied"));
+        assert!(text.contains("mtr -r -c 5 <target>"));
     }
 }
