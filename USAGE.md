@@ -49,7 +49,7 @@ Controls:
 - `←` switch to previous tab
 - `q` quit
 
-When probe snapshots fail repeatedly, the help footer surfaces the latest poll error and live troubleshooting hints (run with Administrator privileges, review firewall policy, or try report mode with `-r`).
+When probe snapshots fail repeatedly, the help footer surfaces the latest poll error and live troubleshooting hints (run with Administrator privileges, review firewall policy, or try report mode with `-r`). If no hop data is detected for 15 seconds, the footer also prompts you to quit (`q`) and retry in report mode for immediate diagnostics.
 
 `--ui native` accepts the standard probe and output tuning options, and renders them in the native Ratatui view.
 

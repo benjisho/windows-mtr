@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - Updated README/USAGE roadmap and examples to document the new native UI preview and controls.
+- Improved the native UI help footer to show elapsed "awaiting data" time and add a 15-second timeout troubleshooting prompt when hop snapshots never arrive.
 
 ## [1.1.3] - 2026-02-28
 
