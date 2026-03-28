@@ -1,87 +1,62 @@
 # AGENTS.md
 
-This file provides instructions for autonomous coding agents working in this repository.
+Codex operating notes for `windows-mtr` (repository scope).
 
-## 1) Mission and contribution goals
-- Keep `windows-mtr` reliable, secure, and predictable for networking diagnostics.
+## Mission and guardrails
+- Keep `windows-mtr` reliable, secure, and predictable for network diagnostics.
 - Prefer small, reviewable pull requests with clear user impact.
-- Preserve CLI compatibility unless change is explicitly documented.
+- Preserve CLI compatibility unless a change is explicitly requested and documented.
 
-## 2) Required workflow for every change
-1. **Understand context first**
-   - Read `README.md`, `USAGE.md`, and relevant source/tests before editing.
-2. **Plan before editing**
-   - Identify affected modules, risks, and validation steps.
-3. **Implement minimal safe change**
-   - Avoid broad refactors unless required by the task.
-4. **Validate locally**
-   - Run formatting, linting, and tests relevant to touched code.
-5. **Document and summarize**
-   - Update docs/changelog when behavior or UX changes.
+## Required workflow
+1. Read context first: `README.md`, `USAGE.md`, and touched source/tests/docs.
+2. Plan a minimal safe diff (avoid unrelated refactors).
+3. Implement with explicit error handling and no silent network fallbacks.
+4. Validate with relevant checks.
+5. Update docs/changelog when behavior, UX, install, API, or release flow changes.
 
-## 3) Repository map
-- `src/` — application source.
-- `tests/` — integration/unit/report tests and fixtures.
+## Repository map
+- `src/` — application code.
+- `tests/` — integration/unit/report tests.
 - `examples/` — sample usage.
-- `xtask/` — project automation helpers.
-- `README.md` and `USAGE.md` — user documentation and commands.
+- `xtask/` — automation helpers.
+- `docs/` — project documentation.
 
-## 4) Coding standards
-- Follow existing Rust style and naming patterns in nearby files.
-- Prioritize correctness and explicit error handling over cleverness.
-- Do not introduce silent fallbacks for network errors without justification.
-- Keep functions cohesive and avoid unnecessary public surface expansion.
-- Add or update tests for bug fixes and behavior changes.
+## Toolchain and validation
+- Rust/toolchain expectations follow repo docs and CI (currently Rust 1.88.0+ / MSRV from `Cargo.toml`).
+- For Rust changes, run when available:
+  - `cargo fmt --all -- --check`
+  - `cargo clippy --all-targets --all-features -- -D warnings`
+  - `cargo test --all`
+- For workflow/docs hygiene changes, run targeted checks (for example `pre-commit run --all-files`, `actionlint`, markdown lint).
+- If a command cannot run, report the exact command and concrete environment blocker.
 
-## 5) Testing and quality gates
-When available, prefer running these commands before finalizing:
+## API/OpenAPI checks (when API contract/spec changes)
+- `python3 scripts/validate_openapi_schema.py`
+- `scripts/check_openapi_compat.sh <base-ref>`
 
-```bash
-cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all
-```
+## Security and sensitive-change caution
+- Treat CLI args, hostnames, packet data, and files as untrusted inputs.
+- Avoid logging sensitive data or adding telemetry/data-exfil behavior.
+- Keep dependencies minimal and justified.
+- Use extra care and minimal diffs for:
+  - `.github/workflows/**`, release/version/tagging/packaging automation.
+  - Security policy/audit/dependency configuration.
 
-If a command is not runnable in the environment, report exactly why.
-
-## 6) Security and safety rules
-- Treat all external inputs (CLI args, hostnames, packets, files) as untrusted.
-- Avoid logging sensitive data or unnecessary host-identifying details.
-- Do not add telemetry, network beacons, or data exfiltration behavior.
-- Keep dependencies minimal; justify and document any new dependency.
-
-## 7) Performance guidelines
-- Be mindful of hot paths in probe/report loops.
-- Avoid needless allocations and blocking operations in frequently executed paths.
-- Include a short performance note in PRs for non-trivial algorithmic changes.
-
-## 8) Documentation expectations
-Update docs when any of these change:
+## Documentation expectations
+Update docs when changing:
 - CLI flags/options/defaults.
-- Output formats or report fields.
-- Installation/build/run instructions.
+- Output/report/API schema.
+- Build/install/run/release behavior.
 
-## 9) Commit and PR guidance
-- Use imperative, specific commit messages.
-- PR descriptions should include:
-  - What changed.
-  - Why it changed.
-  - How it was tested.
-  - Any compatibility or risk notes.
+Primary docs typically include `README.md`, `USAGE.md`, `docs/`, and `CHANGELOG.md`.
 
-## 10) Non-goals and restrictions
+## Non-goals
 - Do not rewrite large modules unless explicitly requested.
-- Do not change license or legal notices without maintainer instruction.
+- Do not change license/legal notices without maintainer instruction.
 - Do not commit generated artifacts unless repository convention requires it.
 
-## 11) GitHub automation files
-- Keep Copilot guidance in `.github/copilot-instructions.md`.
-- Keep role-specific agent specs in `.github/agents/`.
-- Keep path-specific Copilot rules in `.github/instructions/*.instructions.md` using `applyTo`.
-- Ensure agent specs define scope, prohibited actions, validation, and output contract.
-
-## 12) Repository-local skills
-- Place project-specific skills under `skills/<skill-name>/SKILL.md`.
-- Keep skill metadata concise and trigger-oriented; move long details into `references/`.
-- Prefer narrow skills that automate repeatable tasks (diagnostics, release prep, docs sync).
-- Reuse scripts/templates from a skill directory instead of duplicating long instructions.
+## Repo instruction surfaces
+- `.github/copilot-instructions.md` — repository-wide assistant guidance.
+- `.github/instructions/*.instructions.md` — path-scoped rules.
+- `.github/agents/` — role-specific agent specs.
+- `skills/<skill-name>/SKILL.md` — repeatable repository-local workflows.

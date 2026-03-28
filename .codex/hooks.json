@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "name": "windows-mtr session context",
+        "command": "bash -lc 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); python3 \"$ROOT/.codex/hooks/session_start_context.py\"'"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "name": "windows-mtr bash safety policy",
+        "tool": "Bash",
+        "command": "bash -lc 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); python3 \"$ROOT/.codex/hooks/pre_tool_use_policy.py\"'"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "name": "windows-mtr bash reminder review",
+        "tool": "Bash",
+        "command": "bash -lc 'ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd); python3 \"$ROOT/.codex/hooks/post_tool_use_review.py\"'"
+      }
+    ]
+  }
+}
