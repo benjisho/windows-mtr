@@ -250,6 +250,24 @@ fn should_print_interactive_troubleshooting_hint(request: &ProbeRequest, exit_co
         && exit_code != 0
 }
 
+fn format_exit_code(exit_code: i32) -> String {
+    if exit_code < 0 {
+        format!("{exit_code} (0x{:08X})", exit_code as u32)
+    } else {
+        exit_code.to_string()
+    }
+}
+
+fn windows_exit_diagnostic(exit_code: i32) -> Option<&'static str> {
+    match exit_code as u32 {
+        0xC0000005 => Some(
+            "Detected a Windows access violation from the embedded Trippy UI. \
+             Retry with `mtr --ui native <target>` or use report mode (`mtr -r -c 5 <target>`).",
+        ),
+        _ => None,
+    }
+}
+
 fn print_banner() {
     println!("windows-mtr by Benji Shohet (benjisho) — https://github.com/benjisho/windows-mtr");
 }
@@ -455,11 +473,16 @@ fn main() -> anyhow::Result<()> {
     .context("failed to run embedded trippy")?;
 
     if should_print_interactive_troubleshooting_hint(&request, result.exit_code) {
+        let diagnostic = windows_exit_diagnostic(result.exit_code)
+            .map(|message| format!("\n{message}"))
+            .unwrap_or_default();
         eprintln!(
             "windows-mtr interactive mode exited with code {}.\n\
              Try report mode to validate probe execution: `mtr -r -c 5 {}`.\n\
-             If report mode also fails, verify Administrator privileges and local firewall/security policy.",
-            result.exit_code, plan.validated_host
+             If report mode also fails, verify Administrator privileges and local firewall/security policy.{}",
+            format_exit_code(result.exit_code),
+            plan.validated_host,
+            diagnostic
         );
     }
 
@@ -517,6 +540,18 @@ mod tests {
 
         assert!(should_print_interactive_troubleshooting_hint(&request, 1));
         assert!(!should_print_interactive_troubleshooting_hint(&request, 0));
+    }
+
+    #[test]
+    fn format_exit_code_renders_windows_status_hex_for_negative_codes() {
+        assert_eq!(format_exit_code(-1073741819), "-1073741819 (0xC0000005)");
+        assert_eq!(format_exit_code(1), "1");
+    }
+
+    #[test]
+    fn windows_exit_diagnostic_flags_access_violation() {
+        assert!(windows_exit_diagnostic(-1073741819).is_some());
+        assert!(windows_exit_diagnostic(1).is_none());
     }
 
     #[test]
