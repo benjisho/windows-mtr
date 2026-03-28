@@ -19,7 +19,7 @@ use std::io::{self, Stdout};
 use std::process::Command;
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
 
@@ -39,6 +39,7 @@ pub struct NativeUiApp {
     hops: Vec<HopStat>,
     latency_history: Vec<(f64, f64)>,
     loss_history: Vec<(f64, f64)>,
+    started_at: Instant,
     last_error: Option<String>,
     consecutive_poll_failures: u32,
 }
@@ -51,6 +52,7 @@ impl NativeUiApp {
             hops: Vec::new(),
             latency_history: Vec::new(),
             loss_history: Vec::new(),
+            started_at: Instant::now(),
             last_error: None,
             consecutive_poll_failures: 0,
         }
@@ -405,6 +407,13 @@ fn build_help_text(app: &NativeUiApp) -> String {
     let base = "Controls: ←/→ or Tab switch tabs • q quits";
     let mut notes = Vec::new();
 
+    if app.hops.is_empty() {
+        notes.push(format!(
+            "Awaiting hop data for {}s",
+            app.started_at.elapsed().as_secs()
+        ));
+    }
+
     if let Some(err) = &app.last_error {
         notes.push(format!("Last poll error: {err}"));
     }
@@ -412,6 +421,13 @@ fn build_help_text(app: &NativeUiApp) -> String {
     if app.hops.is_empty() && app.consecutive_poll_failures >= 3 {
         notes.push(
             "No hops yet. Try running as Administrator, checking firewall policy, or using report mode (-r)."
+                .to_string(),
+        );
+    }
+
+    if app.hops.is_empty() && app.started_at.elapsed().as_secs() >= 15 {
+        notes.push(
+            "Still no data after 15s. Press q to quit and retry with report mode (-r) for immediate diagnostics."
                 .to_string(),
         );
     }
@@ -631,14 +647,17 @@ mod tests {
     #[test]
     fn build_help_text_includes_live_troubleshooting_when_ui_has_no_data() {
         let mut app = NativeUiApp::new("example.com");
+        app.started_at = Instant::now() - Duration::from_secs(16);
         app.ingest_error(anyhow!("poll failed"));
         app.ingest_error(anyhow!("poll failed"));
         app.ingest_error(anyhow!("poll failed"));
 
         let help = build_help_text(&app);
+        assert!(help.contains("Awaiting hop data for"));
         assert!(help.contains("Last poll error: poll failed"));
         assert!(help.contains("No hops yet."));
         assert!(help.contains("report mode (-r)"));
+        assert!(help.contains("Still no data after 15s."));
     }
 
     #[test]
