@@ -628,7 +628,7 @@ async fn get_probe(
             ));
         }
 
-        let store = state
+        let mut store = state
             .store
             .lock()
             .map_err(|_| internal_error_response("failed to lock probe store"))?;
