@@ -135,14 +135,25 @@ async fn create_probe(
 }
 
 async fn fetch_probe(client: &reqwest::Client, addr: SocketAddr, id: &str) -> serde_json::Value {
+    let (status, body) = fetch_probe_response(client, addr, id).await;
+    assert_eq!(status, reqwest::StatusCode::OK);
+    body
+}
+
+async fn fetch_probe_response(
+    client: &reqwest::Client,
+    addr: SocketAddr,
+    id: &str,
+) -> (reqwest::StatusCode, serde_json::Value) {
     let get_res = client
         .get(format!("http://{addr}/api/v1/probes/{id}"))
         .send()
         .await
         .expect("get probe request should succeed");
 
-    assert_eq!(get_res.status(), reqwest::StatusCode::OK);
-    get_res.json().await.expect("json body expected")
+    let status = get_res.status();
+    let body = get_res.json().await.expect("json body expected");
+    (status, body)
 }
 
 async fn wait_for_probe_status(
@@ -264,7 +275,11 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
                 .as_str()
                 .expect("error text should exist for failed probe");
             assert!(
-                error.contains("privileges are required") || error.contains("exit code 1"),
+                (error.contains("all target probes failed")
+                    && error.contains("127.0.0.1")
+                    && error.contains("probe execution failed"))
+                    || error.contains("privileges are required")
+                    || error.contains("exit code 1"),
                 "unexpected failure details for unprivileged environment: {terminal}"
             );
         }
@@ -684,6 +699,12 @@ async fn mtls_auth_rejects_identity_header_from_untrusted_non_loopback_ingress()
 
     assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
     assert_error_shape(&body, 403, "untrusted_mtls_ingress");
+    assert!(
+        body["error"]["detail"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("trusted ingress")
+    );
 }
 
 #[tokio::test]
@@ -755,6 +776,87 @@ async fn get_probe_returns_not_found_for_unknown_id() {
     assert_eq!(res.status(), reqwest::StatusCode::NOT_FOUND);
     let body: serde_json::Value = res.json().await.expect("json body expected");
     assert_error_shape(&body, 404, "probe_not_found");
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn expired_probe_returns_404_after_ttl() {
+    let config = RestApiConfig {
+        completed_job_ttl: Duration::from_millis(100),
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let created = create_probe(&client, addr, "definitely-not-a-real-host.invalid").await;
+    let id = created["data"]["id"]
+        .as_str()
+        .expect("id should be a string")
+        .to_string();
+
+    let _failed = wait_for_probe_status(&client, addr, &id, "failed").await;
+    sleep(Duration::from_millis(150)).await;
+
+    let (status, body) = fetch_probe_response(&client, addr, &id).await;
+    assert_eq!(status, reqwest::StatusCode::NOT_FOUND);
+    assert_error_shape(&body, 404, "probe_not_found");
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn retention_cap_evicts_oldest_completed_job() {
+    let config = RestApiConfig {
+        max_completed_jobs: 1,
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let first = create_probe(&client, addr, "definitely-not-a-real-host.invalid").await;
+    let first_id = first["data"]["id"]
+        .as_str()
+        .expect("id should be a string")
+        .to_string();
+    let _ = wait_for_probe_status(&client, addr, &first_id, "failed").await;
+
+    let second = create_probe(&client, addr, "definitely-not-a-real-host.invalid").await;
+    let second_id = second["data"]["id"]
+        .as_str()
+        .expect("id should be a string")
+        .to_string();
+    let _ = wait_for_probe_status(&client, addr, &second_id, "failed").await;
+
+    let (first_status, first_body) = fetch_probe_response(&client, addr, &first_id).await;
+    assert_eq!(first_status, reqwest::StatusCode::NOT_FOUND);
+    assert_error_shape(&first_body, 404, "probe_not_found");
+
+    let (second_status, second_body) = fetch_probe_response(&client, addr, &second_id).await;
+    assert_eq!(second_status, reqwest::StatusCode::OK);
+    assert_eq!(second_body["data"]["id"], second_id);
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn error_response_does_not_leak_internal_details() {
+    let (addr, shutdown) = spawn_server().await;
+    let client = build_http_client();
+
+    let created = create_probe(&client, addr, "definitely-not-a-real-host.invalid").await;
+    let id = created["data"]["id"]
+        .as_str()
+        .expect("id should be a string");
+
+    let failed = wait_for_probe_status(&client, addr, id, "failed").await;
+    let error = failed["data"]["error"]
+        .as_str()
+        .expect("error text should exist");
+
+    assert!(error.contains("probe execution failed"));
+    assert!(!error.contains("failed to build probe plan"));
+    assert!(!error.contains("No such file or directory"));
 
     let _ = shutdown.send(());
 }

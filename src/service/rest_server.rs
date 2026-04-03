@@ -71,7 +71,7 @@ impl RequestAuthError {
                 status: StatusCode::FORBIDDEN,
                 code: "untrusted_mtls_ingress",
                 title: "Forbidden",
-                detail: "mTLS identity headers are accepted only from trusted loopback ingress"
+                detail: "mTLS identity headers are accepted only from trusted ingress sources"
                     .to_string(),
             },
             Self::NoneLocalOnlyRemoteAccessDenied => ApiError {
@@ -161,7 +161,8 @@ impl ProbeStore {
         self.prune(Instant::now());
     }
 
-    fn get(&self, id: &str) -> Option<ProbeJob> {
+    fn get(&mut self, id: &str) -> Option<ProbeJob> {
+        self.prune(Instant::now());
         self.jobs.get(id).cloned()
     }
 }
@@ -480,19 +481,21 @@ async fn execute_probe(
                 });
             }
             Ok(Err(error)) => {
+                eprintln!("probe execution failed for {validated_target}: {error}");
                 targets.push(validated_target.clone());
                 target_results.push(ProbeTargetExecutionResult {
                     target: validated_target,
                     success: false,
-                    error: Some(format!("probe execution failed: {error}")),
+                    error: Some("probe execution failed".to_string()),
                 });
             }
             Err(error) => {
+                eprintln!("probe task panicked for {validated_target}: {error}");
                 targets.push(validated_target.clone());
                 target_results.push(ProbeTargetExecutionResult {
                     target: validated_target,
                     success: false,
-                    error: Some(format!("probe task panicked: {error}")),
+                    error: Some("probe execution failed".to_string()),
                 });
             }
         }
@@ -502,13 +505,7 @@ async fn execute_probe(
     if !target_results.is_empty() && target_results.iter().all(|result| !result.success) {
         let error_details = target_results
             .iter()
-            .map(|result| {
-                let detail = result
-                    .error
-                    .as_deref()
-                    .unwrap_or("unknown probe execution error");
-                format!("{}: {detail}", result.target)
-            })
+            .map(|result| format!("{}: probe execution failed", result.target))
             .collect::<Vec<_>>()
             .join("; ");
         return Err(format!("all target probes failed: {error_details}"));
@@ -631,7 +628,7 @@ async fn get_probe(
             ));
         }
 
-        let store = state
+        let mut store = state
             .store
             .lock()
             .map_err(|_| internal_error_response("failed to lock probe store"))?;
@@ -659,7 +656,7 @@ async fn run_with_timeout<T>(
             StatusCode::REQUEST_TIMEOUT,
             "request_timeout",
             "Request timed out",
-            format!("request processing exceeded timeout of {duration:?}"),
+            "request processing timed out".to_string(),
         )),
     }
 }
