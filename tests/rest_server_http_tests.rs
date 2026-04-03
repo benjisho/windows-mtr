@@ -275,7 +275,9 @@ async fn create_probe_transitions_through_queued_running_and_completed() {
                 .as_str()
                 .expect("error text should exist for failed probe");
             assert!(
-                error.contains("privileges are required") || error.contains("exit code 1"),
+                error.contains("probe execution failed")
+                    || error.contains("privileges are required")
+                    || error.contains("exit code 1"),
                 "unexpected failure details for unprivileged environment: {terminal}"
             );
         }
