@@ -16,12 +16,12 @@ This document serves as the single source of truth for feature delivery status.
 - **Notes**: Provides improved performance. Refer to the [DNS Caching Documentation](#) for detailed implementation and considerations.
 
 ## REST API v1
-- **Status**: ✅ Released in v1.2.x  
-- **Notes**: Features enhancements in this version. See [REST API Documentation](#) for comprehensive usage examples.
+- **Status**: ✅ Released in v1.1.3  
+- **Notes**: Implemented with API key and mTLS authentication, rate limiting, and concurrency controls. Default bind is localhost-only (`127.0.0.1:3000`). See [REST API Documentation](security/rest-api.md) for the full threat model and usage examples.
 
 ## Native Ratatui UI
-- **Status**: ✅ Released (via --ui native) in unreleased/next version  
-- **Notes**: Experimental UI feature. Refer to [UI Documentation](#) for more details.
+- **Status**: 🚧 In Progress (Experimental Preview via `--ui native`)  
+- **Notes**: Preview available on `master`. Provides live hop table, latency/loss charts, and multi-tab interface. Not yet promoted to a stable release; expect rough edges.
 
 ## ETW/Windows Observability Integration
 - **Status**: 🛣️ Roadmap  
