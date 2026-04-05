@@ -61,7 +61,7 @@ Windows MTR is an enterprise-grade network diagnostics tool that brings the powe
       <li>State machine-based probe engine</li>
       <li>Direct WinAPI integration</li>
       <li>High-performance packet processing</li>
-      <li>ETW (Event Tracing for Windows) enabled</li>
+      <li>ETW (Event Tracing for Windows) <em>(Roadmap)</em></li>
     </ul>
   </td>
   <td width="33%">
@@ -93,7 +93,7 @@ Windows MTR is built with enterprise-level security practices:
 
 - 🛡️ Regular security audits with automated scanning
 - 🔒 All dependencies vetted for vulnerabilities
-- 🧪 Comprehensive fuzzing with 1000+ malformed packet tests
+- 🧪 Fuzz harness implemented; CI integration in progress
 - 🔑 Cryptographically signed releases with SHA-256 verification
 
 ### REST API security and operational limits (v1, implemented)
@@ -352,8 +352,8 @@ The full roadmap now lives in [docs/ROADMAP.md](docs/ROADMAP.md), which is the s
 
 Quick snapshot:
 
-- ✅ Released: Core MTR functionality, MSI installer, IPv6, Docker, JSON output, DNS cache TTL.
-- 🚧 In progress: Security hardening gates (`cargo-audit` in CI, fuzz harness pending).
+- ✅ Released: Core MTR functionality, MSI installer, IPv6, Docker, JSON output, DNS cache TTL, REST API v1 (authentication, rate limiting, concurrency controls).
+- 🚧 In progress: Native Ratatui UI (experimental preview via `--ui native`), security hardening gates (`cargo-audit` in CI, fuzz harness pending CI integration).
 - 📅 Planned / 🛣️ Roadmap: SNMP integration, ETW observability, versioned JSON schema + CSV export, runtime cleanup.
 
 ## 🤝 Contributing
