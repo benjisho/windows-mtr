@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM rust:1.94.1-slim-trixie AS builder
+FROM rust:1.95.0-slim-trixie AS builder
 WORKDIR /app
 
 # Build dependency layer first for better cache reuse.
