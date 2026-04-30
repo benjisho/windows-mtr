@@ -1,13 +1,26 @@
 {
   "version": "1.1.3",
-  "description": "Windows-native drop-in replacement for Linux mtr",
+  "description": "Windows network diagnostics CLI with embedded Trippy runtime",
   "homepage": "https://github.com/benjisho/windows-mtr",
   "license": "Apache-2.0",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/benjisho/windows-mtr/releases/download/v1.1.3/windows-mtr-1.1.3-x86_64-pc-windows-msvc.zip",
+      "url": "https://github.com/benjisho/windows-mtr/releases/download/v1.1.3/windows-mtr-x86_64.zip",
       "hash": "REPLACE_WITH_RELEASE_SHA256"
     }
   },
-  "bin": "mtr.exe"
+  "bin": [
+    "mtr.exe",
+    "windows-mtr.exe"
+  ],
+  "checkver": {
+    "github": "https://github.com/benjisho/windows-mtr"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/benjisho/windows-mtr/releases/download/v$version/windows-mtr-x86_64.zip"
+      }
+    }
+  }
 }

@@ -23,8 +23,8 @@ This guide covers recommended installation methods for Windows MTR.
 Recommended for most users.
 
 1. Open the [latest release page](https://github.com/benjisho/windows-mtr/releases).
-2. Download the MSI package for your architecture.
-3. Run installer as Administrator.
+2. Download `windows-mtr-x86_64.zip` (canonical artifact).
+3. Extract the ZIP and run as Administrator.
 4. Verify from terminal:
 
 ```powershell
@@ -33,7 +33,7 @@ mtr --help
 
 ## Portable Installation
 
-1. Download `windows-mtr-x86_64.exe` (direct executable) or `windows-mtr-official-x86_64.zip` (official portable bundle).
+1. Download `windows-mtr-x86_64.zip` (official portable bundle).
 2. Extract to a folder (if using ZIP), e.g. `C:\Tools\windows-mtr`.
 3. Run directly:
 
@@ -78,8 +78,8 @@ mtr --json -c 5 1.1.1.1
 
 ## Uninstall
 
-- MSI install: remove via **Apps & Features**.
 - Portable install: delete extracted folder and any PATH entry.
+- If an older MSI-based install was used historically, remove via **Apps & Features**.
 
 ## Troubleshooting
 

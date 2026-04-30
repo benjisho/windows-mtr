@@ -11,7 +11,7 @@ use std::process::{Command, Stdio};
 pub enum UiMode {
     Default,
     Enhanced,
-    Native,
+    Dashboard,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -112,12 +112,12 @@ pub fn verify_options(request: &ProbeRequest) -> Result<(), ProbeError> {
         ));
     }
 
-    if (request.ui_mode == UiMode::Enhanced || request.ui_mode == UiMode::Native)
+    if (request.ui_mode == UiMode::Enhanced || request.ui_mode == UiMode::Dashboard)
         && (request.report || request.json_output.is_some())
     {
         let ui_name = match request.ui_mode {
             UiMode::Enhanced => "enhanced",
-            UiMode::Native => "native",
+            UiMode::Dashboard => "dashboard",
             UiMode::Default => "default",
         };
 
@@ -165,6 +165,17 @@ pub fn verify_options(request: &ProbeRequest) -> Result<(), ProbeError> {
         {
             return Err(ProbeError::InvalidOption(
                 "--trippy-flags cannot override windows-mtr enhanced UI wrapper settings"
+                    .to_string(),
+            ));
+        }
+
+        if request.ui_mode == UiMode::Dashboard
+            && parsed
+                .iter()
+                .any(|token| has_dashboard_conflicting_flag(token))
+        {
+            return Err(ProbeError::InvalidOption(
+                "--trippy-flags cannot set --mode/--report-cycles/--tui-* in --ui dashboard"
                     .to_string(),
             ));
         }
@@ -258,6 +269,100 @@ pub fn parse_passthrough_flags(flags: &str) -> Result<Vec<String>, ProbeError> {
     }
 
     Ok(parsed)
+}
+
+fn has_dashboard_conflicting_flag(token: &str) -> bool {
+    token == "--mode"
+        || token == "--report-cycles"
+        || token.starts_with("--tui-")
+        || token == "--json"
+        || token == "--json-pretty"
+}
+
+pub fn build_json_snapshot_args(
+    request: &ProbeRequest,
+    host: &str,
+) -> Result<Vec<String>, ProbeError> {
+    let mut trippy_args = vec![
+        "mtr".to_string(),
+        "--mode".to_string(),
+        "json".to_string(),
+        "--report-cycles".to_string(),
+        "1".to_string(),
+    ];
+
+    if request.tcp {
+        trippy_args.push("--tcp".to_string());
+    } else if request.udp {
+        trippy_args.push("--udp".to_string());
+    }
+
+    if let Some(port) = request.port {
+        trippy_args.extend(["--target-port".to_string(), port.to_string()]);
+    }
+
+    if let Some(source_port) = request.source_port {
+        trippy_args.extend(["--source-port".to_string(), source_port.to_string()]);
+    }
+
+    if let Some(interval) = request.interval_seconds {
+        trippy_args.extend([
+            "--min-round-duration".to_string(),
+            duration_seconds(interval),
+        ]);
+    }
+
+    if let Some(timeout) = request.timeout_seconds {
+        trippy_args.extend(["--grace-duration".to_string(), duration_seconds(timeout)]);
+    }
+
+    if request.no_dns {
+        trippy_args.extend(["--tui-address-mode".to_string(), "ip".to_string()]);
+    }
+
+    if let Some(max_hops) = request.max_hops {
+        trippy_args.extend(["--max-ttl".to_string(), max_hops.to_string()]);
+    }
+
+    if request.show_asn || request.dns_lookup_as_info {
+        trippy_args.push("--dns-lookup-as-info".to_string());
+    }
+
+    if let Some(packet_size) = request.packet_size {
+        trippy_args.extend(["--packet-size".to_string(), packet_size.to_string()]);
+    }
+
+    if let Some(src) = request.src {
+        trippy_args.extend(["--source-address".to_string(), src.to_string()]);
+    }
+
+    if let Some(interface) = &request.interface {
+        trippy_args.extend(["--interface".to_string(), interface.clone()]);
+    }
+
+    if let Some(ecmp) = &request.ecmp {
+        trippy_args.extend(["--multipath-strategy".to_string(), ecmp.clone()]);
+    }
+
+    if let Some(ttl) = request.dns_cache_ttl_seconds {
+        trippy_args.extend(["--dns-ttl".to_string(), format!("{ttl}s")]);
+    }
+
+    if let Some(extra) = &request.trippy_flags {
+        let parsed = parse_passthrough_flags(extra)?;
+        if let Some(conflict) = parsed
+            .iter()
+            .find(|token| has_dashboard_conflicting_flag(token))
+        {
+            return Err(ProbeError::InvalidOption(format!(
+                "--trippy-flags contains `{conflict}`, which conflicts with --ui dashboard JSON snapshot mode"
+            )));
+        }
+        trippy_args.extend(parsed);
+    }
+
+    trippy_args.push(host.to_string());
+    Ok(trippy_args)
 }
 
 pub fn build_embedded_trippy_args(

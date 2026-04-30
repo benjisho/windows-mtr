@@ -1,0 +1,15 @@
+VERIFICATION
+============
+
+1) Download the release ZIP from:
+   __RELEASE_URL__
+
+2) Compare SHA256:
+   Expected: __ZIP_SHA256__
+   Actual:   (Get-FileHash windows-mtr-x86_64.zip -Algorithm SHA256).Hash
+
+3) Confirm ZIP contains:
+   - mtr.exe
+   - windows-mtr.exe
+   - README.txt
+   - SHA256SUM

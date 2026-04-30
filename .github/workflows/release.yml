@@ -52,44 +52,6 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
 
-      - name: Install cargo-binstall
-        uses: taiki-e/install-action@6eb4471beed212309063862e6f5284ca3da3b01d # cargo-binstall
-
-      # Install trippy using prebuilt binaries first (same strategy as CI)
-      - name: Install trippy
-        run: |
-          echo "Installing trippy..."
-
-          # In CI, force installation to avoid stale "already installed" state
-          # and install only the expected Trippy binary (`trip`).
-          cargo binstall trippy --no-confirm --locked --force --bin trip
-
-          if ($LASTEXITCODE -ne 0) {
-            Write-Warning "cargo binstall could not fetch a prebuilt trippy binary; falling back to cargo install from source."
-            cargo install trippy --locked --force --bin trip
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Failed to install trippy via both cargo binstall and cargo install fallback."
-              exit 1
-            }
-          }
-
-          $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
-          $candidatePaths = @(
-            (Join-Path $cargoBin "trip.exe"),
-            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -ErrorAction SilentlyContinue)
-          )
-          $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-
-          if ($trippyPath -and (Test-Path -Path $trippyPath)) {
-            echo "Trippy executable found at: $trippyPath"
-            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
-          } else {
-            Write-Error "trippy executable was not found after install. Checked: $($candidatePaths -join ', ')"
-            exit 1
-          }
-        shell: pwsh
-        env:
-          CARGO_INCREMENTAL: 0
 
       # Run the tests
       - name: Run tests
@@ -166,31 +128,6 @@ jobs:
 
           echo "All binary verification tests passed successfully!"
         shell: pwsh
-
-      # Find and copy trippy executable for bundling
-      - name: Find trippy executable for bundling
-        id: find_trippy
-        run: |
-          if (-not $env:TRIPPY_PATH -or -not (Test-Path $env:TRIPPY_PATH)) {
-            $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
-            $candidatePaths = @(
-              (Join-Path $cargoBin "trip.exe"),
-              (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -ErrorAction SilentlyContinue)
-            )
-            $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-          } else {
-            $trippyPath = $env:TRIPPY_PATH
-          }
-
-          if ($trippyPath -and (Test-Path -Path $trippyPath)) {
-            echo "Found trippy at: $trippyPath"
-            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
-          } else {
-            Write-Error "Could not find trippy executable to bundle"
-            exit 1
-          }
-        shell: pwsh
-
 
   publish-package:
     name: Publish Container Packages
@@ -291,104 +228,63 @@ jobs:
             ~/.cargo/git
           cache-on-failure: true
 
-      # Create package directory structure and dist directory
-      - name: Create directories
-        run: |
-          mkdir -p dist
-          mkdir -p windows-mtr-official
-        shell: pwsh
-
-      # Create a standalone executable ZIP
+      # Create canonical release ZIP package
       - name: Create official distribution package
         run: |
-          # Build the release binary explicitly first
           cargo build --release --bin mtr --target x86_64-pc-windows-msvc
 
-          # Check for binary in different locations and list them for debugging
-          Write-Host "Searching for the MTR executable..."
-
-          $possiblePaths = @(
-            "target/x86_64-pc-windows-msvc/release/mtr.exe",
-            "target/release/mtr.exe",
-            "target\x86_64-pc-windows-msvc\release\mtr.exe",
-            "target\release\mtr.exe"
-          )
-
-          $mtrPath = $null
-          foreach ($path in $possiblePaths) {
-            if (Test-Path $path) {
-              Write-Host "Found MTR binary at: $path"
-              $mtrPath = $path
-              break
-            }
+          $mtrPath = "target/x86_64-pc-windows-msvc/release/mtr.exe"
+          if (-not (Test-Path $mtrPath)) {
+            Write-Error "No MTR executable found after build: $mtrPath"
+            exit 1
           }
 
-          # If binary not found, look more broadly
-          if ($null -eq $mtrPath) {
-            Write-Host "Binary not found in expected paths, searching in target directories..."
+          New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+          New-Item -ItemType Directory -Path "windows-mtr-package" -Force | Out-Null
 
-            # Look for any .exe files in target/release or target/x86_64-pc-windows-msvc/release
-            $exeFiles = @()
-            $exeFiles += Get-ChildItem -Path "target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
-            $exeFiles += Get-ChildItem -Path "target/x86_64-pc-windows-msvc/release" -Filter "*.exe" -ErrorAction SilentlyContinue
-            $exeFiles += Get-ChildItem -Path "target\release" -Filter "*.exe" -ErrorAction SilentlyContinue
-            $exeFiles += Get-ChildItem -Path "target\x86_64-pc-windows-msvc\release" -Filter "*.exe" -ErrorAction SilentlyContinue
+          Copy-Item $mtrPath "windows-mtr-package/mtr.exe"
+          Copy-Item $mtrPath "windows-mtr-package/windows-mtr.exe"
 
-            foreach ($file in $exeFiles) {
-              Write-Host "Found executable: $($file.FullName)"
-            }
-
-            # If we found any .exe files, use the first one
-            if ($exeFiles.Count -gt 0) {
-              $mtrPath = $exeFiles[0].FullName
-              Write-Host "Using: $mtrPath"
-            } else {
-              Write-Error "No MTR executable found after build"
-              exit 1
-            }
-          }
-
-          # Create directories
-          New-Item -ItemType Directory -Path 'dist' -Force
-          New-Item -ItemType Directory -Path 'windows-mtr-official' -Force
-
-          # Create direct executable asset and portable bundle payload
-          Copy-Item $mtrPath dist/windows-mtr-x86_64.exe
-          Copy-Item dist/windows-mtr-x86_64.exe windows-mtr-official/windows-mtr-x86_64.exe
-
-          # Add a simple README
           @"
-          Windows MTR by Benji Shohet (benjisho)
-          -------------------------------------
-
-          This portable bundle contains:
-          - windows-mtr-x86_64.exe
+          windows-mtr portable package
+          ============================
+          This ZIP contains:
+          - mtr.exe
+          - windows-mtr.exe
+          - README.txt
+          - SHA256SUM
 
           Quick Start:
-          1. Download the executable or this portable zip bundle.
-          2. Run Command Prompt or PowerShell as Administrator.
-          3. Run: mtr 8.8.8.8
+          .\mtr.exe 8.8.8.8
+          .\windows-mtr.exe -r -c 10 8.8.8.8
+          "@ | Set-Content -Path "windows-mtr-package/README.txt"
 
-          For more information see: https://github.com/benjisho/windows-mtr
-          "@ > windows-mtr-official/README.txt
-
-          # Create optional portable ZIP package
-          Compress-Archive -Path "windows-mtr-official\*" -DestinationPath "dist\windows-mtr-official-x86_64.zip" -Force
-
-          # Generate SHA256 checksums for all release assets
-          $exeHash = Get-FileHash -Path "dist\windows-mtr-x86_64.exe" -Algorithm SHA256
-          $zipHash = Get-FileHash -Path "dist\windows-mtr-official-x86_64.zip" -Algorithm SHA256
-          Set-Content -Path "dist\SHA256SUM" -Value @(
-            "$($exeHash.Hash)  windows-mtr-x86_64.exe",
-            "$($zipHash.Hash)  windows-mtr-official-x86_64.zip"
+          $mtrHash = (Get-FileHash -Path "windows-mtr-package/mtr.exe" -Algorithm SHA256).Hash
+          $windowsMtrHash = (Get-FileHash -Path "windows-mtr-package/windows-mtr.exe" -Algorithm SHA256).Hash
+          Set-Content -Path "windows-mtr-package/SHA256SUM" -Value @(
+            "$mtrHash  mtr.exe",
+            "$windowsMtrHash  windows-mtr.exe"
           )
+
+          Compress-Archive -Path "windows-mtr-package/*" -DestinationPath "dist/windows-mtr-x86_64.zip" -Force
+        shell: pwsh
+
+      - name: Verify release package contents/checksums/manifest alignment
+        run: ./scripts/release/verify-release-artifacts.ps1 -ZipPath "dist/windows-mtr-x86_64.zip"
+        shell: pwsh
+
+      - name: Release ZIP executable smoke tests
+        run: |
+          Expand-Archive -Path "dist/windows-mtr-x86_64.zip" -DestinationPath "dist/unpacked" -Force
+          & "dist/unpacked/mtr.exe" --help | Out-Null
+          & "dist/unpacked/windows-mtr.exe" --version | Out-Null
+          & "dist/unpacked/mtr.exe" -n -r -c 1 127.0.0.1 | Out-Null
         shell: pwsh
 
       - name: Smoke check release asset names
         run: |
           $requiredAssets = @(
-            "dist/windows-mtr-x86_64.exe",
-            "dist/windows-mtr-official-x86_64.zip"
+            "dist/windows-mtr-x86_64.zip"
           )
 
           foreach ($asset in $requiredAssets) {
@@ -408,9 +304,7 @@ jobs:
         with:
           name: windows-mtr-release
           path: |
-            dist/windows-mtr-x86_64.exe
-            dist/windows-mtr-official-x86_64.zip
-            dist/SHA256SUM
+            dist/windows-mtr-x86_64.zip
           if-no-files-found: error
           compression-level: 9
 
@@ -420,39 +314,28 @@ jobs:
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           files: |
-            dist/windows-mtr-x86_64.exe
-            dist/windows-mtr-official-x86_64.zip
-            dist/SHA256SUM
+            dist/windows-mtr-x86_64.zip
           name: Windows MTR ${{ github.ref_name }}
           body: |
             # Windows MTR ${{ github.ref_name }}
 
-            A Windows-native clone of Linux MTR for network path diagnostics.
+            Canonical release artifact:
+            - [**windows-mtr-x86_64.zip**](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr-x86_64.zip)
 
-            ## Downloads
+            ZIP contents:
+            - `mtr.exe`
+            - `windows-mtr.exe`
+            - `README.txt`
+            - `SHA256SUM`
 
-            - [**windows-mtr-x86_64.exe**](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr-x86_64.exe) - Direct executable
-            - [**windows-mtr-official-x86_64.zip**](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr-official-x86_64.zip) - Official portable bundle
-            - [**SHA256SUM**](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/SHA256SUM)
+            Quick Start:
+            - `.\\mtr.exe 8.8.8.8`
+            - `.\\windows-mtr.exe -r -c 10 8.8.8.8`
 
-            ## Quick Start
-
-            1. Download `windows-mtr-x86_64.exe` or `windows-mtr-official-x86_64.zip`.
-            2. Run Command Prompt or PowerShell as Administrator.
-            3. Run `mtr 8.8.8.8`.
-
-            ## Usage
-
-            ```
-            # Basic usage
-            windows-mtr 8.8.8.8
-
-            # TCP mode (for HTTPS)
-            windows-mtr -T -P 443 example.com
-
-            # Report mode (no live updates)
-            windows-mtr -r -c 10 google.com
-            ```
+            UI modes:
+            - `--ui default`: embedded Trippy TUI
+            - `--ui enhanced`: embedded Trippy TUI with windows-mtr thresholds/preset
+            - `--ui dashboard`: experimental dashboard fallback that polls JSON snapshots (`--ui native` alias)
 
             See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/master/USAGE.md) for complete documentation.
           draft: false
