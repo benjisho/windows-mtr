@@ -1,5 +1,5 @@
-PackageIdentifier: benjisho.windows-mtr
-PackageVersion: 1.1.3
+PackageIdentifier: BenjiShohet.WindowsMTR
+PackageVersion: VERSION
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.6.0

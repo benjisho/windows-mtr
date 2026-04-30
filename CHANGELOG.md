@@ -8,11 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Added a native Ratatui preview mode via `--ui native` with tabs, hop table rendering, and live latency/loss charts.
+- Added canonical release/distribution docs (`docs/distribution.md`) and strategic capability validation matrix (`docs/capability-validation.md`).
+- Added release automation scripts under `scripts/release/` for artifact verification and local package-manifest updates (WinGet/Scoop/Chocolatey).
+- Added package-manager readiness templates for WinGet, Scoop, and Chocolatey that reference the canonical GitHub Release ZIP.
 
 ### Changed
-- Updated README/USAGE roadmap and examples to document the new native UI preview and controls.
-- Improved the native UI help footer to show elapsed "awaiting data" time and add a 15-second timeout troubleshooting prompt when hop snapshots never arrive.
+- Renamed user-facing dashboard mode to `--ui dashboard` and retained `--ui native` as a compatibility alias.
+- Refactored dashboard polling to use dedicated JSON snapshot args from the service layer instead of mutating TUI args.
+- Updated release workflow to produce and validate canonical `windows-mtr-x86_64.zip` contents (`mtr.exe`, `windows-mtr.exe`, `README.txt`, `SHA256SUM`).
+- Updated README/USAGE/installation docs to align with GitHub Releases as canonical source and to document dashboard fallback behavior honestly.
+
+### Fixed
+- Fixed dashboard packet-loss parsing so percent fields (`loss_pct`, `loss_percentage`) are treated as percentages while ratio fields (`loss_ratio`) are converted to percent.
 
 ## [1.1.3] - 2026-02-28
 

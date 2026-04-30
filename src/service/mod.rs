@@ -11,7 +11,7 @@ use std::process::{Command, Stdio};
 pub enum UiMode {
     Default,
     Enhanced,
-    Native,
+    Dashboard,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -63,6 +63,7 @@ pub struct ProbeRequest {
 pub struct ProbePlan {
     pub validated_host: String,
     pub trippy_args: Vec<String>,
+    pub dashboard_snapshot_args: Option<Vec<String>>,
     pub json_output: Option<JsonOutput>,
     pub ui_mode: UiMode,
 }
@@ -112,12 +113,12 @@ pub fn verify_options(request: &ProbeRequest) -> Result<(), ProbeError> {
         ));
     }
 
-    if (request.ui_mode == UiMode::Enhanced || request.ui_mode == UiMode::Native)
+    if (request.ui_mode == UiMode::Enhanced || request.ui_mode == UiMode::Dashboard)
         && (request.report || request.json_output.is_some())
     {
         let ui_name = match request.ui_mode {
             UiMode::Enhanced => "enhanced",
-            UiMode::Native => "native",
+            UiMode::Dashboard => "dashboard",
             UiMode::Default => "default",
         };
 
@@ -168,6 +169,21 @@ pub fn verify_options(request: &ProbeRequest) -> Result<(), ProbeError> {
                     .to_string(),
             ));
         }
+
+        if request.ui_mode == UiMode::Dashboard {
+            let dashboard_conflicts = ["--mode", "--report-cycles"];
+            let has_dashboard_conflict = parsed.iter().enumerate().any(|(index, token)| {
+                token.starts_with("--tui-")
+                    || dashboard_conflicts.contains(&token.as_str())
+                    || (index > 0 && dashboard_conflicts.contains(&parsed[index - 1].as_str()))
+            });
+
+            if has_dashboard_conflict {
+                return Err(ProbeError::InvalidOption(
+                    "--trippy-flags for --ui dashboard cannot include --mode, --report-cycles, or any --tui-* flags".to_string(),
+                ));
+            }
+        }
     }
 
     Ok(())
@@ -177,10 +193,16 @@ pub fn build_probe_plan(request: &ProbeRequest) -> Result<ProbePlan, ProbeError>
     verify_options(request)?;
     let validated_host = validate_target(&request.host)?;
     let trippy_args = build_embedded_trippy_args(request, &validated_host)?;
+    let dashboard_snapshot_args = if request.ui_mode == UiMode::Dashboard {
+        Some(build_json_snapshot_args(request, &validated_host)?)
+    } else {
+        None
+    };
 
     Ok(ProbePlan {
         validated_host,
         trippy_args,
+        dashboard_snapshot_args,
         json_output: request.json_output,
         ui_mode: request.ui_mode,
     })
@@ -357,6 +379,83 @@ pub fn build_embedded_trippy_args(
 
     trippy_args.push(host.to_string());
     Ok(trippy_args)
+}
+
+pub fn build_json_snapshot_args(
+    request: &ProbeRequest,
+    host: &str,
+) -> Result<Vec<String>, ProbeError> {
+    let mut args = vec![
+        "mtr".to_string(),
+        "--mode".to_string(),
+        "json".to_string(),
+        "--report-cycles".to_string(),
+        "1".to_string(),
+    ];
+
+    if request.tcp {
+        args.push("--tcp".to_string());
+    } else if request.udp {
+        args.push("--udp".to_string());
+    }
+
+    if let Some(port) = request.port {
+        args.extend(["--target-port".to_string(), port.to_string()]);
+    }
+
+    if let Some(source_port) = request.source_port {
+        args.extend(["--source-port".to_string(), source_port.to_string()]);
+    }
+
+    if let Some(interval) = request.interval_seconds {
+        args.extend([
+            "--min-round-duration".to_string(),
+            duration_seconds(interval),
+        ]);
+    }
+
+    if let Some(timeout) = request.timeout_seconds {
+        args.extend(["--grace-duration".to_string(), duration_seconds(timeout)]);
+    }
+
+    if request.no_dns {
+        args.extend(["--tui-address-mode".to_string(), "ip".to_string()]);
+    }
+
+    if let Some(max_hops) = request.max_hops {
+        args.extend(["--max-ttl".to_string(), max_hops.to_string()]);
+    }
+
+    if request.show_asn || request.dns_lookup_as_info {
+        args.push("--dns-lookup-as-info".to_string());
+    }
+
+    if let Some(packet_size) = request.packet_size {
+        args.extend(["--packet-size".to_string(), packet_size.to_string()]);
+    }
+
+    if let Some(src) = request.src {
+        args.extend(["--source-address".to_string(), src.to_string()]);
+    }
+
+    if let Some(interface) = &request.interface {
+        args.extend(["--interface".to_string(), interface.clone()]);
+    }
+
+    if let Some(ecmp) = &request.ecmp {
+        args.extend(["--multipath-strategy".to_string(), ecmp.clone()]);
+    }
+
+    if let Some(ttl) = request.dns_cache_ttl_seconds {
+        args.extend(["--dns-ttl".to_string(), format!("{ttl}s")]);
+    }
+
+    if let Some(extra) = &request.trippy_flags {
+        args.extend(parse_passthrough_flags(extra)?);
+    }
+
+    args.push(host.to_string());
+    Ok(args)
 }
 
 pub fn run_embedded_trippy(

@@ -383,32 +383,6 @@ jobs:
             ~/.cargo/git
           cache-on-failure: true
 
-      - name: Install cargo-binstall
-        uses: taiki-e/install-action@6eb4471beed212309063862e6f5284ca3da3b01d # cargo-binstall
-
-      - name: Install trippy (prebuilt binary)
-        run: |
-          echo "Installing trippy prebuilt binary..."
-          cargo binstall trippy --no-confirm --locked
-
-          $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
-          $candidatePaths = @(
-            (Join-Path $cargoBin "trip.exe"),
-            (Join-Path $cargoBin "trippy.exe"),
-            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
-            (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
-          )
-          $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-
-          if ($trippyPath -and (Test-Path -Path $trippyPath)) {
-            echo "Trippy executable found at: $trippyPath"
-            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
-          } else {
-            Write-Error "Could not find trippy executable after cargo binstall. Checked: $($candidatePaths -join ', ')"
-            exit 1
-          }
-        shell: pwsh
-
       - name: Build release binary
         run: cargo build --release --target x86_64-pc-windows-msvc
         env:
@@ -423,9 +397,6 @@ jobs:
           cp README.md pr-build/
           cp LICENSE pr-build/
           if (Test-Path USAGE.md) { cp USAGE.md pr-build/ }
-
-          # Copy trippy executable
-          cp "${{ env.TRIPPY_PATH }}" pr-build/trip.exe
         shell: pwsh
 
       - name: Create ZIP package
@@ -495,6 +466,31 @@ jobs:
         run: cargo check --all-targets
         env:
           CARGO_INCREMENTAL: 0
+
+  release-script-dry-run:
+    name: Release script dry-run
+    runs-on: windows-latest
+    needs: pre-commit
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Create synthetic release ZIP
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/payload -Force | Out-Null
+          Set-Content dist/payload/mtr.exe "stub"
+          Copy-Item dist/payload/mtr.exe dist/payload/windows-mtr.exe
+          Set-Content dist/payload/README.txt ".\\mtr.exe 8.8.8.8`n.\\windows-mtr.exe -r -c 10 8.8.8.8"
+          $h1 = (Get-FileHash dist/payload/mtr.exe -Algorithm SHA256).Hash
+          $h2 = (Get-FileHash dist/payload/windows-mtr.exe -Algorithm SHA256).Hash
+          @(\"$h1  mtr.exe\", \"$h2  windows-mtr.exe\") | Set-Content dist/payload/SHA256SUM
+          Compress-Archive -Path dist/payload/* -DestinationPath dist/windows-mtr-x86_64.zip -Force
+
+      - name: Verify release artifact script
+        shell: pwsh
+        run: ./scripts/release/verify-release-artifacts.ps1 -ZipPath dist/windows-mtr-x86_64.zip
 
   test-ubuntu-stable-full:
     name: Test (ubuntu-latest, stable-full)

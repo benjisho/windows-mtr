@@ -6,7 +6,7 @@
 mtr [options] <hostname-or-ip>
 ```
 
-> On Windows portable downloads, replace `mtr` with your actual executable name (for example `windows-mtr-x86_64.exe`).
+> For GitHub Release ZIP installs, run either `mtr.exe` or `windows-mtr.exe` from the extracted folder.
 
 ## Core Options
 
@@ -34,15 +34,17 @@ mtr [options] <hostname-or-ip>
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
 | `-z` | DNS ASN lookup shortcut |
-| `--ui <default\|enhanced\|native>` | Interactive UI preset (enhanced enables diagnostic overlays) |
+| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (`native` remains a deprecated compatibility alias for dashboard) |
 
-## Native Ratatui UI
+## Dashboard UI (experimental fallback)
 
-Use `--ui native` to run the built-in Ratatui interface with live hop data, a hop table, and charts.
+Use `--ui dashboard` to run the windows-mtr dashboard that polls embedded Trippy JSON snapshots. This mode is intended as a fallback when embedded Trippy TUI is unstable in your terminal.
 
 ```bash
-mtr --ui native 8.8.8.8
+mtr --ui dashboard 8.8.8.8
 ```
+
+`--ui native` remains supported as a compatibility alias.
 
 Controls:
 - `Tab` / `→` switch to next tab
@@ -51,7 +53,7 @@ Controls:
 
 When probe snapshots fail repeatedly, the help footer surfaces the latest poll error and live troubleshooting hints (run with Administrator privileges, review firewall policy, or try report mode with `-r`). If no hop data is detected for 15 seconds, the footer also prompts you to quit (`q`) and retry in report mode for immediate diagnostics.
 
-`--ui native` accepts the standard probe and output tuning options, and renders them in the native Ratatui view.
+`--ui dashboard` accepts probe-related options. It rejects `--mode`, `--report-cycles`, and `--tui-*` passthrough overrides to keep snapshot polling deterministic.
 
 ## Enhanced UI options
 
@@ -191,3 +193,18 @@ Input validation before probe execution:
 - Intervals/timeouts validated as positive finite numbers (`timeout >= interval`)
 
 See [docs/security/rest-api.md](docs/security/rest-api.md).
+
+
+## Troubleshooting interactive failures
+
+If interactive TUI exits with `0xC0000005`, switch to dashboard mode:
+
+```powershell
+.\mtr.exe --ui dashboard 8.8.8.8
+```
+
+For stable non-interactive diagnostics:
+
+```powershell
+.\mtr.exe -n -r -c 5 8.8.8.8
+```

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>windows-mtr.portable</id>
+    <version>VERSION</version>
+    <title>windows-mtr (Portable)</title>
+    <authors>Benji Shohet</authors>
+    <projectUrl>https://github.com/benjisho/windows-mtr</projectUrl>
+    <projectSourceUrl>https://github.com/benjisho/windows-mtr</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/benjisho/windows-mtr/issues</bugTrackerUrl>
+    <license type="expression">Apache-2.0</license>
+    <tags>windows mtr traceroute networking diagnostics</tags>
+    <summary>Portable windows-mtr binaries from canonical GitHub Release artifacts.</summary>
+    <description>Installs windows-mtr portable binaries (`mtr.exe` and `windows-mtr.exe`) from the canonical GitHub Release ZIP and verifies checksums.</description>
+    <releaseNotes>https://github.com/benjisho/windows-mtr/releases/tag/vVERSION</releaseNotes>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

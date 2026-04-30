@@ -170,7 +170,7 @@ struct TraceCli {
     )]
     trippy_flags: Option<String>,
 
-    /// UI preset for interactive mode
+    /// UI preset for interactive mode (dashboard is experimental; native is a deprecated alias)
     #[arg(long = "ui", value_enum, default_value_t = UiPreset::Default)]
     ui: UiPreset,
 
@@ -207,7 +207,8 @@ struct TraceCli {
 enum UiPreset {
     Default,
     Enhanced,
-    Native,
+    #[value(alias = "native")]
+    Dashboard,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -262,7 +263,7 @@ fn windows_exit_diagnostic(exit_code: i32) -> Option<&'static str> {
     match exit_code as u32 {
         0xC0000005 => Some(
             "Detected a Windows access violation from the embedded Trippy UI. \
-             Retry with `mtr --ui native <target>` or use report mode (`mtr -r -c 5 <target>`).",
+             Retry with `mtr --ui dashboard <target>` or use report mode (`mtr -r -c 5 <target>`).",
         ),
         _ => None,
     }
@@ -356,7 +357,7 @@ fn ui_mode_from_cli(ui: UiPreset) -> UiMode {
     match ui {
         UiPreset::Default => UiMode::Default,
         UiPreset::Enhanced => UiMode::Enhanced,
-        UiPreset::Native => UiMode::Native,
+        UiPreset::Dashboard => UiMode::Dashboard,
     }
 }
 
@@ -453,8 +454,12 @@ fn main() -> anyhow::Result<()> {
         .map_err(|error| anyhow::anyhow!(error.to_string()))
         .context("invalid command-line options")?;
 
-    if plan.ui_mode == UiMode::Native {
-        let code = native_ui::run_native_ui(&plan.validated_host, &plan.trippy_args)?;
+    if plan.ui_mode == UiMode::Dashboard {
+        let snapshot_args = plan
+            .dashboard_snapshot_args
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("missing dashboard JSON snapshot args in probe plan"))?;
+        let code = native_ui::run_dashboard_ui(&plan.validated_host, snapshot_args)?;
         process::exit(code);
     }
 
@@ -743,5 +748,16 @@ mod tests {
             err.to_string()
                 .contains("missing host argument (or run with --api)")
         );
+    }
+
+    #[test]
+    fn ui_dashboard_accepts_native_alias_for_compatibility() {
+        let dashboard = Cli::try_parse_from(["mtr", "--ui", "dashboard", "8.8.8.8"])
+            .expect("dashboard value should parse");
+        let native_alias = Cli::try_parse_from(["mtr", "--ui", "native", "8.8.8.8"])
+            .expect("native alias should parse");
+
+        assert_eq!(dashboard.trace.ui, UiPreset::Dashboard);
+        assert_eq!(native_alias.trace.ui, UiPreset::Dashboard);
     }
 }

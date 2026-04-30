@@ -27,7 +27,7 @@ For release-by-release details, see the [changelog](../CHANGELOG.md).
 | Container publishing to GHCR + Docker Hub | ✅ Released | v1.2.x |
 | REST API (API key + mTLS auth, rate limiting, concurrency controls) | ✅ Released | v1.1.3 |
 | SNMP Integration | 📅 Planned | H2 2026 |
-| Native Ratatui UI (tabs, hop table, charts) | 🚧 In Progress (Experimental Preview via `--ui native`) | H2 2026 |
+| Dashboard UI (tabs, hop table, charts) | 🚧 In Progress (Experimental Preview via `--ui dashboard (native alias retained)`) | H2 2026 |
 | ETW + Windows observability integrations | 🛣️ Roadmap | H2 2026 |
 | Versioned JSON schema + CSV export | 🛣️ Roadmap | H2 2026 |
 | Security hardening gates (cargo-audit + fuzz harness in CI) | 🚧 In Progress (cargo-audit live, fuzz harness pending) | H2 2026 |

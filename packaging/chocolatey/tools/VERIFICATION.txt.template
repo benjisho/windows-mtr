@@ -1,0 +1,13 @@
+Verification steps for windows-mtr portable package:
+
+1. Download the canonical release ZIP:
+   https://github.com/benjisho/windows-mtr/releases/download/vVERSION/windows-mtr-x86_64.zip
+2. Verify SHA256 matches the release SHA256SUM and Chocolatey package metadata.
+3. Confirm ZIP contents include:
+   - mtr.exe
+   - windows-mtr.exe
+   - README.txt
+   - SHA256SUM
+4. Run:
+   .\\mtr.exe --help
+   .\\windows-mtr.exe --version

@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use windows_mtr::service::{
     EnhancedUiConfig, JsonOutput, ProbeError, ProbeRequest, UiMode, build_embedded_trippy_args,
-    build_probe_plan, parse_passthrough_flags,
+    build_json_snapshot_args, build_probe_plan, parse_passthrough_flags,
 };
 
 fn base_request() -> ProbeRequest {
@@ -171,6 +171,34 @@ fn build_embedded_trippy_args_supports_json_mode() {
 
     let trippy_args = build_embedded_trippy_args(&request, "8.8.8.8").expect("should build");
     assert_eq!(trippy_args, vec!["mtr", "--mode", "json", "8.8.8.8"]);
+}
+
+#[test]
+fn build_json_snapshot_args_omits_tui_wrapper_flags() {
+    let mut request = base_request();
+    request.tcp = true;
+    request.port = Some(443);
+    request.count = Some(99);
+    request.ui_mode = UiMode::Dashboard;
+    request.trippy_flags = Some("--verbose".to_string());
+
+    let args = build_json_snapshot_args(&request, "8.8.8.8").expect("should build");
+    assert!(args.contains(&"--mode".to_string()));
+    assert!(args.contains(&"json".to_string()));
+    assert!(args.contains(&"--report-cycles".to_string()));
+    assert!(args.contains(&"1".to_string()));
+    assert!(!args.contains(&"tui".to_string()));
+    assert!(!args.iter().any(|token| token.starts_with("--tui-")));
+}
+
+#[test]
+fn dashboard_rejects_conflicting_passthrough_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Dashboard;
+    request.trippy_flags = Some("--mode tui --tui-refresh-rate 100ms".to_string());
+
+    let err = build_probe_plan(&request).expect_err("dashboard conflicts should be rejected");
+    assert!(matches!(err, ProbeError::InvalidOption(_)));
 }
 
 #[test]
