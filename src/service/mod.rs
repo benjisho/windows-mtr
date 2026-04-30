@@ -11,7 +11,7 @@ use std::process::{Command, Stdio};
 pub enum UiMode {
     Default,
     Enhanced,
-    Native,
+    Dashboard,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -112,12 +112,12 @@ pub fn verify_options(request: &ProbeRequest) -> Result<(), ProbeError> {
         ));
     }
 
-    if (request.ui_mode == UiMode::Enhanced || request.ui_mode == UiMode::Native)
+    if (request.ui_mode == UiMode::Enhanced || request.ui_mode == UiMode::Dashboard)
         && (request.report || request.json_output.is_some())
     {
         let ui_name = match request.ui_mode {
             UiMode::Enhanced => "enhanced",
-            UiMode::Native => "native",
+            UiMode::Dashboard => "dashboard",
             UiMode::Default => "default",
         };
 
@@ -353,6 +353,103 @@ pub fn build_embedded_trippy_args(
 
     if let Some(extra) = &request.trippy_flags {
         trippy_args.extend(parse_passthrough_flags(extra)?);
+    }
+
+    trippy_args.push(host.to_string());
+    Ok(trippy_args)
+}
+
+pub fn build_json_snapshot_args(
+    request: &ProbeRequest,
+    host: &str,
+) -> Result<Vec<String>, ProbeError> {
+    verify_options(request)?;
+    let mut trippy_args = vec!["mtr".to_string(), "--mode".to_string(), "json".to_string()];
+
+    trippy_args.extend(["--report-cycles".to_string(), "1".to_string()]);
+
+    if request.tcp {
+        trippy_args.push("--tcp".to_string());
+    } else if request.udp {
+        trippy_args.push("--udp".to_string());
+    }
+
+    if let Some(port) = request.port {
+        trippy_args.extend(["--target-port".to_string(), port.to_string()]);
+    }
+
+    if let Some(source_port) = request.source_port {
+        trippy_args.extend(["--source-port".to_string(), source_port.to_string()]);
+    }
+
+    if let Some(interval) = request.interval_seconds {
+        trippy_args.extend([
+            "--min-round-duration".to_string(),
+            duration_seconds(interval),
+        ]);
+    }
+
+    if let Some(timeout) = request.timeout_seconds {
+        trippy_args.extend(["--grace-duration".to_string(), duration_seconds(timeout)]);
+    }
+
+    if request.no_dns {
+        trippy_args.extend(["--tui-address-mode".to_string(), "ip".to_string()]);
+    }
+
+    if let Some(max_hops) = request.max_hops {
+        trippy_args.extend(["--max-ttl".to_string(), max_hops.to_string()]);
+    }
+
+    if request.show_asn || request.dns_lookup_as_info {
+        trippy_args.push("--dns-lookup-as-info".to_string());
+    }
+
+    if let Some(packet_size) = request.packet_size {
+        trippy_args.extend(["--packet-size".to_string(), packet_size.to_string()]);
+    }
+
+    if let Some(src) = request.src {
+        trippy_args.extend(["--source-address".to_string(), src.to_string()]);
+    }
+
+    if let Some(interface) = &request.interface {
+        trippy_args.extend(["--interface".to_string(), interface.clone()]);
+    }
+
+    if let Some(ecmp) = &request.ecmp {
+        trippy_args.extend(["--multipath-strategy".to_string(), ecmp.clone()]);
+    }
+
+    if let Some(ttl) = request.dns_cache_ttl_seconds {
+        trippy_args.extend(["--dns-ttl".to_string(), format!("{ttl}s")]);
+    }
+
+    if let Some(extra) = &request.trippy_flags {
+        let parsed = parse_passthrough_flags(extra)?;
+        let forbidden = [
+            "--mode",
+            "--report-cycles",
+            "--json",
+            "--json-pretty",
+            "--tui-latency-warn-threshold",
+            "--tui-loss-warn-threshold",
+            "--tui-latency-bad-threshold",
+            "--tui-loss-bad-threshold",
+            "--tui-row-coloring",
+            "--tui-hop-trend",
+            "--tui-summary-jitter",
+            "--tui-summary-percentiles",
+        ];
+        if parsed
+            .iter()
+            .any(|token| forbidden.iter().any(|forbidden| token == forbidden))
+        {
+            return Err(ProbeError::InvalidOption(
+                "--trippy-flags contains dashboard/json-incompatible options".to_string(),
+            ));
+        }
+        trippy_args.extend(parsed);
     }
 
     trippy_args.push(host.to_string());

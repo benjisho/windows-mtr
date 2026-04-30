@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use windows_mtr::service::{
     EnhancedUiConfig, JsonOutput, ProbeError, ProbeRequest, UiMode, build_embedded_trippy_args,
-    build_probe_plan, parse_passthrough_flags,
+    build_json_snapshot_args, build_probe_plan, parse_passthrough_flags,
 };
 
 fn base_request() -> ProbeRequest {
@@ -180,6 +180,31 @@ fn enhanced_ui_overrides_require_enhanced_mode() {
 
     assert!(matches!(
         build_probe_plan(&request),
+        Err(ProbeError::InvalidOption(_))
+    ));
+}
+
+#[test]
+fn build_json_snapshot_args_uses_json_mode_and_skips_tui_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Dashboard;
+    request.trippy_flags = Some("--log-format json".to_string());
+
+    let args = build_json_snapshot_args(&request, "8.8.8.8").expect("should build");
+    assert!(args.windows(2).any(|pair| pair == ["--mode", "json"]));
+    assert!(args.windows(2).any(|pair| pair == ["--report-cycles", "1"]));
+    assert!(!args.windows(2).any(|pair| pair == ["--mode", "tui"]));
+    assert!(!args.iter().any(|token| token.starts_with("--tui-")));
+}
+
+#[test]
+fn build_json_snapshot_args_rejects_conflicting_passthrough_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Dashboard;
+    request.trippy_flags = Some("--mode tui".to_string());
+
+    assert!(matches!(
+        build_json_snapshot_args(&request, "8.8.8.8"),
         Err(ProbeError::InvalidOption(_))
     ));
 }

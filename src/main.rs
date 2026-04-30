@@ -7,8 +7,8 @@ use std::time::Duration;
 use windows_mtr::service::rest_api::{AuthStrategy, RestApiConfig};
 use windows_mtr::service::rest_server::run_rest_api_server;
 use windows_mtr::service::{
-    EnhancedUiConfig, JsonOutput, ProbeError, ProbeRequest, UiMode, build_probe_plan,
-    run_embedded_trippy,
+    EnhancedUiConfig, JsonOutput, ProbeError, ProbeRequest, UiMode, build_json_snapshot_args,
+    build_probe_plan, run_embedded_trippy,
 };
 
 mod error;
@@ -170,7 +170,7 @@ struct TraceCli {
     )]
     trippy_flags: Option<String>,
 
-    /// UI preset for interactive mode
+    /// UI preset for interactive mode (dashboard is experimental fallback; native alias is deprecated)
     #[arg(long = "ui", value_enum, default_value_t = UiPreset::Default)]
     ui: UiPreset,
 
@@ -205,9 +205,13 @@ struct TraceCli {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum UiPreset {
+    /// default: embedded Trippy interactive TUI
     Default,
+    /// enhanced: embedded Trippy TUI with windows-mtr thresholds/preset
     Enhanced,
-    Native,
+    /// dashboard: experimental windows-mtr dashboard that polls JSON snapshots; useful if embedded Trippy TUI crashes in your terminal
+    #[value(alias = "native")]
+    Dashboard,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -262,7 +266,7 @@ fn windows_exit_diagnostic(exit_code: i32) -> Option<&'static str> {
     match exit_code as u32 {
         0xC0000005 => Some(
             "Detected a Windows access violation from the embedded Trippy UI. \
-             Retry with `mtr --ui native <target>` or use report mode (`mtr -r -c 5 <target>`).",
+             Retry with `mtr --ui dashboard <target>` or use report mode (`mtr -r -c 5 <target>`).",
         ),
         _ => None,
     }
@@ -356,7 +360,7 @@ fn ui_mode_from_cli(ui: UiPreset) -> UiMode {
     match ui {
         UiPreset::Default => UiMode::Default,
         UiPreset::Enhanced => UiMode::Enhanced,
-        UiPreset::Native => UiMode::Native,
+        UiPreset::Dashboard => UiMode::Dashboard,
     }
 }
 
@@ -453,8 +457,12 @@ fn main() -> anyhow::Result<()> {
         .map_err(|error| anyhow::anyhow!(error.to_string()))
         .context("invalid command-line options")?;
 
-    if plan.ui_mode == UiMode::Native {
-        let code = native_ui::run_native_ui(&plan.validated_host, &plan.trippy_args)?;
+    if plan.ui_mode == UiMode::Dashboard {
+        let snapshot_args = build_json_snapshot_args(&request, &plan.validated_host)
+            .map_err(to_cli_error)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))
+            .context("invalid dashboard snapshot options")?;
+        let code = native_ui::run_dashboard_ui(&plan.validated_host, &snapshot_args)?;
         process::exit(code);
     }
 
@@ -554,6 +562,16 @@ mod tests {
         assert!(windows_exit_diagnostic(1).is_none());
     }
 
+    #[test]
+    fn cli_supports_dashboard_ui_and_native_alias() {
+        let dashboard = Cli::try_parse_from(["mtr", "--ui", "dashboard", "8.8.8.8"])
+            .expect("dashboard ui should parse");
+        assert_eq!(dashboard.trace.ui, UiPreset::Dashboard);
+
+        let legacy = Cli::try_parse_from(["mtr", "--ui", "native", "8.8.8.8"])
+            .expect("native alias should parse");
+        assert_eq!(legacy.trace.ui, UiPreset::Dashboard);
+    }
     #[test]
     fn cli_parses_api_bind_override() {
         let cli = Cli::try_parse_from(["mtr", "--api", "--api-bind", "127.0.0.1:4000"])

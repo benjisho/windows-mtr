@@ -33,7 +33,7 @@ struct HopStat {
     worst_ms: f64,
 }
 
-pub struct NativeUiApp {
+pub struct DashboardUiApp {
     target: String,
     tab_index: usize,
     hops: Vec<HopStat>,
@@ -44,7 +44,7 @@ pub struct NativeUiApp {
     consecutive_poll_failures: u32,
 }
 
-impl NativeUiApp {
+impl DashboardUiApp {
     fn new(target: &str) -> Self {
         Self {
             target: target.to_string(),
@@ -98,15 +98,15 @@ impl NativeUiApp {
     }
 }
 
-pub fn run_native_ui(target: &str, trippy_args: &[String]) -> anyhow::Result<i32> {
-    enable_raw_mode().context("failed to enable raw mode for native UI")?;
+pub fn run_dashboard_ui(target: &str, snapshot_args: &[String]) -> anyhow::Result<i32> {
+    enable_raw_mode().context("failed to enable raw mode for dashboard UI")?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).context("failed to initialize terminal backend")?;
 
-    let result = run_ui_loop(&mut terminal, target, trippy_args);
+    let result = run_ui_loop(&mut terminal, target, snapshot_args);
 
     let mut restore_error: Option<anyhow::Error> = None;
 
@@ -136,13 +136,13 @@ pub fn run_native_ui(target: &str, trippy_args: &[String]) -> anyhow::Result<i32
 fn run_ui_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     target: &str,
-    trippy_args: &[String],
+    snapshot_args: &[String],
 ) -> anyhow::Result<i32> {
-    let mut app = NativeUiApp::new(target);
+    let mut app = DashboardUiApp::new(target);
     let tick_rate = Duration::from_millis(250);
     let poll_rate = Duration::from_millis(900);
     let (snapshot_tx, snapshot_rx) = mpsc::channel::<anyhow::Result<Vec<HopStat>>>();
-    let poll_args = trippy_args.to_vec();
+    let poll_args = snapshot_args.to_vec();
     let poll_target = target.to_string();
 
     thread::spawn(move || {
@@ -178,24 +178,16 @@ fn run_ui_loop(
     }
 }
 
-fn fetch_hops_snapshot(base_args: &[String], target: &str) -> anyhow::Result<Vec<HopStat>> {
+fn fetch_hops_snapshot(snapshot_args: &[String], target: &str) -> anyhow::Result<Vec<HopStat>> {
     // SAFETY: `current_exe` is only used to re-exec this process for local JSON polling,
     // not for any trust or authorization decision.
     let current_exe =
         // nosemgrep: rust.lang.security.current-exe.current-exe
-        env::current_exe().context("failed to locate current executable for native UI polling")?;
-
-    let mut args = sanitize_args_for_json_snapshot(base_args);
-    args.extend([
-        "--mode".to_string(),
-        "json".to_string(),
-        "--report-cycles".to_string(),
-        "1".to_string(),
-    ]);
+        env::current_exe().context("failed to locate current executable for dashboard UI polling")?;
 
     let output = Command::new(&current_exe)
         .env(EMBEDDED_TRIPPY_ENV, "1")
-        .args(args.iter().skip(1))
+        .args(snapshot_args.iter().skip(1))
         .output()
         .context("failed to run embedded trippy JSON poll")?;
 
@@ -208,28 +200,6 @@ fn fetch_hops_snapshot(base_args: &[String], target: &str) -> anyhow::Result<Vec
         .context("failed to parse trippy JSON poll output")?;
 
     Ok(extract_hops(&value, target))
-}
-
-fn sanitize_args_for_json_snapshot(base_args: &[String]) -> Vec<String> {
-    let mut cleaned = Vec::with_capacity(base_args.len());
-    let mut skip_next = false;
-    let pair_flags = ["--mode", "--report-cycles"];
-
-    for token in base_args {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
-
-        if pair_flags.contains(&token.as_str()) {
-            skip_next = true;
-            continue;
-        }
-
-        cleaned.push(token.clone());
-    }
-
-    cleaned
 }
 
 fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
@@ -251,7 +221,7 @@ fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
                 format!("hop-{hop}")
             }
         });
-        let loss_pct = read_f64(item, &["loss_pct", "loss", "loss_percentage"]).unwrap_or(0.0);
+        let loss_pct = read_loss_pct(item).unwrap_or(0.0);
         let avg_ms =
             read_f64(item, &["avg_ms", "avg", "average_ms", "last_ms", "last"]).unwrap_or(0.0);
         let best_ms = read_f64(item, &["best_ms", "best", "min_ms", "min"]).unwrap_or(avg_ms);
@@ -270,8 +240,20 @@ fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
     hops
 }
 
+fn read_loss_pct(item: &Value) -> Option<f64> {
+    if let Some(v) = read_f64(item, &["loss_ratio"]) {
+        return Some(v * 100.0);
+    }
+
+    if let Some(v) = read_f64(item, &["loss_pct", "loss_percentage", "loss"]) {
+        return Some(v);
+    }
+
+    None
+}
+
 fn normalize_percent(value: f64) -> f64 {
-    if value < 1.0 { value * 100.0 } else { value }
+    value.clamp(0.0, 100.0)
 }
 
 fn find_hop_array(value: &Value) -> Option<&Vec<Value>> {
@@ -360,7 +342,7 @@ fn read_f64(item: &Value, keys: &[&str]) -> Option<f64> {
     None
 }
 
-fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
+fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &DashboardUiApp) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -378,7 +360,7 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
     let tabs = Tabs::new(titles)
         .block(
             Block::default()
-                .title(format!("windows-mtr native UI ({})", app.target))
+                .title(format!("windows-mtr dashboard UI ({})", app.target))
                 .borders(Borders::ALL),
         )
         .select(app.tab_index)
@@ -403,7 +385,7 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
     frame.render_widget(help, chunks[2]);
 }
 
-fn build_help_text(app: &NativeUiApp) -> String {
+fn build_help_text(app: &DashboardUiApp) -> String {
     let base = "Controls: ←/→ or Tab switch tabs • q quits";
     let mut notes = Vec::new();
 
@@ -441,7 +423,7 @@ fn build_help_text(app: &NativeUiApp) -> String {
 
 fn render_hop_table(
     frame: &mut ratatui::Frame<'_>,
-    app: &NativeUiApp,
+    app: &DashboardUiApp,
     area: ratatui::layout::Rect,
 ) {
     let rows = app.hops.iter().map(|hop| {
@@ -480,7 +462,7 @@ fn render_hop_table(
 
 fn render_latency_chart(
     frame: &mut ratatui::Frame<'_>,
-    app: &NativeUiApp,
+    app: &DashboardUiApp,
     area: ratatui::layout::Rect,
 ) {
     let inner = Layout::default()
@@ -549,7 +531,7 @@ fn render_latency_chart(
 
 fn render_loss_chart(
     frame: &mut ratatui::Frame<'_>,
-    app: &NativeUiApp,
+    app: &DashboardUiApp,
     area: ratatui::layout::Rect,
 ) {
     let dataset = Dataset::default()
@@ -589,19 +571,19 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn sanitize_args_for_json_snapshot_strips_mode_and_cycles_pairs() {
-        let args = vec![
+    fn dashboard_snapshot_args_do_not_include_tui_mode_flags() {
+        let args = [
             "mtr".to_string(),
             "--mode".to_string(),
-            "tui".to_string(),
+            "json".to_string(),
             "--report-cycles".to_string(),
-            "10".to_string(),
+            "1".to_string(),
             "--udp".to_string(),
             "example.com".to_string(),
         ];
 
-        let cleaned = sanitize_args_for_json_snapshot(&args);
-        assert_eq!(cleaned, vec!["mtr", "--udp", "example.com"]);
+        assert!(!args.windows(2).any(|pair| pair == ["--mode", "tui"]));
+        assert!(!args.iter().any(|token| token.starts_with("--tui-")));
     }
 
     #[test]
@@ -638,7 +620,7 @@ mod tests {
 
         assert_eq!(hops[1].hop, 2);
         assert_eq!(hops[1].host, "target.example");
-        assert_eq!(hops[1].loss_pct, 50.0);
+        assert_eq!(hops[1].loss_pct, 0.5);
         assert_eq!(hops[1].best_ms, 15.0);
         assert_eq!(hops[1].avg_ms, 20.0);
         assert_eq!(hops[1].worst_ms, 25.0);
@@ -646,7 +628,7 @@ mod tests {
 
     #[test]
     fn build_help_text_includes_live_troubleshooting_when_ui_has_no_data() {
-        let mut app = NativeUiApp::new("example.com");
+        let mut app = DashboardUiApp::new("example.com");
         app.started_at = Instant::now() - Duration::from_secs(16);
         app.ingest_error(anyhow!("poll failed"));
         app.ingest_error(anyhow!("poll failed"));
@@ -662,7 +644,7 @@ mod tests {
 
     #[test]
     fn build_help_text_is_compact_when_data_stream_is_healthy() {
-        let mut app = NativeUiApp::new("example.com");
+        let mut app = DashboardUiApp::new("example.com");
         app.ingest_snapshot(vec![HopStat {
             hop: 1,
             host: "1.1.1.1".to_string(),
@@ -676,5 +658,29 @@ mod tests {
             build_help_text(&app),
             "Controls: ←/→ or Tab switch tabs • q quits"
         );
+    }
+    #[test]
+    fn loss_parsing_handles_percent_and_ratio_fields() {
+        let payload = json!({
+            "hops": [
+                {"ttl": 1, "host": "a", "loss_pct": 0.5, "avg_ms": 1.0},
+                {"ttl": 2, "host": "b", "loss_percentage": 5, "avg_ms": 1.0},
+                {"ttl": 3, "host": "c", "loss_ratio": 0.05, "avg_ms": 1.0}
+            ]
+        });
+
+        let hops = extract_hops(&payload, "target");
+        assert_eq!(hops[0].loss_pct, 0.5);
+        assert_eq!(hops[1].loss_pct, 5.0);
+        assert_eq!(hops[2].loss_pct, 5.0);
+    }
+
+    #[test]
+    fn parse_trippy_013_fixture_extracts_hops() {
+        let raw = include_str!("../tests/fixtures/trippy_013_json_sample.json");
+        let payload: Value = serde_json::from_str(raw).expect("valid fixture json");
+        let hops = extract_hops(&payload, "example.com");
+        assert!(!hops.is_empty());
+        assert_eq!(hops[0].hop, 1);
     }
 }

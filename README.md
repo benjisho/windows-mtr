@@ -2,7 +2,7 @@
 
 <div align="center">
   <img src="assets/windows-mtr-upscaled.gif" alt="Windows MTR Banner" width="80%">
-  <h3>Enterprise-grade network diagnostics for Windows environments</h3>
+  <h3>Windows-first network diagnostics with an embedded Trippy runtime</h3>
 
   <p align="center">
     <a href="https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml/badge.svg"></a>
@@ -22,7 +22,7 @@
 
 ---
 
-Windows MTR is an enterprise-grade network diagnostics tool that brings the power of Linux's MTR utility to Windows environments with a focus on performance, security, and reliability. Built by Benji Shohet (benjisho) with enterprise-level best practices.
+Windows MTR is a Windows-first network diagnostics CLI inspired by Linux mtr, with embedded Trippy for probe execution and interactive views. Claims in this README are aligned to the validated capability matrix.
 
 ## 📚 Table of Contents
 
@@ -115,75 +115,26 @@ See [docs/security/rest-api.md](docs/security/rest-api.md) for the full threat m
 
 ## 💻 Installation
 
-> [!TIP]
-> For most users, the best path is: **GitHub Releases → MSI installer → Run as Administrator**.
+GitHub Releases is the **primary supported distribution channel**.
 
-### Windows
+1. Download `windows-mtr-x86_64.zip` from [GitHub Releases](https://github.com/benjisho/windows-mtr/releases).
+2. Extract and run either `.\mtr.exe` or `.\windows-mtr.exe`.
+3. Verify checksums with `SHA256SUM`.
 
-#### Professional Installation (Recommended)
+### Installation matrix
 
-1. Download the latest `windows-mtr-1.0.0-x86_64-pc-windows-msvc.msi` from [GitHub Releases](https://github.com/benjisho/windows-mtr/releases)
-2. Run the installer and follow the installation wizard
-3. Find Windows MTR in your Start Menu or run `mtr` from any command prompt
+| Method | Status | Command |
+|---|---|---|
+| GitHub Release ZIP | supported (canonical) | Download + unzip + `.\mtr.exe 8.8.8.8` |
+| WinGet | planned (manifest prepared) | `winget install BenjiShohet.WindowsMTR` *(after publication)* |
+| Scoop | planned (manifest prepared) | `scoop install .\packaging\scoop\windows-mtr.json` |
+| Chocolatey | planned (template prepared) | `choco install windows-mtr.portable --source . -y` |
+| crates.io | future | `cargo install windows-mtr --locked` |
+| cargo-binstall | future | `cargo binstall windows-mtr` |
+| Docker/GHCR | optional secondary channel | `docker run --rm ghcr.io/benjisho/windows-mtr:latest --help` |
+| Homebrew/Snap/.deb/.rpm | deferred | Deferred pending Linux/macOS runtime validation |
 
-#### Portable Installation
-
-1. Download `windows-mtr-x86_64.exe` (direct executable) or `windows-mtr-official-x86_64.zip` (official portable bundle) from [GitHub Releases](https://github.com/benjisho/windows-mtr/releases)
-2. Extract the ZIP file if you chose the portable bundle
-3. Run the downloaded executable directly (for example `windows-mtr-x86_64.exe 8.8.8.8`) or rename it to `mtr.exe` for shorter commands
-
-#### System Requirements
-
-- Windows 7/Server 2012 R2 or later
-- 50MB disk space
-- Administrator privileges required for network operations
-
-### Docker
-
-```bash
-# Pull a release-tagged Windows MTR container (GHCR)
-docker pull ghcr.io/benjisho/windows-mtr:v1.0.0
-
-# Pull a release-tagged Windows MTR container (Docker Hub)
-docker pull benjisho/windows-mtr:v1.0.0
-
-# Run with direct networking (pin to a specific release tag)
-docker run --network host ghcr.io/benjisho/windows-mtr:v1.0.0 -c 5 -r 8.8.8.8
-```
-
-Container images are published from the `Release` workflow to both GHCR (`ghcr.io/benjisho/windows-mtr`) and Docker Hub (`benjisho/windows-mtr`) from explicit release tags like `v1.2.3` for `linux/amd64` and `linux/arm64`.
-
-> [!NOTE]
-> Windows container networking can vary by environment. If `--network host` is not available in your setup, run the binary directly on the host for full probe capability.
-
-### Build from Source on Windows
-
-Follow these steps to compile the Windows MTR executable:
-
-1. Install [Rust](https://www.rust-lang.org/tools/install) with **rustup** (Rust **1.88.0+** required).
-2. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) and select the **Desktop development with C++** workload.
-3. Clone this repository and change into the project directory:
-
-   ```bash
-   git clone https://github.com/benjisho/windows-mtr.git
-   cd windows-mtr
-   ```
-
-4. *(Optional)* Generate a lockfile if you need to build offline:
-
-   ```bash
-   cargo generate-lockfile
-   ```
-
-5. Compile in release mode:
-
-   ```bash
-   cargo build --release
-   ```
-
-6. After a successful build the binary is located at `target\release\mtr.exe`.
-
-The resulting executable is now **self-contained** and embeds Trippy directly (no additional runtime executable required).
+See [docs/distribution.md](docs/distribution.md) for details and maintainer workflow.
 
 ## 🚀 Quick Start
 
@@ -204,11 +155,13 @@ mtr 8.8.8.8
 > [!TIP]
 > If you downloaded a standalone `.exe` and did not install via MSI, use that filename directly (for example `windows-mtr-x86_64.exe 8.8.8.8`) unless you renamed it to `mtr.exe`.
 
-### Native Ratatui UI (live hops + table + charts)
+### Dashboard fallback UI (experimental)
 
 ```bash
-mtr --ui native 8.8.8.8
+mtr --ui dashboard 8.8.8.8
 ```
+
+`--ui dashboard` (legacy alias: `--ui native`) is an experimental windows-mtr dashboard that polls JSON snapshots. It is useful when the default embedded Trippy TUI is unstable in a specific terminal.
 
 ### Report mode with DNS disabled (faster + script-friendly)
 
@@ -253,9 +206,27 @@ mtr --api --api-max-requests-per-window 20 --api-rate-limit-window-seconds 30
 mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 ```
 
+### Troubleshooting interactive crashes
+
+If interactive TUI crashes or exits with `0xC0000005`, try:
+
+```powershell
+.\mtr.exe --ui dashboard 8.8.8.8
+```
+
+For stable diagnostics:
+
+```powershell
+.\mtr.exe -n -r -c 5 8.8.8.8
+```
+
 ### Full Usage Examples
 
 Visit our [detailed usage guide](USAGE.md) for comprehensive examples.
+
+## Capability Status
+
+Validated capability status is tracked in [docs/capability-validation.md](docs/capability-validation.md).
 
 ## 📈 Advanced Features
 
@@ -353,7 +324,7 @@ The full roadmap now lives in [docs/ROADMAP.md](docs/ROADMAP.md), which is the s
 Quick snapshot:
 
 - ✅ Released: Core MTR functionality, MSI installer, IPv6, Docker, JSON output, DNS cache TTL, REST API v1 (authentication, rate limiting, concurrency controls).
-- 🚧 In progress: Native Ratatui UI (experimental preview via `--ui native`), security hardening gates (`cargo-audit` in CI, fuzz harness pending CI integration).
+- 🚧 In progress: Dashboard fallback UI (experimental preview via `--ui native`), security hardening gates (`cargo-audit` in CI, fuzz harness pending CI integration).
 - 📅 Planned / 🛣️ Roadmap: SNMP integration, ETW observability, versioned JSON schema + CSV export, runtime cleanup.
 
 ## 🤝 Contributing

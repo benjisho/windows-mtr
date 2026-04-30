@@ -34,14 +34,14 @@ mtr [options] <hostname-or-ip>
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
 | `-z` | DNS ASN lookup shortcut |
-| `--ui <default\|enhanced\|native>` | Interactive UI preset (enhanced enables diagnostic overlays) |
+| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (enhanced enables diagnostic overlays) |
 
-## Native Ratatui UI
+## Dashboard fallback UI (experimental)
 
-Use `--ui native` to run the built-in Ratatui interface with live hop data, a hop table, and charts.
+Use `--ui dashboard` to run the windows-mtr dashboard that polls embedded Trippy JSON snapshots. Legacy `--ui native` remains as a compatibility alias.
 
 ```bash
-mtr --ui native 8.8.8.8
+mtr --ui dashboard 8.8.8.8
 ```
 
 Controls:
@@ -51,7 +51,7 @@ Controls:
 
 When probe snapshots fail repeatedly, the help footer surfaces the latest poll error and live troubleshooting hints (run with Administrator privileges, review firewall policy, or try report mode with `-r`). If no hop data is detected for 15 seconds, the footer also prompts you to quit (`q`) and retry in report mode for immediate diagnostics.
 
-`--ui native` accepts the standard probe and output tuning options, and renders them in the native Ratatui view.
+`--ui dashboard` is intended as a fallback when embedded Trippy interactive mode crashes in your terminal.
 
 ## Enhanced UI options
 
@@ -191,3 +191,18 @@ Input validation before probe execution:
 - Intervals/timeouts validated as positive finite numbers (`timeout >= interval`)
 
 See [docs/security/rest-api.md](docs/security/rest-api.md).
+
+
+## Troubleshooting
+
+If interactive TUI exits with `0xC0000005`, try:
+
+```powershell
+.\mtr.exe --ui dashboard 8.8.8.8
+```
+
+For stable diagnostics:
+
+```powershell
+.\mtr.exe -n -r -c 5 8.8.8.8
+```
