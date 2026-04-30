@@ -2,7 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-  # Trigger on immutable release version tags only
   push:
     tags:
       - 'v*.*.*'
@@ -23,174 +22,33 @@ jobs:
     name: Build and Test
     runs-on: windows-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
           components: clippy
           targets: x86_64-pc-windows-msvc
 
-
-      # Use the more efficient Rust caching
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
         with:
           save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
           shared-key: "rust-windows-release"
           cache-bin: true
-          cache-directories: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git
-          cache-on-failure: true
 
-      # Fast check to catch errors early without full compilation
       - name: Check code
         run: cargo check --all-targets
-        env:
-          CARGO_INCREMENTAL: 0
 
-      - name: Install cargo-binstall
-        uses: taiki-e/install-action@6eb4471beed212309063862e6f5284ca3da3b01d # cargo-binstall
-
-      # Install trippy using prebuilt binaries first (same strategy as CI)
-      - name: Install trippy
-        run: |
-          echo "Installing trippy..."
-
-          # In CI, force installation to avoid stale "already installed" state
-          # and install only the expected Trippy binary (`trip`).
-          cargo binstall trippy --no-confirm --locked --force --bin trip
-
-          if ($LASTEXITCODE -ne 0) {
-            Write-Warning "cargo binstall could not fetch a prebuilt trippy binary; falling back to cargo install from source."
-            cargo install trippy --locked --force --bin trip
-            if ($LASTEXITCODE -ne 0) {
-              Write-Error "Failed to install trippy via both cargo binstall and cargo install fallback."
-              exit 1
-            }
-          }
-
-          $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
-          $candidatePaths = @(
-            (Join-Path $cargoBin "trip.exe"),
-            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -ErrorAction SilentlyContinue)
-          )
-          $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-
-          if ($trippyPath -and (Test-Path -Path $trippyPath)) {
-            echo "Trippy executable found at: $trippyPath"
-            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
-          } else {
-            Write-Error "trippy executable was not found after install. Checked: $($candidatePaths -join ', ')"
-            exit 1
-          }
-        shell: pwsh
-        env:
-          CARGO_INCREMENTAL: 0
-
-      # Run the tests
       - name: Run tests
         run: cargo test --all
-        env:
-          CARGO_INCREMENTAL: 0
 
-      # Build the release binary with explicit binary name
       - name: Build release binary
         run: cargo build --release --bin mtr --target x86_64-pc-windows-msvc
-        env:
-          CARGO_INCREMENTAL: 0
-          RUSTFLAGS: "-C target-feature=+crt-static"
 
-      # Check build output and list files in target directory for debugging
-      - name: Check build output
-        run: |
-          echo "Checking for binary in target directories..."
-
-          # Check standard target directory
-          if (Test-Path "target/release") {
-            echo "Contents of target/release:"
-            Get-ChildItem -Path "target/release" -Filter "*.exe"
-          }
-
-          # Check target-specific directory
-          if (Test-Path "target/x86_64-pc-windows-msvc/release") {
-            echo "Contents of target/x86_64-pc-windows-msvc/release:"
-            Get-ChildItem -Path "target/x86_64-pc-windows-msvc/release" -Filter "*.exe"
-          }
-
-          # Also check with slashes in other direction
-          if (Test-Path "target\release") {
-            echo "Contents of target\release:"
-            Get-ChildItem -Path "target\release" -Filter "*.exe"
-          }
-
-          # Check target-specific directory with backslashes
-          if (Test-Path "target\x86_64-pc-windows-msvc\release") {
-            echo "Contents of target\x86_64-pc-windows-msvc\release:"
-            Get-ChildItem -Path "target\x86_64-pc-windows-msvc\release" -Filter "*.exe"
-          }
-        shell: pwsh
-
-      # New step: Verify the binary works correctly
       - name: Verify binary functionality
-        run: |
-          echo "Verifying binary functionality..."
-          $ErrorActionPreference = "Stop"
-          # Test help output
-          $helpOutput = & ./target/x86_64-pc-windows-msvc/release/mtr.exe --help
-          if (-not ($helpOutput -match "Usage:" -and $helpOutput -match "Arguments:" -and $helpOutput -match "Options:")) {
-            Write-Error "Help output verification failed"
-            exit 1
-          }
-          echo "✓ Help command verified"
-
-          # Test version output
-          $versionOutput = & ./target/x86_64-pc-windows-msvc/release/mtr.exe --version
-          if (-not ($versionOutput -match "mtr ")) {
-            Write-Error "Version output verification failed"
-            exit 1
-          }
-          echo "✓ Version command verified"
-
-          # Test basic command-line argument parsing (without network activity)
-          try {
-            Start-Process -FilePath "./target/x86_64-pc-windows-msvc/release/mtr.exe" -ArgumentList "-T", "-P", "443", "-c", "1", "-n", "--help" -NoNewWindow -Wait
-            echo "✓ Command-line argument parsing verified"
-          } catch {
-            Write-Error "Command-line argument parsing test failed: $_"
-            exit 1
-          }
-
-          echo "All binary verification tests passed successfully!"
         shell: pwsh
-
-      # Find and copy trippy executable for bundling
-      - name: Find trippy executable for bundling
-        id: find_trippy
         run: |
-          if (-not $env:TRIPPY_PATH -or -not (Test-Path $env:TRIPPY_PATH)) {
-            $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
-            $candidatePaths = @(
-              (Join-Path $cargoBin "trip.exe"),
-              (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path -ErrorAction SilentlyContinue)
-            )
-            $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-          } else {
-            $trippyPath = $env:TRIPPY_PATH
-          }
-
-          if ($trippyPath -and (Test-Path -Path $trippyPath)) {
-            echo "Found trippy at: $trippyPath"
-            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
-          } else {
-            Write-Error "Could not find trippy executable to bundle"
-            exit 1
-          }
-        shell: pwsh
-
+          ./target/x86_64-pc-windows-msvc/release/mtr.exe --help | Out-Null
+          ./target/x86_64-pc-windows-msvc/release/mtr.exe --version | Out-Null
 
   publish-package:
     name: Publish Container Packages
@@ -202,23 +60,18 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
-
-      - name: Log in to GHCR
-        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
+      - uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log in to Docker Hub
+      - name: Log in to Docker Hub (optional)
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -242,8 +95,7 @@ jobs:
             type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=semver,pattern={{version}},value=${{ github.ref_name }}
 
-      - name: Build and push image
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+      - uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
           context: .
           file: ./Dockerfile
@@ -256,206 +108,93 @@ jobs:
           provenance: true
           sbom: true
 
-  # Only run for tag pushes (real releases)
   release:
     name: Create Release
-    needs:
-      - build
-      - publish-package
+    needs: [build, publish-package]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
-    # Add explicit permissions for creating releases
     permissions:
-      contents: write  # Required for creating releases and uploading assets
+      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
         with:
-          components: clippy
           targets: x86_64-pc-windows-msvc
 
+      - name: Build release binary
+        run: cargo build --release --bin mtr --target x86_64-pc-windows-msvc
 
-      # Use the more efficient Rust caching
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2
-        with:
-          save-if: ${{ startsWith(github.ref, 'refs/tags/') }}
-          shared-key: "rust-windows-release"
-          cache-bin: true
-          cache-directories: |
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git
-          cache-on-failure: true
-
-      # Create package directory structure and dist directory
-      - name: Create directories
-        run: |
-          mkdir -p dist
-          mkdir -p windows-mtr-official
+      - name: Assemble canonical release ZIP
         shell: pwsh
-
-      # Create a standalone executable ZIP
-      - name: Create official distribution package
         run: |
-          # Build the release binary explicitly first
-          cargo build --release --bin mtr --target x86_64-pc-windows-msvc
-
-          # Check for binary in different locations and list them for debugging
-          Write-Host "Searching for the MTR executable..."
-
-          $possiblePaths = @(
-            "target/x86_64-pc-windows-msvc/release/mtr.exe",
-            "target/release/mtr.exe",
-            "target\x86_64-pc-windows-msvc\release\mtr.exe",
-            "target\release\mtr.exe"
-          )
-
-          $mtrPath = $null
-          foreach ($path in $possiblePaths) {
-            if (Test-Path $path) {
-              Write-Host "Found MTR binary at: $path"
-              $mtrPath = $path
-              break
-            }
-          }
-
-          # If binary not found, look more broadly
-          if ($null -eq $mtrPath) {
-            Write-Host "Binary not found in expected paths, searching in target directories..."
-
-            # Look for any .exe files in target/release or target/x86_64-pc-windows-msvc/release
-            $exeFiles = @()
-            $exeFiles += Get-ChildItem -Path "target/release" -Filter "*.exe" -ErrorAction SilentlyContinue
-            $exeFiles += Get-ChildItem -Path "target/x86_64-pc-windows-msvc/release" -Filter "*.exe" -ErrorAction SilentlyContinue
-            $exeFiles += Get-ChildItem -Path "target\release" -Filter "*.exe" -ErrorAction SilentlyContinue
-            $exeFiles += Get-ChildItem -Path "target\x86_64-pc-windows-msvc\release" -Filter "*.exe" -ErrorAction SilentlyContinue
-
-            foreach ($file in $exeFiles) {
-              Write-Host "Found executable: $($file.FullName)"
-            }
-
-            # If we found any .exe files, use the first one
-            if ($exeFiles.Count -gt 0) {
-              $mtrPath = $exeFiles[0].FullName
-              Write-Host "Using: $mtrPath"
-            } else {
-              Write-Error "No MTR executable found after build"
-              exit 1
-            }
-          }
-
-          # Create directories
-          New-Item -ItemType Directory -Path 'dist' -Force
-          New-Item -ItemType Directory -Path 'windows-mtr-official' -Force
-
-          # Create direct executable asset and portable bundle payload
-          Copy-Item $mtrPath dist/windows-mtr-x86_64.exe
-          Copy-Item dist/windows-mtr-x86_64.exe windows-mtr-official/windows-mtr-x86_64.exe
-
-          # Add a simple README
+          New-Item -ItemType Directory -Force -Path dist,dist\bundle | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/mtr.exe dist/bundle/mtr.exe
+          Copy-Item target/x86_64-pc-windows-msvc/release/mtr.exe dist/bundle/windows-mtr.exe
           @"
-          Windows MTR by Benji Shohet (benjisho)
-          -------------------------------------
+Windows MTR portable bundle
+===========================
 
-          This portable bundle contains:
-          - windows-mtr-x86_64.exe
+Run from an elevated PowerShell or Command Prompt for full probe support.
 
-          Quick Start:
-          1. Download the executable or this portable zip bundle.
-          2. Run Command Prompt or PowerShell as Administrator.
-          3. Run: mtr 8.8.8.8
+Quick start:
+.\mtr.exe 8.8.8.8
+.\windows-mtr.exe -r -c 10 8.8.8.8
 
-          For more information see: https://github.com/benjisho/windows-mtr
-          "@ > windows-mtr-official/README.txt
+Docs: https://github.com/benjisho/windows-mtr
+"@ | Set-Content dist/bundle/README.txt
 
-          # Create optional portable ZIP package
-          Compress-Archive -Path "windows-mtr-official\*" -DestinationPath "dist\windows-mtr-official-x86_64.zip" -Force
+          Compress-Archive -Path dist/bundle/* -DestinationPath dist/windows-mtr-x86_64.zip -Force
 
-          # Generate SHA256 checksums for all release assets
-          $exeHash = Get-FileHash -Path "dist\windows-mtr-x86_64.exe" -Algorithm SHA256
-          $zipHash = Get-FileHash -Path "dist\windows-mtr-official-x86_64.zip" -Algorithm SHA256
-          Set-Content -Path "dist\SHA256SUM" -Value @(
-            "$($exeHash.Hash)  windows-mtr-x86_64.exe",
-            "$($zipHash.Hash)  windows-mtr-official-x86_64.zip"
-          )
+          $zipHash = (Get-FileHash dist/windows-mtr-x86_64.zip -Algorithm SHA256).Hash.ToLower()
+          $exeHash = (Get-FileHash dist/bundle/mtr.exe -Algorithm SHA256).Hash.ToLower()
+          $aliasHash = (Get-FileHash dist/bundle/windows-mtr.exe -Algorithm SHA256).Hash.ToLower()
+          @(
+            "$zipHash  windows-mtr-x86_64.zip",
+            "$exeHash  mtr.exe",
+            "$aliasHash  windows-mtr.exe"
+          ) | Set-Content dist/bundle/SHA256SUM
+
+          Compress-Archive -Path dist/bundle/* -DestinationPath dist/windows-mtr-x86_64.zip -Force
+
+      - name: Validate release artifacts
         shell: pwsh
+        run: scripts/release/verify-release-artifacts.ps1 -ZipPath dist/windows-mtr-x86_64.zip -ShaPath dist/bundle/SHA256SUM
 
-      - name: Smoke check release asset names
+      - name: Release smoke tests from extracted ZIP
+        shell: pwsh
         run: |
-          $requiredAssets = @(
-            "dist/windows-mtr-x86_64.exe",
-            "dist/windows-mtr-official-x86_64.zip"
-          )
+          Expand-Archive dist/windows-mtr-x86_64.zip -DestinationPath dist/extracted -Force
+          dist/extracted/mtr.exe --help | Out-Null
+          dist/extracted/windows-mtr.exe --version | Out-Null
+          dist/extracted/mtr.exe -n -r -c 1 127.0.0.1 | Out-Null
 
-          foreach ($asset in $requiredAssets) {
-            if (-not (Test-Path $asset)) {
-              Write-Error "Missing required release asset: $asset"
-              exit 1
-            }
-          }
-
-          Write-Host "Release asset naming smoke check passed:"
-          Get-ChildItem dist | ForEach-Object { Write-Host " - $($_.Name)" }
-        shell: pwsh
-
-      # Upload all artifacts to GitHub
-      - name: Upload artifacts
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: windows-mtr-release
           path: |
-            dist/windows-mtr-x86_64.exe
-            dist/windows-mtr-official-x86_64.zip
-            dist/SHA256SUM
+            dist/windows-mtr-x86_64.zip
+            dist/bundle/SHA256SUM
           if-no-files-found: error
-          compression-level: 9
 
-      # Create the GitHub release with only the official zip file
       - name: Create GitHub Release
-        id: create_release
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
           files: |
-            dist/windows-mtr-x86_64.exe
-            dist/windows-mtr-official-x86_64.zip
-            dist/SHA256SUM
+            dist/windows-mtr-x86_64.zip
+            dist/bundle/SHA256SUM
           name: Windows MTR ${{ github.ref_name }}
           body: |
             # Windows MTR ${{ github.ref_name }}
 
-            A Windows-native clone of Linux MTR for network path diagnostics.
+            Canonical artifact source: GitHub Releases.
 
             ## Downloads
-
-            - [**windows-mtr-x86_64.exe**](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr-x86_64.exe) - Direct executable
-            - [**windows-mtr-official-x86_64.zip**](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/windows-mtr-official-x86_64.zip) - Official portable bundle
-            - [**SHA256SUM**](https://github.com/benjisho/windows-mtr/releases/download/${{ github.ref_name }}/SHA256SUM)
+            - windows-mtr-x86_64.zip
+            - SHA256SUM
 
             ## Quick Start
-
-            1. Download `windows-mtr-x86_64.exe` or `windows-mtr-official-x86_64.zip`.
-            2. Run Command Prompt or PowerShell as Administrator.
-            3. Run `mtr 8.8.8.8`.
-
-            ## Usage
-
-            ```
-            # Basic usage
-            windows-mtr 8.8.8.8
-
-            # TCP mode (for HTTPS)
-            windows-mtr -T -P 443 example.com
-
-            # Report mode (no live updates)
-            windows-mtr -r -c 10 google.com
-            ```
-
-            See [USAGE.md](https://github.com/benjisho/windows-mtr/blob/master/USAGE.md) for complete documentation.
-          draft: false
-          prerelease: false
+            1. Download and extract `windows-mtr-x86_64.zip`
+            2. Run `.\mtr.exe 8.8.8.8`
+            3. Or run `.\windows-mtr.exe -r -c 10 8.8.8.8`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

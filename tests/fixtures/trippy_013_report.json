@@ -1,0 +1,29 @@
+{
+  "report": {
+    "target": "dns.google",
+    "hops": [
+      {
+        "ttl": 1,
+        "host": "192.168.1.1",
+        "loss_pct": 0.5,
+        "sent": 1,
+        "last_ms": 1.2,
+        "avg_ms": 1.2,
+        "best_ms": 1.2,
+        "worst_ms": 1.2,
+        "stddev_ms": 0.0
+      },
+      {
+        "ttl": 2,
+        "host": "dns.google",
+        "loss_ratio": 0.05,
+        "sent": 1,
+        "last_ms": 12.7,
+        "avg_ms": 12.7,
+        "best_ms": 12.7,
+        "worst_ms": 12.7,
+        "stddev_ms": 0.0
+      }
+    ]
+  }
+}

@@ -1,9 +1,9 @@
-PackageIdentifier: benjisho.windows-mtr
-PackageVersion: 1.1.3
+PackageIdentifier: BenjiShohet.WindowsMTR
+PackageVersion: VERSION
 PackageLocale: en-US
 Publisher: Benji Shohet
 PackageName: windows-mtr
-ShortDescription: Windows-native drop-in replacement for Linux mtr with embedded Trippy runtime.
+ShortDescription: Windows MTR diagnostics CLI with embedded Trippy and optional dashboard fallback UI.
 License: Apache-2.0
 LicenseUrl: https://github.com/benjisho/windows-mtr/blob/main/LICENSE
 ManifestType: defaultLocale

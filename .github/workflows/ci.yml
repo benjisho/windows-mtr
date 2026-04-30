@@ -383,32 +383,6 @@ jobs:
             ~/.cargo/git
           cache-on-failure: true
 
-      - name: Install cargo-binstall
-        uses: taiki-e/install-action@6eb4471beed212309063862e6f5284ca3da3b01d # cargo-binstall
-
-      - name: Install trippy (prebuilt binary)
-        run: |
-          echo "Installing trippy prebuilt binary..."
-          cargo binstall trippy --no-confirm --locked
-
-          $cargoBin = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME "bin" } else { Join-Path $env:USERPROFILE ".cargo\bin" }
-          $candidatePaths = @(
-            (Join-Path $cargoBin "trip.exe"),
-            (Join-Path $cargoBin "trippy.exe"),
-            (Get-Command trip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue),
-            (Get-Command trippy -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
-          )
-          $trippyPath = $candidatePaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-
-          if ($trippyPath -and (Test-Path -Path $trippyPath)) {
-            echo "Trippy executable found at: $trippyPath"
-            echo "TRIPPY_PATH=$trippyPath" >> $env:GITHUB_ENV
-          } else {
-            Write-Error "Could not find trippy executable after cargo binstall. Checked: $($candidatePaths -join ', ')"
-            exit 1
-          }
-        shell: pwsh
-
       - name: Build release binary
         run: cargo build --release --target x86_64-pc-windows-msvc
         env:
@@ -417,20 +391,19 @@ jobs:
       - name: Create test build directory
         run: |
           mkdir -p pr-build
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe pr-build/mtr.exe
           cp target/x86_64-pc-windows-msvc/release/mtr.exe pr-build/windows-mtr.exe
 
           # Copy documentation files individually to avoid PowerShell parameter issues
           cp README.md pr-build/
           cp LICENSE pr-build/
           if (Test-Path USAGE.md) { cp USAGE.md pr-build/ }
-
-          # Copy trippy executable
-          cp "${{ env.TRIPPY_PATH }}" pr-build/trip.exe
+          # Note: external trip.exe is not bundled. windows-mtr ships embedded Trippy runtime.
         shell: pwsh
 
       - name: Create ZIP package
         run: |
-          Compress-Archive -Path pr-build/* -DestinationPath pr-build/windows-mtr-PR${{ github.event.pull_request.number }}.zip -Force
+          Compress-Archive -Path pr-build/* -DestinationPath pr-build/windows-mtr-x86_64-pr${{ github.event.pull_request.number }}.zip -Force
         shell: pwsh
 
       - name: Upload PR build artifacts

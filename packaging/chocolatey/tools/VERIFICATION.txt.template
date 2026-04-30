@@ -1,0 +1,10 @@
+VERIFICATION
+============
+
+1. Download the canonical release ZIP from:
+   RELEASE_URL
+2. Verify SHA256:
+   REPLACE_WITH_RELEASE_SHA256
+3. Compare with SHA256SUM from the same GitHub Release.
+
+This portable package should reference the same binary artifact published to GitHub Releases.

@@ -99,7 +99,7 @@ impl NativeUiApp {
 }
 
 pub fn run_native_ui(target: &str, trippy_args: &[String]) -> anyhow::Result<i32> {
-    enable_raw_mode().context("failed to enable raw mode for native UI")?;
+    enable_raw_mode().context("failed to enable raw mode for dashboard UI")?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
 
@@ -183,19 +183,11 @@ fn fetch_hops_snapshot(base_args: &[String], target: &str) -> anyhow::Result<Vec
     // not for any trust or authorization decision.
     let current_exe =
         // nosemgrep: rust.lang.security.current-exe.current-exe
-        env::current_exe().context("failed to locate current executable for native UI polling")?;
-
-    let mut args = sanitize_args_for_json_snapshot(base_args);
-    args.extend([
-        "--mode".to_string(),
-        "json".to_string(),
-        "--report-cycles".to_string(),
-        "1".to_string(),
-    ]);
+        env::current_exe().context("failed to locate current executable for dashboard polling")?;
 
     let output = Command::new(&current_exe)
         .env(EMBEDDED_TRIPPY_ENV, "1")
-        .args(args.iter().skip(1))
+        .args(base_args.iter().skip(1))
         .output()
         .context("failed to run embedded trippy JSON poll")?;
 
@@ -208,28 +200,6 @@ fn fetch_hops_snapshot(base_args: &[String], target: &str) -> anyhow::Result<Vec
         .context("failed to parse trippy JSON poll output")?;
 
     Ok(extract_hops(&value, target))
-}
-
-fn sanitize_args_for_json_snapshot(base_args: &[String]) -> Vec<String> {
-    let mut cleaned = Vec::with_capacity(base_args.len());
-    let mut skip_next = false;
-    let pair_flags = ["--mode", "--report-cycles"];
-
-    for token in base_args {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
-
-        if pair_flags.contains(&token.as_str()) {
-            skip_next = true;
-            continue;
-        }
-
-        cleaned.push(token.clone());
-    }
-
-    cleaned
 }
 
 fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
@@ -251,7 +221,7 @@ fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
                 format!("hop-{hop}")
             }
         });
-        let loss_pct = read_f64(item, &["loss_pct", "loss", "loss_percentage"]).unwrap_or(0.0);
+        let loss_pct = read_loss_pct(item).unwrap_or(0.0);
         let avg_ms =
             read_f64(item, &["avg_ms", "avg", "average_ms", "last_ms", "last"]).unwrap_or(0.0);
         let best_ms = read_f64(item, &["best_ms", "best", "min_ms", "min"]).unwrap_or(avg_ms);
@@ -268,10 +238,6 @@ fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
     }
 
     hops
-}
-
-fn normalize_percent(value: f64) -> f64 {
-    if value < 1.0 { value * 100.0 } else { value }
 }
 
 fn find_hop_array(value: &Value) -> Option<&Vec<Value>> {
@@ -304,6 +270,18 @@ fn find_hop_array(value: &Value) -> Option<&Vec<Value>> {
         }
         _ => None,
     }
+}
+
+fn read_loss_pct(item: &Value) -> Option<f64> {
+    if let Some(value) = read_f64(item, &["loss_pct", "loss_percentage", "loss"]) {
+        return Some(value);
+    }
+
+    read_f64(item, &["loss_ratio"]).map(|ratio| ratio * 100.0)
+}
+
+fn normalize_percent(value: f64) -> f64 {
+    value
 }
 
 fn looks_like_hop_array(array: &[Value]) -> bool {
@@ -378,7 +356,7 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
     let tabs = Tabs::new(titles)
         .block(
             Block::default()
-                .title(format!("windows-mtr native UI ({})", app.target))
+                .title(format!("windows-mtr dashboard ({})", app.target))
                 .borders(Borders::ALL),
         )
         .select(app.tab_index)
@@ -589,19 +567,15 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn sanitize_args_for_json_snapshot_strips_mode_and_cycles_pairs() {
-        let args = vec![
-            "mtr".to_string(),
-            "--mode".to_string(),
-            "tui".to_string(),
-            "--report-cycles".to_string(),
-            "10".to_string(),
-            "--udp".to_string(),
-            "example.com".to_string(),
-        ];
+    fn read_loss_pct_distinguishes_percent_and_ratio_fields() {
+        let percent = json!({"loss_pct": 0.5});
+        assert_eq!(read_loss_pct(&percent), Some(0.5));
 
-        let cleaned = sanitize_args_for_json_snapshot(&args);
-        assert_eq!(cleaned, vec!["mtr", "--udp", "example.com"]);
+        let percent_alt = json!({"loss_percentage": 5.0});
+        assert_eq!(read_loss_pct(&percent_alt), Some(5.0));
+
+        let ratio = json!({"loss_ratio": 0.05});
+        assert_eq!(read_loss_pct(&ratio), Some(5.0));
     }
 
     #[test]
@@ -638,10 +612,20 @@ mod tests {
 
         assert_eq!(hops[1].hop, 2);
         assert_eq!(hops[1].host, "target.example");
-        assert_eq!(hops[1].loss_pct, 50.0);
+        assert_eq!(hops[1].loss_pct, 0.5);
         assert_eq!(hops[1].best_ms, 15.0);
         assert_eq!(hops[1].avg_ms, 20.0);
         assert_eq!(hops[1].worst_ms, 25.0);
+    }
+
+    #[test]
+    fn extract_hops_parses_trippy_013_fixture_shape() {
+        let payload: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/trippy_013_report.json"))
+                .expect("fixture should parse");
+        let hops = extract_hops(&payload, "dns.google");
+        assert!(!hops.is_empty());
+        assert_eq!(hops[0].hop, 1);
     }
 
     #[test]

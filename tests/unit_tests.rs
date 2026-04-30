@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use windows_mtr::service::{
     EnhancedUiConfig, JsonOutput, ProbeError, ProbeRequest, UiMode, build_embedded_trippy_args,
-    build_probe_plan, parse_passthrough_flags,
+    build_json_snapshot_args, build_probe_plan, parse_passthrough_flags,
 };
 
 fn base_request() -> ProbeRequest {
@@ -171,6 +171,32 @@ fn build_embedded_trippy_args_supports_json_mode() {
 
     let trippy_args = build_embedded_trippy_args(&request, "8.8.8.8").expect("should build");
     assert_eq!(trippy_args, vec!["mtr", "--mode", "json", "8.8.8.8"]);
+}
+
+#[test]
+fn build_json_snapshot_args_uses_json_mode_and_omits_enhanced_tui_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Dashboard;
+    request.no_dns = true;
+    request.count = Some(15);
+    request.trippy_flags = Some("--verbose".to_string());
+
+    let args = build_json_snapshot_args(&request, "8.8.8.8").expect("should build");
+    assert!(args.windows(2).any(|w| w == ["--mode", "json"]));
+    assert!(args.windows(2).any(|w| w == ["--report-cycles", "1"]));
+    assert!(!args.iter().any(|a| a == "tui"));
+    assert!(!args.iter().any(|a| a.starts_with("--tui-")));
+}
+
+#[test]
+fn build_json_snapshot_args_rejects_conflicting_passthrough_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Dashboard;
+    request.trippy_flags = Some("--mode tui".to_string());
+
+    let err = build_json_snapshot_args(&request, "8.8.8.8")
+        .expect_err("dashboard should reject conflicting passthrough flags");
+    assert!(matches!(err, ProbeError::InvalidOption(_)));
 }
 
 #[test]

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package>
+  <metadata>
+    <id>windows-mtr.portable</id>
+    <version>VERSION</version>
+    <title>windows-mtr (Portable)</title>
+    <authors>Benji Shohet</authors>
+    <projectUrl>https://github.com/benjisho/windows-mtr</projectUrl>
+    <projectSourceUrl>https://github.com/benjisho/windows-mtr</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/benjisho/windows-mtr/issues</bugTrackerUrl>
+    <license type="expression">Apache-2.0</license>
+    <tags>network diagnostics mtr traceroute ping windows</tags>
+    <summary>Portable windows-mtr package using the canonical GitHub Release ZIP.</summary>
+    <description>windows-mtr portable package that installs mtr.exe and windows-mtr.exe from GitHub Releases.</description>
+    <releaseNotes>https://github.com/benjisho/windows-mtr/releases/tag/vVERSION</releaseNotes>
+  </metadata>
+</package>
