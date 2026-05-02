@@ -1,13 +1,15 @@
-PackageIdentifier: benjisho.windows-mtr
+PackageIdentifier: BenjiShohet.WindowsMTR
 PackageVersion: 1.1.3
 InstallerType: zip
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/benjisho/windows-mtr/releases/download/v1.1.3/windows-mtr-1.1.3-x86_64-pc-windows-msvc.zip
+    InstallerUrl: https://github.com/benjisho/windows-mtr/releases/download/v1.1.3/windows-mtr-x86_64.zip
     InstallerSha256: REPLACE_WITH_RELEASE_SHA256
     NestedInstallerType: portable
     NestedInstallerFiles:
       - RelativeFilePath: mtr.exe
         PortableCommandAlias: mtr
+      - RelativeFilePath: windows-mtr.exe
+        PortableCommandAlias: windows-mtr
 ManifestType: installer
 ManifestVersion: 1.6.0

@@ -27,7 +27,8 @@ const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
   windows-mtr -r -c 10 example.com              # Report mode with 10 pings per hop
   windows-mtr --json -c 20 example.com          # JSON report output
   windows-mtr --api                              # Run REST API runtime
-  windows-mtr --trippy-flags '--tui-refresh-rate 150ms' example.com")]
+  windows-mtr --trippy-flags '--tui-refresh-rate 150ms' example.com
+  windows-mtr --ui dashboard 8.8.8.8          # Experimental dashboard fallback (alias: --ui native)")]
 struct Cli {
     /// Run in REST API mode instead of probe CLI mode
     #[arg(long = "api")]
@@ -170,7 +171,7 @@ struct TraceCli {
     )]
     trippy_flags: Option<String>,
 
-    /// UI preset for interactive mode
+    /// UI preset for interactive mode (`dashboard` is an experimental fallback; `native` is a deprecated alias)
     #[arg(long = "ui", value_enum, default_value_t = UiPreset::Default)]
     ui: UiPreset,
 
@@ -207,7 +208,11 @@ struct TraceCli {
 enum UiPreset {
     Default,
     Enhanced,
-    Native,
+    #[value(
+        alias = "native",
+        help = "experimental windows-mtr dashboard that polls JSON snapshots; useful if embedded Trippy TUI crashes in your terminal (native is deprecated alias)"
+    )]
+    Dashboard,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -262,7 +267,7 @@ fn windows_exit_diagnostic(exit_code: i32) -> Option<&'static str> {
     match exit_code as u32 {
         0xC0000005 => Some(
             "Detected a Windows access violation from the embedded Trippy UI. \
-             Retry with `mtr --ui native <target>` or use report mode (`mtr -r -c 5 <target>`).",
+             Retry with `mtr --ui dashboard <target>` (`--ui native` is deprecated alias) or use report mode (`mtr -r -c 5 <target>`).",
         ),
         _ => None,
     }
@@ -356,7 +361,7 @@ fn ui_mode_from_cli(ui: UiPreset) -> UiMode {
     match ui {
         UiPreset::Default => UiMode::Default,
         UiPreset::Enhanced => UiMode::Enhanced,
-        UiPreset::Native => UiMode::Native,
+        UiPreset::Dashboard => UiMode::Dashboard,
     }
 }
 
@@ -453,8 +458,13 @@ fn main() -> anyhow::Result<()> {
         .map_err(|error| anyhow::anyhow!(error.to_string()))
         .context("invalid command-line options")?;
 
-    if plan.ui_mode == UiMode::Native {
-        let code = native_ui::run_native_ui(&plan.validated_host, &plan.trippy_args)?;
+    if plan.ui_mode == UiMode::Dashboard {
+        let dashboard_args =
+            windows_mtr::service::build_json_snapshot_args(&request, &plan.validated_host)
+                .map_err(to_cli_error)
+                .map_err(|error| anyhow::anyhow!(error.to_string()))
+                .context("invalid --ui dashboard configuration")?;
+        let code = native_ui::run_native_ui(&plan.validated_host, &dashboard_args)?;
         process::exit(code);
     }
 
@@ -616,6 +626,17 @@ mod tests {
             cli.api_mtls_trusted_ingress[1],
             "10.0.0.10".parse::<IpAddr>().unwrap()
         );
+    }
+
+    #[test]
+    fn cli_accepts_dashboard_ui_and_native_alias() {
+        let dashboard = Cli::try_parse_from(["mtr", "--ui", "dashboard", "8.8.8.8"])
+            .expect("dashboard UI should parse");
+        assert!(matches!(dashboard.trace.ui, UiPreset::Dashboard));
+
+        let alias = Cli::try_parse_from(["mtr", "--ui", "native", "8.8.8.8"])
+            .expect("native alias should parse");
+        assert!(matches!(alias.trace.ui, UiPreset::Dashboard));
     }
 
     #[test]

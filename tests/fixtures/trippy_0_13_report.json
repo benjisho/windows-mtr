@@ -1,0 +1,22 @@
+{
+  "report": {
+    "hops": [
+      {
+        "ttl": 1,
+        "host": "192.168.1.1",
+        "loss_pct": 0.0,
+        "best_ms": 1.1,
+        "avg_ms": 1.5,
+        "worst_ms": 2.0
+      },
+      {
+        "ttl": 2,
+        "host": "dns.google (8.8.8.8)",
+        "loss_ratio": 0.05,
+        "best_ms": 18.0,
+        "avg_ms": 20.0,
+        "worst_ms": 23.0
+      }
+    ]
+  }
+}

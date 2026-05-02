@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use windows_mtr::service::{
     EnhancedUiConfig, JsonOutput, ProbeError, ProbeRequest, UiMode, build_embedded_trippy_args,
-    build_probe_plan, parse_passthrough_flags,
+    build_json_snapshot_args, build_probe_plan, parse_passthrough_flags,
 };
 
 fn base_request() -> ProbeRequest {
@@ -171,6 +171,44 @@ fn build_embedded_trippy_args_supports_json_mode() {
 
     let trippy_args = build_embedded_trippy_args(&request, "8.8.8.8").expect("should build");
     assert_eq!(trippy_args, vec!["mtr", "--mode", "json", "8.8.8.8"]);
+}
+
+#[test]
+fn build_json_snapshot_args_uses_json_mode_without_tui_flags() {
+    let mut request = base_request();
+    request.udp = true;
+    request.port = Some(53);
+    request.count = Some(10);
+    request.trippy_flags = Some("--dns-resolve-method system".to_string());
+
+    let args = build_json_snapshot_args(&request, "8.8.8.8").expect("should build");
+
+    assert!(args.windows(2).any(|w| w == ["--mode", "json"]));
+    assert!(args.windows(2).any(|w| w == ["--report-cycles", "1"]));
+    assert!(!args.iter().any(|t| t == "tui"));
+    assert!(!args.iter().any(|t| t.starts_with("--tui-")));
+}
+
+#[test]
+fn build_json_snapshot_args_no_dns_does_not_emit_tui_flags() {
+    let mut request = base_request();
+    request.no_dns = true;
+
+    let args = build_json_snapshot_args(&request, "8.8.8.8").expect("should build");
+
+    assert!(!args.iter().any(|t| t.starts_with("--tui-")));
+}
+
+#[test]
+fn build_json_snapshot_args_rejects_conflicting_passthrough_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Dashboard;
+    request.trippy_flags = Some("--mode tui --tui-refresh-rate 150ms".to_string());
+
+    assert!(matches!(
+        build_probe_plan(&request),
+        Err(ProbeError::InvalidOption(_))
+    ));
 }
 
 #[test]

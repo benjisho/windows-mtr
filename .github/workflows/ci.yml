@@ -417,20 +417,38 @@ jobs:
       - name: Create test build directory
         run: |
           mkdir -p pr-build
+          cp target/x86_64-pc-windows-msvc/release/mtr.exe pr-build/mtr.exe
           cp target/x86_64-pc-windows-msvc/release/mtr.exe pr-build/windows-mtr.exe
 
-          # Copy documentation files individually to avoid PowerShell parameter issues
-          cp README.md pr-build/
-          cp LICENSE pr-build/
-          if (Test-Path USAGE.md) { cp USAGE.md pr-build/ }
+          @"
+          windows-mtr PR package
+          ======================
+          .\mtr.exe 8.8.8.8
+          .\windows-mtr.exe -r -c 10 8.8.8.8
+          "@ | Set-Content -Path "pr-build/README.txt"
 
-          # Copy trippy executable
-          cp "${{ env.TRIPPY_PATH }}" pr-build/trip.exe
+          $mtrHash = (Get-FileHash -Path "pr-build/mtr.exe" -Algorithm SHA256).Hash
+          $windowsMtrHash = (Get-FileHash -Path "pr-build/windows-mtr.exe" -Algorithm SHA256).Hash
+          Set-Content -Path "pr-build/SHA256SUM" -Value @(
+            "$mtrHash  mtr.exe",
+            "$windowsMtrHash  windows-mtr.exe"
+          )
         shell: pwsh
 
       - name: Create ZIP package
         run: |
-          Compress-Archive -Path pr-build/* -DestinationPath pr-build/windows-mtr-PR${{ github.event.pull_request.number }}.zip -Force
+          Compress-Archive -Path pr-build/* -DestinationPath pr-build/windows-mtr-x86_64.zip -Force
+        shell: pwsh
+
+      - name: Verify PR ZIP package layout
+        run: ./scripts/release/verify-release-artifacts.ps1 -ZipPath "pr-build/windows-mtr-x86_64.zip"
+        shell: pwsh
+
+      - name: Dry-run release metadata update scripts
+        run: |
+          ./scripts/release/update-winget-manifest.ps1 -Version "1.1.3" -ZipPath "pr-build/windows-mtr-x86_64.zip"
+          ./scripts/release/update-scoop-manifest.ps1 -Version "1.1.3" -ZipPath "pr-build/windows-mtr-x86_64.zip"
+          ./scripts/release/update-chocolatey.ps1 -Version "1.1.3" -ZipPath "pr-build/windows-mtr-x86_64.zip"
         shell: pwsh
 
       - name: Upload PR build artifacts
@@ -439,6 +457,8 @@ jobs:
           name: windows-mtr-PR${{ github.event.pull_request.number }}
           path: |
             pr-build/*.exe
+            pr-build/*.txt
+            pr-build/SHA256SUM
             pr-build/*.zip
           retention-days: 14
 

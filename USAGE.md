@@ -6,7 +6,7 @@
 mtr [options] <hostname-or-ip>
 ```
 
-> On Windows portable downloads, replace `mtr` with your actual executable name (for example `windows-mtr-x86_64.exe`).
+> On GitHub release ZIP installs, run `.\mtr.exe` or `.\windows-mtr.exe`.
 
 ## Core Options
 
@@ -34,14 +34,16 @@ mtr [options] <hostname-or-ip>
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
 | `-z` | DNS ASN lookup shortcut |
-| `--ui <default\|enhanced\|native>` | Interactive UI preset (enhanced enables diagnostic overlays) |
+| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (enhanced enables diagnostic overlays) |
 
-## Native Ratatui UI
+## Dashboard UI (experimental fallback)
 
-Use `--ui native` to run the built-in Ratatui interface with live hop data, a hop table, and charts.
+Use `--ui dashboard` to run the windows-mtr dashboard that polls Trippy JSON snapshots. This is a fallback if the embedded Trippy interactive TUI crashes in your terminal.
+
+`--ui native` is kept as a deprecated compatibility alias.
 
 ```bash
-mtr --ui native 8.8.8.8
+mtr --ui dashboard 8.8.8.8
 ```
 
 Controls:
@@ -51,7 +53,21 @@ Controls:
 
 When probe snapshots fail repeatedly, the help footer surfaces the latest poll error and live troubleshooting hints (run with Administrator privileges, review firewall policy, or try report mode with `-r`). If no hop data is detected for 15 seconds, the footer also prompts you to quit (`q`) and retry in report mode for immediate diagnostics.
 
-`--ui native` accepts the standard probe and output tuning options, and renders them in the native Ratatui view.
+`--ui dashboard` accepts probe-related flags and builds dedicated JSON snapshot args (no `--tui-*` flags).
+
+## Troubleshooting
+
+If interactive TUI crashes or exits with `0xC0000005`, try:
+
+```bash
+.\mtr.exe --ui dashboard 8.8.8.8
+```
+
+For stable diagnostics, use report mode:
+
+```bash
+.\mtr.exe -n -r -c 5 8.8.8.8
+```
 
 ## Enhanced UI options
 

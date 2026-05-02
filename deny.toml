@@ -11,6 +11,8 @@ ignore = [
   "RUSTSEC-2025-0132",
   # transitive via ratatui/trippy; crate archived with no direct safe upgrade path for this stack yet
   "RUSTSEC-2024-0436",
+  # transitive via trippy-dns/hickory-resolver; hickory-proto 0.26.x is incompatible with trippy 0.13.x constraints
+  "RUSTSEC-2026-0119",
 ]
 
 [licenses]
