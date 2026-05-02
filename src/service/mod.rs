@@ -316,10 +316,6 @@ pub fn build_json_snapshot_args(
         trippy_args.extend(["--grace-duration".to_string(), duration_seconds(timeout)]);
     }
 
-    if request.no_dns {
-        trippy_args.extend(["--tui-address-mode".to_string(), "ip".to_string()]);
-    }
-
     if let Some(max_hops) = request.max_hops {
         trippy_args.extend(["--max-ttl".to_string(), max_hops.to_string()]);
     }

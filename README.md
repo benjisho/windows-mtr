@@ -380,7 +380,7 @@ The full roadmap now lives in [docs/ROADMAP.md](docs/ROADMAP.md), which is the s
 
 Quick snapshot:
 
-- ✅ Released: Core MTR functionality, MSI installer, IPv6, Docker, JSON output, DNS cache TTL, REST API v1 (authentication, rate limiting, concurrency controls).
+- ✅ Released: Core MTR functionality, IPv6, Docker, JSON output, DNS cache TTL, REST API v1 (authentication, rate limiting, concurrency controls).
 - 🚧 In progress: experimental dashboard fallback UI (`--ui dashboard`, `--ui native` alias), additional release-artifact validation, and security hardening follow-up.
 - 📅 Planned / 🛣️ Roadmap: SNMP integration, ETW observability, versioned JSON schema + CSV export, runtime cleanup.
 

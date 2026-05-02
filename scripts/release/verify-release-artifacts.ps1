@@ -20,11 +20,13 @@ foreach ($file in $required) {
 }
 
 $readme = Get-Content -Raw -Path (Join-Path $temp "README.txt")
-if ($readme -notmatch '\\.\\mtr\\.exe\s+8\\.8\\.8\\.8') {
-  throw "README.txt missing required command: .\\mtr.exe 8.8.8.8"
+$requiredCommand1 = '.\mtr.exe 8.8.8.8'
+$requiredCommand2 = '.\windows-mtr.exe -r -c 10 8.8.8.8'
+if ($readme -notmatch [regex]::Escape($requiredCommand1)) {
+  throw "README.txt missing required command: $requiredCommand1"
 }
-if ($readme -notmatch '\\.\\windows-mtr\\.exe\s+-r\s+-c\s+10\s+8\\.8\\.8\\.8') {
-  throw "README.txt missing required command: .\\windows-mtr.exe -r -c 10 8.8.8.8"
+if ($readme -notmatch [regex]::Escape($requiredCommand2)) {
+  throw "README.txt missing required command: $requiredCommand2"
 }
 
 $hashLines = Get-Content (Join-Path $temp "SHA256SUM")

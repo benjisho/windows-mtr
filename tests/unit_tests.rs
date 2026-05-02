@@ -190,6 +190,16 @@ fn build_json_snapshot_args_uses_json_mode_without_tui_flags() {
 }
 
 #[test]
+fn build_json_snapshot_args_no_dns_does_not_emit_tui_flags() {
+    let mut request = base_request();
+    request.no_dns = true;
+
+    let args = build_json_snapshot_args(&request, "8.8.8.8").expect("should build");
+
+    assert!(!args.iter().any(|t| t.starts_with("--tui-")));
+}
+
+#[test]
 fn build_json_snapshot_args_rejects_conflicting_passthrough_flags() {
     let mut request = base_request();
     request.ui_mode = UiMode::Dashboard;
