@@ -6,4 +6,6 @@ ignore = [
   "RUSTSEC-2024-0436",
   # Transitive via ratatui -> lru; upstream ratatui/trippy bump required.
   "RUSTSEC-2026-0002",
+  # Transitive via trippy-dns/hickory-resolver; blocked on trippy 0.13.x dependency constraints.
+  "RUSTSEC-2026-0119",
 ]
