@@ -80,12 +80,12 @@ Windows MTR is a Windows-focused network diagnostics CLI inspired by Linux mtr. 
 
 ## 📊 Performance
 
-Our benchmarks demonstrate Windows MTR's commitment to high-performance networking:
+Windows MTR prioritizes predictable diagnostics and operational safety over unverified headline metrics. Performance and coverage claims should be treated as release-specific and validated from CI artifacts/benchmarks for each tagged release.
 
-- **50+ million** packets per second processing capability
-- **87.3%** function coverage with automated testing
-- **Sub-microsecond** timing precision for accurate measurements
-- **40%** smaller distribution size with XZ compression
+- Probe throughput depends on protocol, host kernel/network stack, and runtime flags
+- Test coverage trends are tracked in CI and may vary by release
+- Timing precision depends on OS scheduler behavior and system load
+- Distribution size varies by release artifact composition and compression strategy
 
 ## 🔐 Security
 
@@ -94,7 +94,7 @@ Windows MTR is built with enterprise-level security practices:
 - 🛡️ Regular security audits with automated scanning
 - 🔒 All dependencies vetted for vulnerabilities
 - 🧪 Fuzz harness implemented; CI integration in progress
-- 🔑 Cryptographically signed releases with SHA-256 verification
+- 🔑 SHA-256 checksum verification for canonical release ZIP artifacts
 
 ### REST API security and operational limits (v1, implemented)
 
@@ -422,7 +422,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## 📊 Analytics & Usage Metrics
 
 <div align="center">
-  <img src="https://img.shields.io/badge/Code%20Coverage-87.3%25-brightgreen" alt="Code Coverage" />
+  <img src="https://img.shields.io/badge/Code%20Coverage-CI--tracked-brightgreen" alt="Code Coverage" />
   <img src="https://img.shields.io/badge/Test%20Cases-35%2B-blue" alt="Test Cases" />
   <img src="https://img.shields.io/badge/Integration%20Tests-10%2B-blue" alt="Integration Tests" />
   <img src="https://img.shields.io/badge/Fuzz%20Tests-1000%2B-blue" alt="Fuzz Tests" />
