@@ -354,7 +354,7 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
     let tabs = Tabs::new(titles)
         .block(
             Block::default()
-                .title(format!("windows-mtr dashboard ({})", app.target))
+                .title(dashboard_title(&app.target))
                 .borders(Borders::ALL),
         )
         .select(app.tab_index)
@@ -379,8 +379,12 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
     frame.render_widget(help, chunks[2]);
 }
 
+fn dashboard_title(target: &str) -> String {
+    format!("windows-mtr fallback dashboard ({target})")
+}
+
 fn build_help_text(app: &NativeUiApp) -> String {
-    let base = "Controls: ←/→ or Tab switch tabs • q quits";
+    let base = "Fallback dashboard: JSON snapshot polling, limited fields. For full UI use default mode. • Controls: ←/→ or Tab switch tabs • q quits";
     let mut notes = Vec::new();
 
     if app.hops.is_empty() {
@@ -659,7 +663,7 @@ mod tests {
 
         assert_eq!(
             build_help_text(&app),
-            "Controls: ←/→ or Tab switch tabs • q quits"
+            "Fallback dashboard: JSON snapshot polling, limited fields. For full UI use default mode. • Controls: ←/→ or Tab switch tabs • q quits"
         );
     }
 }

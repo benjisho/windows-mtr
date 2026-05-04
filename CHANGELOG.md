@@ -11,8 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Added an experimental dashboard preview mode via `--ui dashboard` (deprecated compatibility alias: `--ui native`) with tabs, hop table rendering, and live latency/loss charts.
 
 ### Changed
-- Updated README/USAGE roadmap and examples to document the dashboard fallback UI and controls.
-- Improved the dashboard UI help footer to show elapsed "awaiting data" time and add a 15-second timeout troubleshooting prompt when hop snapshots never arrive.
+- Updated README/USAGE to keep the default embedded Trippy TUI as the primary recommended interactive experience and to document dashboard mode as an experimental fallback only.
+- Clarified CLI behavior for `--ui enhanced`: unavailable with bundled Trippy 0.13.0 and now returns a clean actionable validation error.
+- Improved the fallback dashboard title/help footer wording to clearly communicate JSON polling limitations and default-mode recommendation.
+
+### Fixed
+- Stopped passing unsupported enhanced `--tui-*` flags to bundled Trippy 0.13.0 (`--tui-latency-*`, `--tui-loss-*`, `--tui-row-coloring`, `--tui-hop-trend`, `--tui-summary-*`).
 
 ## [1.1.3] - 2026-02-28
 

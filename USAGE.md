@@ -34,7 +34,7 @@ mtr [options] <hostname-or-ip>
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
 | `-z` | DNS ASN lookup shortcut |
-| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (enhanced enables diagnostic overlays) |
+| `--ui <default|enhanced|dashboard>` | Interactive UI preset (`default` = full embedded Trippy TUI, `dashboard` = experimental fallback, `enhanced` currently unavailable with bundled Trippy 0.13.0) |
 
 ## Dashboard UI (experimental fallback)
 
@@ -69,9 +69,11 @@ For stable diagnostics, use report mode:
 .\mtr.exe -n -r -c 5 8.8.8.8
 ```
 
-## Enhanced UI options
+## Enhanced UI options (currently unavailable with bundled Trippy 0.13.0)
 
-The `enhanced` preset applies defaults tuned for quicker incident triage:
+`--ui enhanced` is currently soft-disabled because bundled Trippy 0.13.0 does not support the required enhanced `--tui-*` flags. Use default interactive mode (`mtr 8.8.8.8`) or fallback dashboard mode (`mtr --ui dashboard 8.8.8.8`).
+
+When enhanced becomes supported again, the preset is intended to apply defaults tuned for quicker incident triage:
 
 - Latency color bands: `--latency-warn-ms 100`, `--latency-bad-ms 250`
 - Loss color bands: `--loss-warn-pct 2`, `--loss-bad-pct 5`
@@ -126,12 +128,8 @@ The `enhanced` preset applies defaults tuned for quicker incident triage:
 # Interactive TUI
 mtr 8.8.8.8
 
-# Interactive TUI (enhanced diagnostic preset)
-mtr --ui enhanced 8.8.8.8
-
-# Enhanced mode with custom threshold bands + toggles
-mtr --ui enhanced --latency-warn-ms 80 --latency-bad-ms 180 --loss-warn-pct 1 --loss-bad-pct 3 --enhanced-sparklines off 8.8.8.8
-
+# NOTE: --ui enhanced is currently unavailable with bundled Trippy 0.13.0
+# mtr --ui enhanced 8.8.8.8
 # TCP report
 mtr -T -P 443 -c 15 -r github.com
 

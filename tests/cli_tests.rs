@@ -51,7 +51,7 @@ fn test_enhanced_ui_conflicts_with_report_mode() {
 }
 
 #[test]
-fn test_enhanced_wrapper_conflicts_with_passthrough_override() {
+fn test_enhanced_ui_returns_unavailable_error_even_with_passthrough() {
     let output = Command::new("cargo")
         .args([
             "run",
@@ -68,9 +68,7 @@ fn test_enhanced_wrapper_conflicts_with_passthrough_override() {
     assert!(!output.status.success());
 
     let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
-    assert!(
-        stderr.contains("--trippy-flags cannot override windows-mtr enhanced UI wrapper settings")
-    );
+    assert!(stderr.contains("enhanced UI is not available with bundled Trippy 0.13.0"));
 }
 
 #[test]
@@ -156,4 +154,17 @@ fn test_basic_execution() {
     // Check for expected output format in report mode
     assert!(stdout.contains("Host"));
     assert!(stdout.contains("Loss%"));
+}
+
+#[test]
+fn test_enhanced_ui_is_soft_disabled_in_interactive_mode() {
+    let output = Command::new("cargo")
+        .args(["run", "--", "--ui", "enhanced", "8.8.8.8"])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(!output.status.success());
+
+    let stderr = String::from_utf8(output.stderr).expect("Invalid UTF-8");
+    assert!(stderr.contains("enhanced UI is not available with bundled Trippy 0.13.0"));
 }

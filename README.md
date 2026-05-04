@@ -199,7 +199,7 @@ mtr 8.8.8.8
 > [!TIP]
 > From the canonical ZIP, use `.\mtr.exe` or `.\windows-mtr.exe` directly.
 
-### Dashboard fallback UI (experimental)
+### Dashboard fallback UI (experimental, limited)
 
 ```bash
 mtr --ui dashboard 8.8.8.8
@@ -213,7 +213,7 @@ mtr -n -r -c 20 1.1.1.1
 
 ### Troubleshooting
 
-If interactive TUI crashes (for example Windows status `0xC0000005`), try:
+If embedded Trippy interactive TUI crashes (for example Windows status `0xC0000005`), try the fallback dashboard:
 
 ```bash
 .\mtr.exe --ui dashboard 8.8.8.8

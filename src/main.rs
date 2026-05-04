@@ -175,31 +175,31 @@ struct TraceCli {
     #[arg(long = "ui", value_enum, default_value_t = UiPreset::Default)]
     ui: UiPreset,
 
-    /// Latency warning threshold in milliseconds for enhanced UI coloring
+    /// Latency warning threshold in milliseconds for enhanced UI coloring (currently unavailable with bundled Trippy 0.13.0)
     #[arg(long = "latency-warn-ms", value_name = "MS")]
     latency_warn_ms: Option<f32>,
 
-    /// Latency critical threshold in milliseconds for enhanced UI coloring
+    /// Latency critical threshold in milliseconds for enhanced UI coloring (currently unavailable with bundled Trippy 0.13.0)
     #[arg(long = "latency-bad-ms", value_name = "MS")]
     latency_bad_ms: Option<f32>,
 
-    /// Packet loss warning threshold percentage for enhanced UI coloring
+    /// Packet loss warning threshold percentage for enhanced UI coloring (currently unavailable with bundled Trippy 0.13.0)
     #[arg(long = "loss-warn-pct", value_name = "PCT")]
     loss_warn_pct: Option<f32>,
 
-    /// Packet loss critical threshold percentage for enhanced UI coloring
+    /// Packet loss critical threshold percentage for enhanced UI coloring (currently unavailable with bundled Trippy 0.13.0)
     #[arg(long = "loss-bad-pct", value_name = "PCT")]
     loss_bad_pct: Option<f32>,
 
-    /// Toggle row coloring bands in enhanced UI
+    /// Toggle row coloring bands in enhanced UI (currently unavailable with bundled Trippy 0.13.0)
     #[arg(long = "enhanced-row-color", value_enum, value_name = "on|off")]
     enhanced_row_color: Option<OnOff>,
 
-    /// Toggle per-hop trend/sparkline column in enhanced UI
+    /// Toggle per-hop trend/sparkline column in enhanced UI (currently unavailable with bundled Trippy 0.13.0)
     #[arg(long = "enhanced-sparklines", value_enum, value_name = "on|off")]
     enhanced_sparklines: Option<OnOff>,
 
-    /// Toggle percentile/jitter summary in enhanced UI
+    /// Toggle percentile/jitter summary in enhanced UI (currently unavailable with bundled Trippy 0.13.0)
     #[arg(long = "enhanced-summary", value_enum, value_name = "on|off")]
     enhanced_summary: Option<OnOff>,
 }
@@ -207,6 +207,7 @@ struct TraceCli {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum UiPreset {
     Default,
+    #[value(help = "unavailable with bundled Trippy 0.13.0; returns a validation error")]
     Enhanced,
     #[value(
         alias = "native",
