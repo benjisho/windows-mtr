@@ -205,6 +205,12 @@ mtr 8.8.8.8
 mtr --ui dashboard 8.8.8.8
 ```
 
+This dashboard is a fallback path that polls JSON snapshots and exposes limited fields. For the full interactive experience, use the default embedded Trippy TUI with:
+
+```bash
+mtr 8.8.8.8
+```
+
 ### Report mode with DNS disabled (faster + script-friendly)
 
 ```bash

@@ -221,3 +221,28 @@ fn enhanced_ui_overrides_require_enhanced_mode() {
         Err(ProbeError::InvalidOption(_))
     ));
 }
+
+#[test]
+fn build_embedded_trippy_args_enhanced_mode_does_not_emit_unsupported_tui_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Enhanced;
+
+    let args = build_embedded_trippy_args(&request, "8.8.8.8").expect("should build");
+    let unsupported = [
+        "--tui-latency-warn-threshold",
+        "--tui-latency-bad-threshold",
+        "--tui-loss-warn-threshold",
+        "--tui-loss-bad-threshold",
+        "--tui-row-coloring",
+        "--tui-hop-trend",
+        "--tui-summary-jitter",
+        "--tui-summary-percentiles",
+    ];
+
+    for flag in unsupported {
+        assert!(
+            !args.iter().any(|token| token == flag),
+            "unexpected unsupported trippy flag present: {flag}"
+        );
+    }
+}

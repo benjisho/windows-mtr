@@ -34,7 +34,7 @@ mtr [options] <hostname-or-ip>
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
 | `-z` | DNS ASN lookup shortcut |
-| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (enhanced enables diagnostic overlays) |
+| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (`enhanced` is temporarily unavailable with bundled Trippy 0.13.0) |
 
 ## Dashboard UI (experimental fallback)
 
@@ -69,15 +69,9 @@ For stable diagnostics, use report mode:
 .\mtr.exe -n -r -c 5 8.8.8.8
 ```
 
-## Enhanced UI options
+## Enhanced UI options (temporarily unavailable)
 
-The `enhanced` preset applies defaults tuned for quicker incident triage:
-
-- Latency color bands: `--latency-warn-ms 100`, `--latency-bad-ms 250`
-- Loss color bands: `--loss-warn-pct 2`, `--loss-bad-pct 5`
-- Row coloring: `--enhanced-row-color on`
-- Per-hop trend/sparkline column: `--enhanced-sparklines on`
-- Percentile + jitter summary area: `--enhanced-summary on`
+`--ui enhanced` is currently soft-disabled with bundled Trippy 0.13.0 and returns an actionable error. Use default UI (`mtr <target>`) for full embedded Trippy TUI, or `--ui dashboard` as an emergency fallback.
 
 | Option | Description |
 |---|---|
@@ -126,11 +120,8 @@ The `enhanced` preset applies defaults tuned for quicker incident triage:
 # Interactive TUI
 mtr 8.8.8.8
 
-# Interactive TUI (enhanced diagnostic preset)
+# Enhanced UI is currently unavailable with bundled Trippy 0.13.0
 mtr --ui enhanced 8.8.8.8
-
-# Enhanced mode with custom threshold bands + toggles
-mtr --ui enhanced --latency-warn-ms 80 --latency-bad-ms 180 --loss-warn-pct 1 --loss-bad-pct 3 --enhanced-sparklines off 8.8.8.8
 
 # TCP report
 mtr -T -P 443 -c 15 -r github.com
@@ -145,14 +136,13 @@ mtr -S 192.0.2.10 -s 128 8.8.4.4
 mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.8
 ```
 
-## Default vs enhanced mode (side-by-side)
+## Default UI vs fallback dashboard
 
-| Default mode | Enhanced mode |
+| Default mode (recommended) | Fallback dashboard |
 |---|---|
-| `mtr 8.8.8.8` | `mtr --ui enhanced 8.8.8.8` |
-| Standard hop table | Adds threshold-based row coloring |
-| Average-focused quick view | Adds percentile + jitter summary |
-| No explicit trend column | Optional per-hop sparkline trend column |
+| `mtr 8.8.8.8` | `mtr --ui dashboard 8.8.8.8` |
+| Full embedded Trippy interactive TUI | JSON snapshot polling with limited fields |
+| Best interactive fidelity | Emergency fallback when embedded TUI crashes |
 
 ![Default mode demo](assets/windows-mtr-m.gif)
 ![Enhanced mode demo](assets/windows-mtr-upscaled.gif)
