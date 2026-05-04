@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Updated documentation and roadmap to reflect delivered v2.0 capabilities.
 
 ### Fixed
+- Fixed `--ui enhanced` handling for bundled Trippy 0.13.0: stop passing unsupported `--tui-*` flags and return a clear unavailable-with-action message.
+- Clarified `--ui dashboard` as an experimental fallback dashboard (JSON snapshot polling, limited fields), not parity with the embedded Trippy TUI.
 - Hardened security workflow with a pinned Rust toolchain, explicit `cargo-deny` policy file, and an always-on GitHub Actions job summary.
 - Tuned `cargo-deny` policy to handle known transitive advisories and unavoidable duplicate crates in the Trippy 0.13 dependency graph.
 - Added `cargo-audit` policy configuration with documented temporary ignores for transitive upstream advisories in the current Trippy 0.13 stack.

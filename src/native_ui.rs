@@ -21,6 +21,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+const FALLBACK_DASHBOARD_TITLE_PREFIX: &str = "windows-mtr fallback dashboard";
+
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
 
 #[derive(Clone)]
@@ -354,7 +356,10 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
     let tabs = Tabs::new(titles)
         .block(
             Block::default()
-                .title(format!("windows-mtr dashboard ({})", app.target))
+                .title(format!(
+                    "{FALLBACK_DASHBOARD_TITLE_PREFIX} ({})",
+                    app.target
+                ))
                 .borders(Borders::ALL),
         )
         .select(app.tab_index)
@@ -380,7 +385,7 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
 }
 
 fn build_help_text(app: &NativeUiApp) -> String {
-    let base = "Controls: ←/→ or Tab switch tabs • q quits";
+    let base = "Fallback dashboard: JSON snapshot polling, limited fields. For full UI use default mode. • Controls: ←/→ or Tab switch tabs • q quits";
     let mut notes = Vec::new();
 
     if app.hops.is_empty() {
@@ -659,7 +664,7 @@ mod tests {
 
         assert_eq!(
             build_help_text(&app),
-            "Controls: ←/→ or Tab switch tabs • q quits"
+            "Fallback dashboard: JSON snapshot polling, limited fields. For full UI use default mode. • Controls: ←/→ or Tab switch tabs • q quits"
         );
     }
 }

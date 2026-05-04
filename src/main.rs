@@ -171,7 +171,7 @@ struct TraceCli {
     )]
     trippy_flags: Option<String>,
 
-    /// UI preset for interactive mode (`dashboard` is an experimental fallback; `native` is a deprecated alias)
+    /// UI preset for interactive mode (`enhanced` is currently unavailable with bundled Trippy 0.13.0; `dashboard` is an experimental fallback; `native` is a deprecated alias)
     #[arg(long = "ui", value_enum, default_value_t = UiPreset::Default)]
     ui: UiPreset,
 
@@ -207,6 +207,9 @@ struct TraceCli {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum UiPreset {
     Default,
+    #[value(
+        help = "unavailable with bundled Trippy 0.13.0; use default UI or --ui dashboard fallback"
+    )]
     Enhanced,
     #[value(
         alias = "native",
