@@ -28,7 +28,7 @@ const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
   windows-mtr --json -c 20 example.com          # JSON report output
   windows-mtr --api                              # Run REST API runtime
   windows-mtr --trippy-flags '--tui-refresh-rate 150ms' example.com
-  windows-mtr --ui dashboard 8.8.8.8          # Experimental dashboard fallback (alias: --ui native)")]
+  windows-mtr --ui dashboard 8.8.8.8          # Experimental fallback dashboard (alias: --ui native)")]
 struct Cli {
     /// Run in REST API mode instead of probe CLI mode
     #[arg(long = "api")]
@@ -171,7 +171,7 @@ struct TraceCli {
     )]
     trippy_flags: Option<String>,
 
-    /// UI preset for interactive mode (`dashboard` is an experimental fallback; `native` is a deprecated alias)
+    /// UI preset for interactive mode (`enhanced` is currently unavailable with bundled Trippy 0.13.0; `dashboard`/`native` are fallback modes)
     #[arg(long = "ui", value_enum, default_value_t = UiPreset::Default)]
     ui: UiPreset,
 

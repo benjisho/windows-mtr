@@ -22,7 +22,7 @@
 
 ---
 
-Windows MTR is a Windows-focused network diagnostics CLI inspired by Linux mtr. It embeds Trippy for probing/reporting and includes an experimental dashboard fallback for terminals where the embedded interactive TUI crashes.
+Windows MTR is a Windows-focused network diagnostics CLI inspired by Linux mtr. It embeds Trippy for probing/reporting. The default interactive experience is the embedded Trippy TUI; `--ui dashboard` is an experimental fallback for terminals where the TUI crashes.
 
 ## 📚 Table of Contents
 
@@ -199,7 +199,7 @@ mtr 8.8.8.8
 > [!TIP]
 > From the canonical ZIP, use `.\mtr.exe` or `.\windows-mtr.exe` directly.
 
-### Dashboard fallback UI (experimental)
+### Dashboard fallback UI (experimental, limited)
 
 ```bash
 mtr --ui dashboard 8.8.8.8

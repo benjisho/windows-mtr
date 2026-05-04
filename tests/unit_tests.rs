@@ -221,3 +221,33 @@ fn enhanced_ui_overrides_require_enhanced_mode() {
         Err(ProbeError::InvalidOption(_))
     ));
 }
+
+#[test]
+fn enhanced_mode_is_soft_disabled() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Enhanced;
+    let err = build_probe_plan(&request).expect_err("enhanced should be unavailable");
+    assert!(matches!(err, ProbeError::InvalidOption(_)));
+    assert!(
+        err.to_string()
+            .contains("enhanced UI is not available with bundled Trippy 0.13.0")
+    );
+}
+
+#[test]
+fn enhanced_mode_build_args_does_not_emit_unsupported_tui_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Enhanced;
+    let args = build_embedded_trippy_args(&request, "8.8.8.8").expect("args build");
+    let banned = [
+        "--tui-latency-warn-threshold",
+        "--tui-latency-bad-threshold",
+        "--tui-loss-warn-threshold",
+        "--tui-loss-bad-threshold",
+        "--tui-row-coloring",
+        "--tui-hop-trend",
+        "--tui-summary-jitter",
+        "--tui-summary-percentiles",
+    ];
+    assert!(!args.iter().any(|a| banned.contains(&a.as_str())));
+}
