@@ -34,7 +34,7 @@ mtr [options] <hostname-or-ip>
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
 | `-z` | DNS ASN lookup shortcut |
-| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (enhanced enables diagnostic overlays) |
+| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (`enhanced` currently unavailable with bundled Trippy 0.13.0) |
 
 ## Dashboard UI (experimental fallback)
 
@@ -71,23 +71,9 @@ For stable diagnostics, use report mode:
 
 ## Enhanced UI options
 
-The `enhanced` preset applies defaults tuned for quicker incident triage:
+`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Running enhanced mode now returns a clear validation error that recommends default UI or dashboard fallback.
 
-- Latency color bands: `--latency-warn-ms 100`, `--latency-bad-ms 250`
-- Loss color bands: `--loss-warn-pct 2`, `--loss-bad-pct 5`
-- Row coloring: `--enhanced-row-color on`
-- Per-hop trend/sparkline column: `--enhanced-sparklines on`
-- Percentile + jitter summary area: `--enhanced-summary on`
-
-| Option | Description |
-|---|---|
-| `--latency-warn-ms <MS>` | Warning threshold for per-hop latency coloring |
-| `--latency-bad-ms <MS>` | Critical threshold for per-hop latency coloring |
-| `--loss-warn-pct <PCT>` | Warning threshold for packet loss coloring |
-| `--loss-bad-pct <PCT>` | Critical threshold for packet loss coloring |
-| `--enhanced-row-color <on\|off>` | Enable/disable row band coloring in enhanced mode |
-| `--enhanced-sparklines <on\|off>` | Enable/disable per-hop trend/sparkline column |
-| `--enhanced-summary <on\|off>` | Enable/disable percentile and jitter summary area |
+Enhanced tuning flags are retained for forward compatibility but require future bundled Trippy support before they can be used again.
 
 ## Timing & DNS Cache
 
@@ -126,12 +112,6 @@ The `enhanced` preset applies defaults tuned for quicker incident triage:
 # Interactive TUI
 mtr 8.8.8.8
 
-# Interactive TUI (enhanced diagnostic preset)
-mtr --ui enhanced 8.8.8.8
-
-# Enhanced mode with custom threshold bands + toggles
-mtr --ui enhanced --latency-warn-ms 80 --latency-bad-ms 180 --loss-warn-pct 1 --loss-bad-pct 3 --enhanced-sparklines off 8.8.8.8
-
 # TCP report
 mtr -T -P 443 -c 15 -r github.com
 
@@ -145,17 +125,11 @@ mtr -S 192.0.2.10 -s 128 8.8.4.4
 mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.8
 ```
 
-## Default vs enhanced mode (side-by-side)
+## Interactive mode recommendation
 
-| Default mode | Enhanced mode |
-|---|---|
-| `mtr 8.8.8.8` | `mtr --ui enhanced 8.8.8.8` |
-| Standard hop table | Adds threshold-based row coloring |
-| Average-focused quick view | Adds percentile + jitter summary |
-| No explicit trend column | Optional per-hop sparkline trend column |
+Use `mtr 8.8.8.8` as the primary interactive experience (embedded Trippy TUI).
 
-![Default mode demo](assets/windows-mtr-m.gif)
-![Enhanced mode demo](assets/windows-mtr-upscaled.gif)
+Use `mtr --ui dashboard 8.8.8.8` only as a fallback dashboard for terminals where the embedded TUI crashes.
 
 ## REST API startup and operational limits (v1, implemented)
 

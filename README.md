@@ -199,11 +199,13 @@ mtr 8.8.8.8
 > [!TIP]
 > From the canonical ZIP, use `.\mtr.exe` or `.\windows-mtr.exe` directly.
 
-### Dashboard fallback UI (experimental)
+### Dashboard fallback UI (experimental, limited)
 
 ```bash
 mtr --ui dashboard 8.8.8.8
 ```
+
+`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Use default mode (`mtr 8.8.8.8`) for the full embedded Trippy TUI.
 
 ### Report mode with DNS disabled (faster + script-friendly)
 

@@ -212,6 +212,37 @@ fn build_json_snapshot_args_rejects_conflicting_passthrough_flags() {
 }
 
 #[test]
+fn enhanced_ui_is_soft_disabled_with_actionable_error() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Enhanced;
+
+    assert!(matches!(
+        build_probe_plan(&request),
+        Err(ProbeError::InvalidOption(msg)) if msg.contains("enhanced UI is not available with bundled Trippy 0.13.0")
+    ));
+}
+
+#[test]
+fn build_embedded_trippy_args_enhanced_has_no_unsupported_tui_flags() {
+    let mut request = base_request();
+    request.ui_mode = UiMode::Enhanced;
+
+    let args = build_embedded_trippy_args(&request, "8.8.8.8").expect("should build");
+    for forbidden in [
+        "--tui-latency-warn-threshold",
+        "--tui-latency-bad-threshold",
+        "--tui-loss-warn-threshold",
+        "--tui-loss-bad-threshold",
+        "--tui-row-coloring",
+        "--tui-hop-trend",
+        "--tui-summary-jitter",
+        "--tui-summary-percentiles",
+    ] {
+        assert!(!args.iter().any(|token| token == forbidden));
+    }
+}
+
+#[test]
 fn enhanced_ui_overrides_require_enhanced_mode() {
     let mut request = base_request();
     request.has_enhanced_overrides = true;

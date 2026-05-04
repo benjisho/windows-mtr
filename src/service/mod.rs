@@ -133,41 +133,13 @@ pub fn verify_options(request: &ProbeRequest) -> Result<(), ProbeError> {
     }
 
     if request.ui_mode == UiMode::Enhanced {
-        if request.enhanced_ui.latency_warn_ms >= request.enhanced_ui.latency_bad_ms {
-            return Err(ProbeError::InvalidOption(
-                "--latency-warn-ms must be lower than --latency-bad-ms".to_string(),
-            ));
-        }
-        if request.enhanced_ui.loss_warn_pct >= request.enhanced_ui.loss_bad_pct {
-            return Err(ProbeError::InvalidOption(
-                "--loss-warn-pct must be lower than --loss-bad-pct".to_string(),
-            ));
-        }
+        return Err(ProbeError::InvalidOption(
+            "enhanced UI is not available with bundled Trippy 0.13.0; use default UI or --ui dashboard fallback".to_string(),
+        ));
     }
 
     if let Some(flags) = &request.trippy_flags {
         let parsed = parse_passthrough_flags(flags)?;
-        let conflicting = [
-            "--tui-latency-warn-threshold",
-            "--tui-latency-bad-threshold",
-            "--tui-loss-warn-threshold",
-            "--tui-loss-bad-threshold",
-            "--tui-row-coloring",
-            "--tui-hop-trend",
-            "--tui-summary-jitter",
-            "--tui-summary-percentiles",
-        ];
-
-        if request.ui_mode == UiMode::Enhanced
-            && parsed
-                .iter()
-                .any(|token| conflicting.iter().any(|flag| token == flag))
-        {
-            return Err(ProbeError::InvalidOption(
-                "--trippy-flags cannot override windows-mtr enhanced UI wrapper settings"
-                    .to_string(),
-            ));
-        }
 
         if request.ui_mode == UiMode::Dashboard
             && parsed
@@ -428,28 +400,6 @@ pub fn build_embedded_trippy_args(
 
     if let Some(ttl) = request.dns_cache_ttl_seconds {
         trippy_args.extend(["--dns-ttl".to_string(), format!("{ttl}s")]);
-    }
-
-    if request.ui_mode == UiMode::Enhanced {
-        let ui = request.enhanced_ui;
-        trippy_args.extend([
-            "--tui-latency-warn-threshold".to_string(),
-            format!("{}ms", ui.latency_warn_ms),
-            "--tui-latency-bad-threshold".to_string(),
-            format!("{}ms", ui.latency_bad_ms),
-            "--tui-loss-warn-threshold".to_string(),
-            ui.loss_warn_pct.to_string(),
-            "--tui-loss-bad-threshold".to_string(),
-            ui.loss_bad_pct.to_string(),
-            "--tui-row-coloring".to_string(),
-            ui.row_coloring.to_string(),
-            "--tui-hop-trend".to_string(),
-            ui.sparklines.to_string(),
-            "--tui-summary-jitter".to_string(),
-            ui.summary.to_string(),
-            "--tui-summary-percentiles".to_string(),
-            ui.summary.to_string(),
-        ]);
     }
 
     if let Some(extra) = &request.trippy_flags {
