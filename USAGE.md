@@ -34,7 +34,7 @@ mtr [options] <hostname-or-ip>
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
 | `-z` | DNS ASN lookup shortcut |
-| `--ui <default\|enhanced\|dashboard>` | Interactive UI preset (`enhanced` currently unavailable with bundled Trippy 0.13.0) |
+| `--ui <default\|dashboard>` | Interactive UI preset (`dashboard` is experimental fallback; `native` is deprecated alias) |
 
 ## Dashboard UI (experimental fallback)
 
@@ -69,11 +69,11 @@ For stable diagnostics, use report mode:
 .\mtr.exe -n -r -c 5 8.8.8.8
 ```
 
-## Enhanced UI options
+## Enhanced UI options (deprecated)
 
-`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Running enhanced mode now returns a clear validation error that recommends default UI or dashboard fallback.
+`--ui enhanced` is intentionally not part of the supported interactive presets.
 
-Enhanced tuning flags are retained for forward compatibility but require future bundled Trippy support before they can be used again.
+Legacy enhanced tuning flags remain parser-visible only for compatibility and currently fail validation with guidance to use default UI or `--ui dashboard`.
 
 ## Timing & DNS Cache
 

@@ -205,7 +205,7 @@ mtr 8.8.8.8
 mtr --ui dashboard 8.8.8.8
 ```
 
-`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Use default mode (`mtr 8.8.8.8`) for the full embedded Trippy TUI.
+Use default mode (`mtr 8.8.8.8`) for the embedded Trippy TUI. `--ui dashboard` is an experimental fallback, and `--ui native` remains a deprecated compatibility alias.
 
 ### Report mode with DNS disabled (faster + script-friendly)
 
