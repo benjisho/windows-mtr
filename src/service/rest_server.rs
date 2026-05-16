@@ -8,7 +8,7 @@ use std::time::Instant;
 use anyhow::{Context, anyhow};
 use axum::body::{Body, to_bytes};
 use axum::extract::{ConnectInfo, Path, Request, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -33,6 +33,10 @@ use crate::service::{
 
 const API_KEY_HEADER: &str = "X-API-Key";
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
+const REQUEST_ID_HEADER: &str = "X-Request-ID";
+const RATE_LIMIT_LIMIT_HEADER: &str = "X-RateLimit-Limit";
+const RATE_LIMIT_REMAINING_HEADER: &str = "X-RateLimit-Remaining";
+const RATE_LIMIT_RESET_HEADER: &str = "X-RateLimit-Reset";
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -228,7 +232,24 @@ pub fn build_router(state: RestServerState) -> Router {
             )),
         )
         .route("/api/v1/probes/{id}", get(get_probe))
+        .layer(from_fn_with_state(
+            state.clone(),
+            attach_request_id_response_header,
+        ))
         .with_state(state)
+}
+
+async fn attach_request_id_response_header(
+    State(state): State<RestServerState>,
+    request: Request,
+    next: Next,
+) -> axum::response::Response {
+    let request_id = format!("req-{}", state.next_id.fetch_add(1, Ordering::Relaxed));
+    let mut response = next.run(request).await;
+    if let Ok(value) = HeaderValue::from_str(&request_id) {
+        response.headers_mut().insert(REQUEST_ID_HEADER, value);
+    }
+    response
 }
 
 async fn enforce_probe_request_guards(
@@ -236,7 +257,7 @@ async fn enforce_probe_request_guards(
     request: Request,
     next: Next,
 ) -> ApiResult<axum::response::Response> {
-    {
+    let snapshot = {
         let mut limiter = state
             .probe_rate_limiter
             .lock()
@@ -244,7 +265,8 @@ async fn enforce_probe_request_guards(
         limiter
             .allow(Instant::now())
             .map_err(validation_error_response)?;
-    }
+        limiter.snapshot(Instant::now())
+    };
 
     let (parts, body) = request.into_parts();
     let payload = to_bytes(body, state.config.max_payload_bytes + 1)
@@ -258,7 +280,23 @@ async fn enforce_probe_request_guards(
     validate_payload_size(payload.len(), &state.config).map_err(validation_error_response)?;
 
     let request = Request::from_parts(parts, Body::from(payload));
-    Ok(next.run(request).await)
+    let mut response = next.run(request).await;
+    response.headers_mut().insert(
+        RATE_LIMIT_LIMIT_HEADER,
+        HeaderValue::from_str(&snapshot.limit.to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    response.headers_mut().insert(
+        RATE_LIMIT_REMAINING_HEADER,
+        HeaderValue::from_str(&snapshot.remaining.to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    response.headers_mut().insert(
+        RATE_LIMIT_RESET_HEADER,
+        HeaderValue::from_str(&snapshot.reset_after.as_secs().to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    Ok(response)
 }
 
 pub async fn run_rest_api_server(config: RestApiConfig) -> anyhow::Result<()> {
