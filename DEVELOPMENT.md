@@ -124,3 +124,17 @@ SKIP=hadolint pre-commit run --all-files
 - [Installation Guide](docs/INSTALLATION.md)
 - [Usage Guide](docs/USAGE.md)
 - [API Reference](docs/API.md)
+
+
+## Security & Fuzzing
+
+- `cargo audit` runs in CI on every push/PR and fails on known vulnerability advisories.
+- `cargo fuzz` builds every harness and runs a short, crash-detection regression lane in CI.
+- Full fuzz campaigns are intended for longer manual or scheduled runs.
+- Local commands:
+
+```bash
+cargo audit --deny warnings --deny unmaintained --deny unsound --deny yanked
+cargo fuzz build --fuzz-dir fuzz
+cargo fuzz run <target> --fuzz-dir fuzz
+```
