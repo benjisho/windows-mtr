@@ -408,6 +408,13 @@ pub struct FixedWindowRateLimiter {
     count: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct RateLimitSnapshot {
+    pub limit: usize,
+    pub remaining: usize,
+    pub reset_after: Duration,
+}
+
 impl FixedWindowRateLimiter {
     pub fn new(
         max_requests: usize,
@@ -448,6 +455,18 @@ impl FixedWindowRateLimiter {
 
         self.count += 1;
         Ok(())
+    }
+
+    pub fn snapshot(&self, now: Instant) -> RateLimitSnapshot {
+        let elapsed = now.duration_since(self.window_started_at);
+        let reset_after = self.window.saturating_sub(elapsed);
+        let remaining = self.max_requests.saturating_sub(self.count);
+
+        RateLimitSnapshot {
+            limit: self.max_requests,
+            remaining,
+            reset_after,
+        }
     }
 }
 

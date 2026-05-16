@@ -8,8 +8,9 @@ use std::time::Instant;
 use anyhow::{Context, anyhow};
 use axum::body::{Body, to_bytes};
 use axum::extract::{ConnectInfo, Path, Request, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::{Next, from_fn_with_state};
+use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use subtle::ConstantTimeEq;
@@ -33,6 +34,13 @@ use crate::service::{
 
 const API_KEY_HEADER: &str = "X-API-Key";
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
+const REQUEST_ID_HEADER: &str = "X-Request-ID";
+const RATE_LIMIT_LIMIT_HEADER: &str = "X-RateLimit-Limit";
+const RATE_LIMIT_REMAINING_HEADER: &str = "X-RateLimit-Remaining";
+const RATE_LIMIT_RESET_HEADER: &str = "X-RateLimit-Reset";
+const RATE_LIMIT_LIMIT_STANDARD_HEADER: &str = "RateLimit-Limit";
+const RATE_LIMIT_REMAINING_STANDARD_HEADER: &str = "RateLimit-Remaining";
+const RATE_LIMIT_RESET_STANDARD_HEADER: &str = "RateLimit-Reset";
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -173,7 +181,8 @@ pub struct RestServerState {
     pub concurrency_gate: Arc<ProbeConcurrencyGate>,
     probe_rate_limiter: Arc<Mutex<FixedWindowRateLimiter>>,
     store: Arc<Mutex<ProbeStore>>,
-    next_id: Arc<AtomicU64>,
+    next_job_id: Arc<AtomicU64>,
+    next_request_id: Arc<AtomicU64>,
     probe_runner_path: Arc<PathBuf>,
 }
 
@@ -204,14 +213,20 @@ impl RestServerState {
                 max_completed_jobs,
                 completed_job_ttl,
             })),
-            next_id: Arc::new(AtomicU64::new(1)),
+            next_job_id: Arc::new(AtomicU64::new(1)),
+            next_request_id: Arc::new(AtomicU64::new(1)),
             probe_runner_path: Arc::new(probe_runner_path),
         })
     }
 
     fn next_job_id(&self) -> String {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let id = self.next_job_id.fetch_add(1, Ordering::Relaxed);
         format!("probe-{id}")
+    }
+
+    fn next_request_id(&self) -> String {
+        let id = self.next_request_id.fetch_add(1, Ordering::Relaxed);
+        format!("req-{id}")
     }
 }
 
@@ -228,7 +243,24 @@ pub fn build_router(state: RestServerState) -> Router {
             )),
         )
         .route("/api/v1/probes/{id}", get(get_probe))
+        .layer(from_fn_with_state(
+            state.clone(),
+            attach_request_id_response_header,
+        ))
         .with_state(state)
+}
+
+async fn attach_request_id_response_header(
+    State(state): State<RestServerState>,
+    request: Request,
+    next: Next,
+) -> axum::response::Response {
+    let request_id = state.next_request_id();
+    let mut response = next.run(request).await;
+    if let Ok(value) = HeaderValue::from_str(&request_id) {
+        response.headers_mut().insert(REQUEST_ID_HEADER, value);
+    }
+    response
 }
 
 async fn enforce_probe_request_guards(
@@ -236,14 +268,20 @@ async fn enforce_probe_request_guards(
     request: Request,
     next: Next,
 ) -> ApiResult<axum::response::Response> {
-    {
+    let (snapshot, allow_result) = {
         let mut limiter = state
             .probe_rate_limiter
             .lock()
             .map_err(|_| internal_error_response("failed to lock probe rate limiter"))?;
-        limiter
-            .allow(Instant::now())
-            .map_err(validation_error_response)?;
+        let now = Instant::now();
+        let allow_result = limiter.allow(now);
+        let snapshot = limiter.snapshot(now);
+        (snapshot, allow_result)
+    };
+    if let Err(error) = allow_result {
+        let mut response = validation_error_response(error).into_response();
+        attach_rate_limit_headers(&mut response, snapshot)?;
+        return Ok(response);
     }
 
     let (parts, body) = request.into_parts();
@@ -258,7 +296,45 @@ async fn enforce_probe_request_guards(
     validate_payload_size(payload.len(), &state.config).map_err(validation_error_response)?;
 
     let request = Request::from_parts(parts, Body::from(payload));
-    Ok(next.run(request).await)
+    let mut response = next.run(request).await;
+    attach_rate_limit_headers(&mut response, snapshot)?;
+    Ok(response)
+}
+
+fn attach_rate_limit_headers(
+    response: &mut axum::response::Response,
+    snapshot: crate::service::rest_api::RateLimitSnapshot,
+) -> ApiResult<()> {
+    response.headers_mut().insert(
+        RATE_LIMIT_LIMIT_HEADER,
+        HeaderValue::from_str(&snapshot.limit.to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    response.headers_mut().insert(
+        RATE_LIMIT_LIMIT_STANDARD_HEADER,
+        HeaderValue::from_str(&snapshot.limit.to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    response.headers_mut().insert(
+        RATE_LIMIT_REMAINING_HEADER,
+        HeaderValue::from_str(&snapshot.remaining.to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    response.headers_mut().insert(
+        RATE_LIMIT_REMAINING_STANDARD_HEADER,
+        HeaderValue::from_str(&snapshot.remaining.to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    let reset_seconds = snapshot.reset_after.as_secs();
+    let reset_value = HeaderValue::from_str(&reset_seconds.to_string())
+        .map_err(|_| internal_error_response("invalid rate limit header value"))?;
+    response
+        .headers_mut()
+        .insert(RATE_LIMIT_RESET_HEADER, reset_value.clone());
+    response
+        .headers_mut()
+        .insert(RATE_LIMIT_RESET_STANDARD_HEADER, reset_value);
+    Ok(())
 }
 
 pub async fn run_rest_api_server(config: RestApiConfig) -> anyhow::Result<()> {
