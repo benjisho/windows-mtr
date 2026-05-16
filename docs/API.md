@@ -5,6 +5,7 @@ Windows MTR is primarily a CLI application. This document defines its operationa
 1. Command-line interface (flags/options)
 2. Exit behavior
 3. Structured report output (JSON)
+4. REST API response envelope and operational headers
 
 ## CLI Interface
 
@@ -52,6 +53,23 @@ Consumer best practices:
 - Treat unknown fields as forward-compatible additions.
 - Avoid strict ordering assumptions.
 - Validate required fields in your own schema.
+
+
+## REST API Envelope and Headers
+
+For `mtr --api`, consumers should rely on the versioned response envelope and standard operational headers.
+
+Current baseline:
+
+- Response body includes `meta.schema_version` (currently `v1`) for compatibility checks.
+- Rate limiting is enforced server-side; expose and document rate-limit headers when enabled for client-side throttling (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`).
+- Return a request correlation header (`X-Request-ID` or equivalent) so clients can map failures to server logs.
+
+Client guidance:
+
+- Do not hard-fail on unknown envelope fields.
+- Prefer schema-version checks over ad-hoc field detection.
+- On `429`, back off using returned header values when present.
 
 ## Compatibility Notes
 
