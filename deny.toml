@@ -5,6 +5,7 @@ all-features = true
 
 [advisories]
 version = 2
+db-urls = ["https://github.com/RustSec/advisory-db"]
 yanked = "deny"
 ignore = [
   # transitive via trippy-tui/maxminddb; no compatible update available while pinned to trippy 0.13.x

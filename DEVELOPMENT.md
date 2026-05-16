@@ -100,6 +100,20 @@ SKIP=hadolint pre-commit run --all-files
 - `xtask/` — automation helpers
 - `docs/` — expanded project documentation
 
+## Security & Fuzzing
+
+- `cargo audit` is enforced in CI and fails builds on known advisories (`warnings`, `unmaintained`, `unsound`, and `yanked`).
+- `cargo fuzz` targets in `fuzz/` are built and smoke-tested in CI to catch crash regressions early.
+- For deeper local campaigns, run: `cargo fuzz run --fuzz-dir fuzz <target>`.
+
+Local security commands:
+
+```bash
+cargo audit --deny warnings --deny unmaintained --deny unsound --deny yanked
+cargo fuzz build --fuzz-dir fuzz
+cargo fuzz list --fuzz-dir fuzz
+```
+
 ## Troubleshooting
 
 ### Build fails with linker/toolchain errors (Windows)
