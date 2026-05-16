@@ -60,6 +60,8 @@ When running in REST API mode (`--api`), probe creation endpoints emit rate-limi
 - `X-RateLimit-Limit`: maximum requests allowed in the active window.
 - `X-RateLimit-Remaining`: requests left in the active window.
 - `X-RateLimit-Reset`: **seconds until** the current window resets (not an epoch timestamp).
+- `RateLimit-Limit`: standards-aligned companion header carrying the same limit value.
+- `RateLimit-Remaining`: standards-aligned companion header carrying the same remaining value.
 - `RateLimit-Reset`: standards-aligned companion header carrying the same seconds-until-reset value.
 
 All REST responses also include:

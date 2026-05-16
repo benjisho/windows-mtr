@@ -151,6 +151,8 @@ async fn responses_include_request_id_and_rate_limit_headers() {
     assert!(limit >= 1);
     assert!(create.headers().get("X-RateLimit-Remaining").is_some());
     assert!(create.headers().get("X-RateLimit-Reset").is_some());
+    assert!(create.headers().get("RateLimit-Limit").is_some());
+    assert!(create.headers().get("RateLimit-Remaining").is_some());
     assert!(create.headers().get("RateLimit-Reset").is_some());
 
     let _ = shutdown.send(());
@@ -592,6 +594,8 @@ async fn create_probe_rejects_burst_traffic_with_429() {
     assert!(third.headers().get("X-RateLimit-Limit").is_some());
     assert!(third.headers().get("X-RateLimit-Remaining").is_some());
     assert!(third.headers().get("X-RateLimit-Reset").is_some());
+    assert!(third.headers().get("RateLimit-Limit").is_some());
+    assert!(third.headers().get("RateLimit-Remaining").is_some());
     assert!(third.headers().get("RateLimit-Reset").is_some());
     let remaining = third
         .headers()

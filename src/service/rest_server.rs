@@ -38,6 +38,8 @@ const REQUEST_ID_HEADER: &str = "X-Request-ID";
 const RATE_LIMIT_LIMIT_HEADER: &str = "X-RateLimit-Limit";
 const RATE_LIMIT_REMAINING_HEADER: &str = "X-RateLimit-Remaining";
 const RATE_LIMIT_RESET_HEADER: &str = "X-RateLimit-Reset";
+const RATE_LIMIT_LIMIT_STANDARD_HEADER: &str = "RateLimit-Limit";
+const RATE_LIMIT_REMAINING_STANDARD_HEADER: &str = "RateLimit-Remaining";
 const RATE_LIMIT_RESET_STANDARD_HEADER: &str = "RateLimit-Reset";
 
 type ApiResult<T> = Result<T, ApiError>;
@@ -179,7 +181,8 @@ pub struct RestServerState {
     pub concurrency_gate: Arc<ProbeConcurrencyGate>,
     probe_rate_limiter: Arc<Mutex<FixedWindowRateLimiter>>,
     store: Arc<Mutex<ProbeStore>>,
-    next_id: Arc<AtomicU64>,
+    next_job_id: Arc<AtomicU64>,
+    next_request_id: Arc<AtomicU64>,
     probe_runner_path: Arc<PathBuf>,
 }
 
@@ -210,14 +213,20 @@ impl RestServerState {
                 max_completed_jobs,
                 completed_job_ttl,
             })),
-            next_id: Arc::new(AtomicU64::new(1)),
+            next_job_id: Arc::new(AtomicU64::new(1)),
+            next_request_id: Arc::new(AtomicU64::new(1)),
             probe_runner_path: Arc::new(probe_runner_path),
         })
     }
 
     fn next_job_id(&self) -> String {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let id = self.next_job_id.fetch_add(1, Ordering::Relaxed);
         format!("probe-{id}")
+    }
+
+    fn next_request_id(&self) -> String {
+        let id = self.next_request_id.fetch_add(1, Ordering::Relaxed);
+        format!("req-{id}")
     }
 }
 
@@ -246,7 +255,7 @@ async fn attach_request_id_response_header(
     request: Request,
     next: Next,
 ) -> axum::response::Response {
-    let request_id = format!("req-{}", state.next_id.fetch_add(1, Ordering::Relaxed));
+    let request_id = state.next_request_id();
     let mut response = next.run(request).await;
     if let Ok(value) = HeaderValue::from_str(&request_id) {
         response.headers_mut().insert(REQUEST_ID_HEADER, value);
@@ -302,7 +311,17 @@ fn attach_rate_limit_headers(
             .map_err(|_| internal_error_response("invalid rate limit header value"))?,
     );
     response.headers_mut().insert(
+        RATE_LIMIT_LIMIT_STANDARD_HEADER,
+        HeaderValue::from_str(&snapshot.limit.to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    response.headers_mut().insert(
         RATE_LIMIT_REMAINING_HEADER,
+        HeaderValue::from_str(&snapshot.remaining.to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
+    );
+    response.headers_mut().insert(
+        RATE_LIMIT_REMAINING_STANDARD_HEADER,
         HeaderValue::from_str(&snapshot.remaining.to_string())
             .map_err(|_| internal_error_response("invalid rate limit header value"))?,
     );
