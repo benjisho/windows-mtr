@@ -4,6 +4,7 @@
 all-features = true
 
 [advisories]
+# NOTE: RustSec ignores are temporary and should be revisited regularly.
 version = 2
 yanked = "deny"
 ignore = [

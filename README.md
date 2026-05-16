@@ -93,7 +93,7 @@ Windows MTR is built with enterprise-level security practices:
 
 - 🛡️ Regular security audits with automated scanning
 - 🔒 All dependencies vetted for vulnerabilities
-- 🧪 Fuzz harness implemented; CI integration in progress
+- 🧪 Fuzz harness implemented with CI regression gating
 - 🔑 SHA-256 checksum verification for canonical release ZIP artifacts
 
 ### REST API security and operational limits (v1, implemented)
