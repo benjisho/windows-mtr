@@ -151,6 +151,7 @@ async fn responses_include_request_id_and_rate_limit_headers() {
     assert!(limit >= 1);
     assert!(create.headers().get("X-RateLimit-Remaining").is_some());
     assert!(create.headers().get("X-RateLimit-Reset").is_some());
+    assert!(create.headers().get("RateLimit-Reset").is_some());
 
     let _ = shutdown.send(());
 }
@@ -587,6 +588,20 @@ async fn create_probe_rejects_burst_traffic_with_429() {
         .await
         .expect("third create probe request should succeed");
     assert_eq!(third.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+
+    assert!(third.headers().get("X-RateLimit-Limit").is_some());
+    assert!(third.headers().get("X-RateLimit-Remaining").is_some());
+    assert!(third.headers().get("X-RateLimit-Reset").is_some());
+    assert!(third.headers().get("RateLimit-Reset").is_some());
+    let remaining = third
+        .headers()
+        .get("X-RateLimit-Remaining")
+        .expect("remaining header should exist")
+        .to_str()
+        .expect("header should be utf-8")
+        .parse::<usize>()
+        .expect("header should be numeric");
+    assert_eq!(remaining, 0);
 
     let body: serde_json::Value = third.json().await.expect("json body expected");
     assert_error_shape(&body, 429, "rate_limited");
