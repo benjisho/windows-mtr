@@ -6,6 +6,8 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+# cargo-audit is enforced in CI with strict deny flags. Keep temporary ignores
+# explicit and documented until upstream dependency upgrades are available.
 ignore = [
   # transitive via trippy-tui/maxminddb; no compatible update available while pinned to trippy 0.13.x
   "RUSTSEC-2025-0132",

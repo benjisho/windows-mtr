@@ -6,6 +6,7 @@
 
   <p align="center">
     <a href="https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml/badge.svg"></a>
+    <a href="https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml"><img alt="Security Audit" src="https://github.com/benjisho/windows-mtr/actions/workflows/ci.yml/badge.svg?event=push&job=security-audit"></a>
     <a href="https://github.com/benjisho/windows-mtr/actions/workflows/release.yml"><img alt="Release" src="https://github.com/benjisho/windows-mtr/actions/workflows/release.yml/badge.svg?branch=master"></a>
     <a href="https://github.com/benjisho/windows-mtr/actions/workflows/security.yml"><img alt="Security" src="https://github.com/benjisho/windows-mtr/actions/workflows/security.yml/badge.svg"></a>
     <a href="https://github.com/benjisho/windows-mtr/releases"><img alt="Version" src="https://img.shields.io/github/v/release/benjisho/windows-mtr?color=blue&label=Version"></a>
@@ -93,7 +94,7 @@ Windows MTR is built with enterprise-level security practices:
 
 - 🛡️ Regular security audits with automated scanning
 - 🔒 All dependencies vetted for vulnerabilities
-- 🧪 Fuzz harness implemented; CI integration in progress
+- 🧪 Fuzz harness implemented; short regression smoke run enforced in CI
 - 🔑 SHA-256 checksum verification for canonical release ZIP artifacts
 
 ### REST API security and operational limits (v1, implemented)

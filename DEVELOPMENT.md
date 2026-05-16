@@ -92,6 +92,18 @@ If you are working in a restricted environment and cannot install it, you can ex
 SKIP=hadolint pre-commit run --all-files
 ```
 
+## Security & Fuzzing
+
+- `cargo audit` runs in CI and fails the build on vulnerabilities (`--deny warnings --deny unmaintained --deny unsound --deny yanked`).
+- `cargo fuzz` runs a short smoke harness in CI to catch regressions/crashes early.
+- Fuzz targets live under `fuzz/`.
+- Local equivalents:
+
+```bash
+cargo audit --deny warnings --deny unmaintained --deny unsound --deny yanked
+cd fuzz && cargo fuzz run fuzz_passthrough_flags -- -max_total_time=20
+```
+
 ## Project Layout
 
 - `src/` — core application code

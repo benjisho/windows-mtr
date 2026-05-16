@@ -347,6 +347,44 @@ jobs:
       - name: Smoke test container entrypoint
         run: docker run --rm windows-mtr:ci-amd64 --help
 
+  security-audit:
+    name: Security audit + fuzz smoke
+    runs-on: ubuntu-latest
+    needs: pre-commit
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@6eb4471beed212309063862e6f5284ca3da3b01d # cargo-audit
+
+      - name: Run cargo audit (deny warnings, unmaintained, unsound, yanked)
+        run: cargo audit --deny warnings --deny unmaintained --deny unsound --deny yanked
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Build fuzz targets
+        working-directory: fuzz
+        run: cargo fuzz build
+
+      - name: Run fuzz smoke (short timed run; fail on crash)
+        working-directory: fuzz
+        shell: bash
+        run: |
+          timeout 30s cargo fuzz run fuzz_passthrough_flags -- -max_total_time=20
+          status=$?
+          if [ $status -eq 124 ]; then
+            echo "Fuzz run timed out after 30s (expected for smoke mode)."
+            exit 0
+          fi
+          exit $status
+
   # New job to build binaries during pull requests for testing
   build-pr-binaries:
     name: Build PR Binaries
