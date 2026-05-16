@@ -15,6 +15,10 @@ on:
     paths:
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - 'deny.toml'
+      - 'fuzz/**'
+      - 'README.md'
+      - 'DEVELOPMENT.md'
       - 'src/**'
       - 'tests/**'
       - 'xtask/**'
@@ -29,6 +33,10 @@ on:
     paths:
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - 'deny.toml'
+      - 'fuzz/**'
+      - 'README.md'
+      - 'DEVELOPMENT.md'
       - 'src/**'
       - 'tests/**'
       - 'xtask/**'
@@ -681,3 +689,42 @@ jobs:
         shell: pwsh
         run: |
           "GitHub-hosted windows-latest runners cannot be interactively elevated; elevated probe smoke is provided via the optional self-hosted 'elevated' lane." | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+
+  security-audit:
+    name: Security audit + fuzz smoke
+    runs-on: ubuntu-latest
+    needs: pre-commit
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Run cargo audit
+        run: cargo audit --deny warnings --deny unmaintained --deny unsound --deny yanked
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Build fuzz targets
+        run: cargo fuzz build --fuzz-dir fuzz
+
+      - name: Run fuzz smoke target (short CI run)
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=$(cargo fuzz list --fuzz-dir fuzz | head -n 1)
+          if [ -z "$target" ]; then
+            echo "No fuzz targets found under fuzz/"
+            exit 1
+          fi
+
+          timeout --preserve-status 30s cargo fuzz run "$target" --fuzz-dir fuzz -- -max_total_time=20
