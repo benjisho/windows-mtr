@@ -369,6 +369,7 @@ Capability claims are validated against source code, tests, CI, documentation, a
 - [🛣️ Product Roadmap](docs/ROADMAP.md)
 - [📦 Distribution Plan](docs/distribution.md)
 - [✅ Capability Validation Matrix](docs/capability-validation.md)
+- [🎯 Gap Prioritization & Scope Decisions](docs/gap-prioritization.md)
 - [🧩 CLI/API Reference](docs/API.md)
 - [🧪 Probe parity matrix](docs/probe-parity.md)
 - [📑 Usage Examples](docs/USAGE.md)
