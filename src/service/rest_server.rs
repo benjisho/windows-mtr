@@ -10,6 +10,7 @@ use axum::body::{Body, to_bytes};
 use axum::extract::{ConnectInfo, Path, Request, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::{Next, from_fn_with_state};
+use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use subtle::ConstantTimeEq;
@@ -37,6 +38,7 @@ const REQUEST_ID_HEADER: &str = "X-Request-ID";
 const RATE_LIMIT_LIMIT_HEADER: &str = "X-RateLimit-Limit";
 const RATE_LIMIT_REMAINING_HEADER: &str = "X-RateLimit-Remaining";
 const RATE_LIMIT_RESET_HEADER: &str = "X-RateLimit-Reset";
+const RATE_LIMIT_RESET_STANDARD_HEADER: &str = "RateLimit-Reset";
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -257,16 +259,21 @@ async fn enforce_probe_request_guards(
     request: Request,
     next: Next,
 ) -> ApiResult<axum::response::Response> {
-    let snapshot = {
+    let (snapshot, allow_result) = {
         let mut limiter = state
             .probe_rate_limiter
             .lock()
             .map_err(|_| internal_error_response("failed to lock probe rate limiter"))?;
-        limiter
-            .allow(Instant::now())
-            .map_err(validation_error_response)?;
-        limiter.snapshot(Instant::now())
+        let now = Instant::now();
+        let allow_result = limiter.allow(now);
+        let snapshot = limiter.snapshot(now);
+        (snapshot, allow_result)
     };
+    if let Err(error) = allow_result {
+        let mut response = validation_error_response(error).into_response();
+        attach_rate_limit_headers(&mut response, snapshot)?;
+        return Ok(response);
+    }
 
     let (parts, body) = request.into_parts();
     let payload = to_bytes(body, state.config.max_payload_bytes + 1)
@@ -281,6 +288,14 @@ async fn enforce_probe_request_guards(
 
     let request = Request::from_parts(parts, Body::from(payload));
     let mut response = next.run(request).await;
+    attach_rate_limit_headers(&mut response, snapshot)?;
+    Ok(response)
+}
+
+fn attach_rate_limit_headers(
+    response: &mut axum::response::Response,
+    snapshot: crate::service::rest_api::RateLimitSnapshot,
+) -> ApiResult<()> {
     response.headers_mut().insert(
         RATE_LIMIT_LIMIT_HEADER,
         HeaderValue::from_str(&snapshot.limit.to_string())
@@ -291,12 +306,16 @@ async fn enforce_probe_request_guards(
         HeaderValue::from_str(&snapshot.remaining.to_string())
             .map_err(|_| internal_error_response("invalid rate limit header value"))?,
     );
-    response.headers_mut().insert(
-        RATE_LIMIT_RESET_HEADER,
-        HeaderValue::from_str(&snapshot.reset_after.as_secs().to_string())
-            .map_err(|_| internal_error_response("invalid rate limit header value"))?,
-    );
-    Ok(response)
+    let reset_seconds = snapshot.reset_after.as_secs();
+    let reset_value = HeaderValue::from_str(&reset_seconds.to_string())
+        .map_err(|_| internal_error_response("invalid rate limit header value"))?;
+    response
+        .headers_mut()
+        .insert(RATE_LIMIT_RESET_HEADER, reset_value.clone());
+    response
+        .headers_mut()
+        .insert(RATE_LIMIT_RESET_STANDARD_HEADER, reset_value);
+    Ok(())
 }
 
 pub async fn run_rest_api_server(config: RestApiConfig) -> anyhow::Result<()> {
