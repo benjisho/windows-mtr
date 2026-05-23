@@ -176,6 +176,7 @@ mod tests {
             source_port: None,
             report: false,
             json_output: None,
+            csv_output_path: None,
             count: None,
             interval_seconds: None,
             timeout_seconds: None,
