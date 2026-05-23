@@ -4,7 +4,7 @@ pub mod rest_server;
 use anyhow::Context;
 use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -19,6 +19,7 @@ pub enum JsonOutput {
     Compact,
     Pretty,
 }
+pub const CLI_JSON_SCHEMA_VERSION: &str = "1.0";
 
 #[derive(Debug, Clone, Copy)]
 pub struct EnhancedUiConfig {
@@ -40,6 +41,7 @@ pub struct ProbeRequest {
     pub source_port: Option<u16>,
     pub report: bool,
     pub json_output: Option<JsonOutput>,
+    pub csv_output_path: Option<PathBuf>,
     pub count: Option<usize>,
     pub interval_seconds: Option<f32>,
     pub timeout_seconds: Option<f32>,
@@ -64,6 +66,7 @@ pub struct ProbePlan {
     pub validated_host: String,
     pub trippy_args: Vec<String>,
     pub json_output: Option<JsonOutput>,
+    pub csv_output_path: Option<PathBuf>,
     pub ui_mode: UiMode,
 }
 
@@ -106,14 +109,18 @@ pub fn verify_options(request: &ProbeRequest) -> Result<(), ProbeError> {
         return Err(ProbeError::PortRequired(protocol.to_string(), flag));
     }
 
-    if request.report_wide && !request.report && request.json_output.is_none() {
+    if request.report_wide
+        && !request.report
+        && request.json_output.is_none()
+        && request.csv_output_path.is_none()
+    {
         return Err(ProbeError::InvalidOption(
             "-w/--report-wide requires -r/--report or --json output mode".to_string(),
         ));
     }
 
     if (request.ui_mode == UiMode::Enhanced || request.ui_mode == UiMode::Dashboard)
-        && (request.report || request.json_output.is_some())
+        && (request.report || request.json_output.is_some() || request.csv_output_path.is_some())
     {
         let ui_name = match request.ui_mode {
             UiMode::Enhanced => "enhanced",
@@ -165,12 +172,13 @@ pub fn build_probe_plan(request: &ProbeRequest) -> Result<ProbePlan, ProbeError>
         validated_host,
         trippy_args,
         json_output: request.json_output,
+        csv_output_path: request.csv_output_path.clone(),
         ui_mode: request.ui_mode,
     })
 }
 
 fn mode_from_request(request: &ProbeRequest) -> &'static str {
-    if request.json_output.is_some() {
+    if request.json_output.is_some() || request.csv_output_path.is_some() {
         "json"
     } else if request.report || request.report_wide {
         "pretty"
@@ -415,8 +423,9 @@ pub fn run_embedded_trippy(
     args: &[String],
     json_output: Option<JsonOutput>,
     embedded_env_name: &str,
+    csv_output_path: Option<&Path>,
 ) -> anyhow::Result<ProbeResult> {
-    if let Some(format) = json_output {
+    if json_output.is_some() || csv_output_path.is_some() {
         let output = Command::new(current_exe)
             .env(embedded_env_name, "1")
             .args(args.iter().skip(1))
@@ -432,16 +441,24 @@ pub fn run_embedded_trippy(
             );
         }
 
-        match format {
-            JsonOutput::Compact => {
-                let value: serde_json::Value = serde_json::from_slice(&output.stdout)
-                    .context("failed to parse trippy JSON output")?;
-                serde_json::to_writer(std::io::stdout(), &value)
-                    .context("failed to write compact JSON output")?;
-                std::io::stdout().write_all(b"\n")?;
-            }
-            JsonOutput::Pretty => {
-                std::io::stdout().write_all(&output.stdout)?;
+        let trippy_value: serde_json::Value =
+            serde_json::from_slice(&output.stdout).context("failed to parse trippy JSON output")?;
+
+        if let Some(path) = csv_output_path {
+            write_csv_report(path, &trippy_value)?;
+        } else if let Some(format) = json_output {
+            let value = with_schema_version(trippy_value);
+            match format {
+                JsonOutput::Compact => {
+                    serde_json::to_writer(std::io::stdout(), &value)
+                        .context("failed to write compact JSON output")?;
+                    std::io::stdout().write_all(b"\n")?;
+                }
+                JsonOutput::Pretty => {
+                    serde_json::to_writer_pretty(std::io::stdout(), &value)
+                        .context("failed to write pretty JSON output")?;
+                    std::io::stdout().write_all(b"\n")?;
+                }
             }
         }
 
@@ -458,4 +475,106 @@ pub fn run_embedded_trippy(
     Ok(ProbeResult {
         exit_code: status.code().unwrap_or(2),
     })
+}
+
+fn with_schema_version(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(object) = value.as_object_mut() {
+        object.insert(
+            "schema_version".to_string(),
+            serde_json::Value::String(CLI_JSON_SCHEMA_VERSION.to_string()),
+        );
+    }
+    value
+}
+
+fn split_host_parts(host: &str) -> (String, String) {
+    if let Some((hostname, rest)) = host.split_once(" (")
+        && let Some(ip) = rest.strip_suffix(')')
+    {
+        return (ip.to_string(), hostname.to_string());
+    }
+    (host.to_string(), String::new())
+}
+
+fn write_csv_report(path: &Path, value: &serde_json::Value) -> anyhow::Result<()> {
+    let hops = value
+        .get("report")
+        .and_then(|r| r.get("hops"))
+        .and_then(serde_json::Value::as_array)
+        .context("missing report.hops in trippy JSON output")?;
+
+    let file = std::fs::File::create(path)
+        .with_context(|| format!("failed to create CSV output file at {}", path.display()))?;
+    let mut writer = csv::Writer::from_writer(file);
+    writer.write_record([
+        "hop", "ip", "hostname", "avg_ms", "best_ms", "worst_ms", "loss_pct",
+    ])?;
+    for hop in hops {
+        let ttl = hop
+            .get("ttl")
+            .and_then(|v| v.as_u64())
+            .unwrap_or_default()
+            .to_string();
+        let host = hop.get("host").and_then(|v| v.as_str()).unwrap_or_default();
+        let (ip, hostname) = split_host_parts(host);
+        let avg = hop
+            .get("avg_ms")
+            .and_then(|v| v.as_f64())
+            .unwrap_or_default()
+            .to_string();
+        let best = hop
+            .get("best_ms")
+            .and_then(|v| v.as_f64())
+            .unwrap_or_default()
+            .to_string();
+        let worst = hop
+            .get("worst_ms")
+            .and_then(|v| v.as_f64())
+            .unwrap_or_default()
+            .to_string();
+        let loss = hop
+            .get("loss_pct")
+            .and_then(|v| v.as_f64())
+            .unwrap_or_else(|| {
+                hop.get("loss_percentage")
+                    .and_then(|v| v.as_f64())
+                    .or_else(|| {
+                        hop.get("loss_ratio")
+                            .and_then(|v| v.as_f64())
+                            .map(|v| v * 100.0)
+                    })
+                    .unwrap_or_default()
+            });
+        writer.write_record([ttl, ip, hostname, avg, best, worst, loss.to_string()])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn schema_version_is_added_to_json_output() {
+        let input = json!({"report":{"hops":[]}});
+        let output = with_schema_version(input);
+        assert_eq!(output["schema_version"], CLI_JSON_SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn csv_writer_outputs_expected_header_and_values() {
+        let fixture = json!({
+            "report": { "hops": [
+                {"ttl": 1, "host": "router.local (192.168.1.1)", "avg_ms": 1.5, "best_ms": 1.1, "worst_ms": 2.0, "loss_ratio": 0.05}
+            ]}
+        });
+        let path = std::env::temp_dir().join("windows_mtr_csv_test.csv");
+        write_csv_report(&path, &fixture).expect("csv should write");
+        let data = std::fs::read_to_string(&path).expect("csv should be readable");
+        assert!(data.contains("hop,ip,hostname,avg_ms,best_ms,worst_ms,loss_pct"));
+        assert!(data.contains("1,192.168.1.1,router.local,1.5,1.1,2,5"));
+        let _ = std::fs::remove_file(path);
+    }
 }

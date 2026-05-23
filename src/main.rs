@@ -2,6 +2,7 @@ use anyhow::Context;
 use clap::{Args, Parser, ValueEnum};
 use std::env;
 use std::net::{IpAddr, SocketAddr};
+use std::path::PathBuf;
 use std::process;
 use std::time::Duration;
 use windows_mtr::service::rest_api::{AuthStrategy, RestApiConfig};
@@ -104,12 +105,16 @@ struct TraceCli {
     report: bool,
 
     /// Generate JSON report output
-    #[arg(short = 'j', long = "json", conflicts_with = "json_pretty")]
+    #[arg(short = 'j', long = "json", group = "output_format")]
     json: bool,
 
     /// Generate pretty-formatted JSON report output
-    #[arg(long = "json-pretty", conflicts_with = "json")]
+    #[arg(long = "json-pretty", group = "output_format")]
     json_pretty: bool,
+
+    /// Write report output as CSV to a file path
+    #[arg(long = "csv", value_name = "PATH", group = "output_format")]
+    csv: Option<PathBuf>,
 
     /// Number of pings (cycles) to send to each host
     #[arg(short = 'c')]
@@ -402,6 +407,7 @@ fn build_probe_request(args: &TraceCli) -> anyhow::Result<ProbeRequest> {
         source_port: args.source_port,
         report: args.report,
         json_output: json_output_from_cli(args),
+        csv_output_path: args.csv.clone(),
         count: args.count,
         interval_seconds: args.interval,
         timeout_seconds: args.timeout,
@@ -482,6 +488,7 @@ fn main() -> anyhow::Result<()> {
         &plan.trippy_args,
         plan.json_output,
         EMBEDDED_TRIPPY_ENV,
+        plan.csv_output_path.as_deref(),
     )
     .context("failed to run embedded trippy")?;
 
@@ -524,6 +531,7 @@ mod tests {
             source_port: None,
             report: false,
             json_output: None,
+            csv_output_path: None,
             count: None,
             interval_seconds: None,
             timeout_seconds: None,
