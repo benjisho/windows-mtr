@@ -30,7 +30,8 @@ For release-by-release details, see the [changelog](../CHANGELOG.md).
 | Dashboard UI (tabs, hop table, charts) | 🚧 In Progress (experimental preview via `--ui dashboard`, with deprecated alias `--ui native`) | H2 2026 |
 | ETW + Windows observability integrations | 🛣️ Roadmap | H2 2026 |
 | Versioned JSON schema + CSV export | 🛣️ Roadmap | H2 2026 |
-| Security hardening gates (cargo-audit + fuzz harness in CI) | 🚧 In Progress (cargo-audit live, fuzz harness pending) | H2 2026 |
+| Security hardening gates (cargo-deny + cargo-audit + fuzz smoke in CI) | ✅ Released | v1.2.x |
+| Advanced security hardening (long-running/scheduled fuzzing, advisory cleanup) | 🛣️ Roadmap | H2 2026 |
 | Cross-platform probe parity/privilege smoke tests | ✅ Released (CI `Probe parity (windows-latest\|ubuntu-latest)` + privilege smoke lanes: `Privilege probe smoke (ubuntu-latest\|windows-latest, non-elevated)`, `Privilege probe smoke (ubuntu-latest, elevated)`, and optional `Privilege probe smoke (windows, elevated self-hosted)`; coverage includes non-elevated failures on Windows/Ubuntu and elevated success on Ubuntu + Windows self-hosted; constraint: elevated Windows lane requires self-hosted runner because GitHub-hosted `windows-latest` cannot be interactively elevated.) | H2 2026 |
 | GitHub Actions hardening (pin workflow actions by commit SHA) | ✅ Released | v1.2.x |
 | CLI/runtime cleanup (unused error variants, banner polish) | 🛣️ Roadmap | H2 2026 |
