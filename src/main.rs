@@ -1,5 +1,5 @@
 use anyhow::Context;
-use clap::{Args, Parser, ValueEnum};
+use clap::{ArgGroup, Args, Parser, ValueEnum};
 use std::env;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
@@ -80,6 +80,11 @@ struct Cli {
 }
 
 #[derive(Args, Debug)]
+#[command(group(
+    ArgGroup::new("output_mode")
+        .args(["report", "report_wide", "json", "json_pretty", "csv"])
+        .multiple(false)
+))]
 struct TraceCli {
     /// Target host to trace (hostname or IP)
     host: Option<String>,
@@ -105,15 +110,15 @@ struct TraceCli {
     report: bool,
 
     /// Generate JSON report output
-    #[arg(short = 'j', long = "json", group = "output_format")]
+    #[arg(short = 'j', long = "json")]
     json: bool,
 
     /// Generate pretty-formatted JSON report output
-    #[arg(long = "json-pretty", group = "output_format")]
+    #[arg(long = "json-pretty")]
     json_pretty: bool,
 
     /// Write report output as CSV to a file path
-    #[arg(long = "csv", value_name = "PATH", group = "output_format")]
+    #[arg(long = "csv", value_name = "PATH")]
     csv: Option<PathBuf>,
 
     /// Number of pings (cycles) to send to each host
@@ -253,13 +258,14 @@ fn json_output_from_cli(args: &TraceCli) -> Option<JsonOutput> {
 }
 
 fn should_print_banner(args: &Cli) -> bool {
-    !args.api && json_output_from_cli(&args.trace).is_none()
+    !args.api && json_output_from_cli(&args.trace).is_none() && args.trace.csv.is_none()
 }
 
 fn should_print_interactive_troubleshooting_hint(request: &ProbeRequest, exit_code: i32) -> bool {
     request.ui_mode == UiMode::Default
         && !request.report
         && request.json_output.is_none()
+        && request.csv_output_path.is_none()
         && exit_code != 0
 }
 
@@ -561,6 +567,20 @@ mod tests {
 
         assert!(should_print_interactive_troubleshooting_hint(&request, 1));
         assert!(!should_print_interactive_troubleshooting_hint(&request, 0));
+
+        let mut csv_request = request.clone();
+        csv_request.csv_output_path = Some(PathBuf::from("out.csv"));
+        assert!(!should_print_interactive_troubleshooting_hint(
+            &csv_request,
+            1
+        ));
+    }
+
+    #[test]
+    fn should_not_print_banner_for_csv_mode() {
+        let cli =
+            Cli::try_parse_from(["mtr", "--csv", "out.csv", "8.8.8.8"]).expect("csv should parse");
+        assert!(!should_print_banner(&cli));
     }
 
     #[test]
@@ -580,6 +600,33 @@ mod tests {
         let cli = Cli::try_parse_from(["mtr", "--api", "--api-bind", "127.0.0.1:4000"])
             .expect("api bind should parse");
         assert_eq!(cli.api_bind, Some("127.0.0.1:4000".parse().unwrap()));
+    }
+
+    #[test]
+    fn cli_rejects_json_and_csv_together() {
+        let err = Cli::try_parse_from(["mtr", "--json", "--csv", "out.csv", "8.8.8.8"])
+            .expect_err("json + csv must be rejected");
+        let msg = err.to_string();
+        assert!(msg.contains("--json"));
+        assert!(msg.contains("--csv"));
+    }
+
+    #[test]
+    fn cli_rejects_report_and_csv_together() {
+        let err = Cli::try_parse_from(["mtr", "-r", "--csv", "out.csv", "8.8.8.8"])
+            .expect_err("report + csv must be rejected");
+        let msg = err.to_string();
+        assert!(msg.contains("-r"));
+        assert!(msg.contains("--csv"));
+    }
+
+    #[test]
+    fn cli_rejects_report_wide_and_csv_together() {
+        let err = Cli::try_parse_from(["mtr", "-w", "--csv", "out.csv", "8.8.8.8"])
+            .expect_err("report-wide + csv must be rejected");
+        let msg = err.to_string();
+        assert!(msg.contains("-w"));
+        assert!(msg.contains("--csv"));
     }
 
     #[test]
