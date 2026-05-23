@@ -137,13 +137,13 @@ See [docs/security/rest-api.md](docs/security/rest-api.md) for the full threat m
 
 ```bash
 # Pull a release-tagged Windows MTR container (GHCR)
-docker pull ghcr.io/benjisho/windows-mtr:v1.0.0
+docker pull ghcr.io/benjisho/windows-mtr:v1.2.6
 
 # Pull a release-tagged Windows MTR container (Docker Hub)
-docker pull benjisho/windows-mtr:v1.0.0
+docker pull benjisho/windows-mtr:v1.2.6
 
 # Run with direct networking (pin to a specific release tag)
-docker run --network host ghcr.io/benjisho/windows-mtr:v1.0.0 -c 5 -r 8.8.8.8
+docker run --network host ghcr.io/benjisho/windows-mtr:v1.2.6 -c 5 -r 8.8.8.8
 ```
 
 Container images are published from the `Release` workflow to both GHCR (`ghcr.io/benjisho/windows-mtr`) and Docker Hub (`benjisho/windows-mtr`) from explicit release tags like `v1.2.3` for `linux/amd64` and `linux/arm64`.

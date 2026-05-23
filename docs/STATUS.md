@@ -28,5 +28,5 @@ This document serves as the single source of truth for feature delivery status.
 - **Notes**: Planned for future release. This integration is critical for observability.
 
 ## Security Hardening (cargo-audit + fuzz CI)
-- **Status**: 🚧 In Progress
-- **Notes**: Security hardening initiatives are underway. cargo-audit is live, while fuzz harness is pending. More information can be found in the [Security Documentation](security/rest-api.md).
+- **Status**: ✅ Released in v1.2.x
+- **Notes**: `cargo-deny`, `cargo-audit`, and fuzz smoke regression gates are active in CI (`security.yml` and `ci.yml`). See the [Security Documentation](security/rest-api.md) for more details. Advanced/scheduled long-running fuzz campaigns remain on the roadmap.
