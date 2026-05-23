@@ -30,6 +30,7 @@ mtr [options] <hostname-or-ip>
 | `-w, --report-wide` | Wide report output mode |
 | `-j, --json` | JSON report mode |
 | `--json-pretty` | Pretty JSON report mode |
+| `--csv <PATH>` | Write CSV report output to file |
 | `-c <COUNT>` | Probe/report cycles |
 | `-n` | Disable reverse DNS rendering (show IP only) |
 | `-b, --show-asn` | Enable ASN lookup/rendering |
@@ -117,6 +118,9 @@ mtr -T -P 443 -c 15 -r github.com
 
 # JSON output for automation
 mtr --json -c 20 1.1.1.1
+
+# CSV output for automation
+mtr --csv out.csv -c 20 1.1.1.1
 
 # Force source IP + packet size
 mtr -S 192.0.2.10 -s 128 8.8.4.4

@@ -18,7 +18,7 @@ Primary categories:
 
 - **Probe selection:** `-T`, `-U`, `-P`, `--source-port`
 - **Routing scope:** `-m`, `-S`, `--interface`
-- **Output mode:** `-r`, `-w`, `--json`, `--json-pretty`
+- **Output mode:** `-r`, `-w`, `--json`, `--json-pretty`, `--csv <PATH>`
 - **Sampling/timing:** `-c`, `-i`, `-W`
 - **Name/ASN rendering:** `-n`, `-b`, `-z`
 
@@ -40,6 +40,7 @@ Automation guidance:
 ## JSON Output Contract
 
 When `--json` or `--json-pretty` is used, output is machine-readable and intended for downstream tooling.
+All CLI JSON outputs include a top-level `schema_version` string (currently `"1.0"`). Bump this version whenever the CLI JSON schema changes.
 
 Example pattern:
 
@@ -52,6 +53,12 @@ Consumer best practices:
 - Treat unknown fields as forward-compatible additions.
 - Avoid strict ordering assumptions.
 - Validate required fields in your own schema.
+
+## CSV Output Contract
+
+Use `--csv <PATH>` to export probe report rows to CSV with a header row. Current headers:
+
+`hop,ip,hostname,avg_ms,best_ms,worst_ms,loss_pct`
 
 ## REST API Response Headers
 

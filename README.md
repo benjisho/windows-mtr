@@ -237,6 +237,9 @@ mtr -c 10 -r 8.8.8.8 > network-report.txt
 
 ```bash
 mtr --json -c 20 8.8.8.8 > network-report.json
+
+# CSV output for spreadsheet pipelines
+mtr --csv network-report.csv -c 20 8.8.8.8
 ```
 
 ### Test HTTPS Connectivity
@@ -323,7 +326,7 @@ mtr -T -P 25 mailserver.example.com
 Windows MTR can be integrated into your monitoring systems:
 
 ```bash
-mtr -c 10 -r --json 8.8.8.8 > metrics.json
+mtr -c 10 --json 8.8.8.8 > metrics.json
 ```
 
 ### Automation

@@ -531,6 +531,7 @@ async fn execute_probe(
                 runner_path.as_ref(),
                 &trippy_args,
                 json_output,
+                None,
                 EMBEDDED_TRIPPY_ENV,
             )
         })
@@ -632,6 +633,7 @@ fn normalized_to_probe_request(
         source_port: None,
         report: true,
         json_output: None,
+        csv_output: None,
         count: normalized.count.or(Some(1)),
         interval_seconds: normalized.interval_seconds,
         timeout_seconds: normalized.timeout_seconds,

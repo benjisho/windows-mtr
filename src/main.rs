@@ -1,5 +1,5 @@
 use anyhow::Context;
-use clap::{Args, Parser, ValueEnum};
+use clap::{ArgGroup, Args, Parser, ValueEnum};
 use std::env;
 use std::net::{IpAddr, SocketAddr};
 use std::process;
@@ -79,6 +79,11 @@ struct Cli {
 }
 
 #[derive(Args, Debug)]
+#[command(group(
+    ArgGroup::new("output_mode")
+        .args(["report", "json", "json_pretty", "csv"])
+        .multiple(false)
+))]
 struct TraceCli {
     /// Target host to trace (hostname or IP)
     host: Option<String>,
@@ -110,6 +115,9 @@ struct TraceCli {
     /// Generate pretty-formatted JSON report output
     #[arg(long = "json-pretty", conflicts_with = "json")]
     json_pretty: bool,
+    /// Write report output as CSV to the given file path
+    #[arg(long = "csv", value_name = "PATH")]
+    csv: Option<std::path::PathBuf>,
 
     /// Number of pings (cycles) to send to each host
     #[arg(short = 'c')]
@@ -248,13 +256,14 @@ fn json_output_from_cli(args: &TraceCli) -> Option<JsonOutput> {
 }
 
 fn should_print_banner(args: &Cli) -> bool {
-    !args.api && json_output_from_cli(&args.trace).is_none()
+    !args.api && json_output_from_cli(&args.trace).is_none() && args.trace.csv.is_none()
 }
 
 fn should_print_interactive_troubleshooting_hint(request: &ProbeRequest, exit_code: i32) -> bool {
     request.ui_mode == UiMode::Default
         && !request.report
         && request.json_output.is_none()
+        && request.csv_output.is_none()
         && exit_code != 0
 }
 
@@ -402,6 +411,7 @@ fn build_probe_request(args: &TraceCli) -> anyhow::Result<ProbeRequest> {
         source_port: args.source_port,
         report: args.report,
         json_output: json_output_from_cli(args),
+        csv_output: args.csv.clone(),
         count: args.count,
         interval_seconds: args.interval,
         timeout_seconds: args.timeout,
@@ -481,6 +491,7 @@ fn main() -> anyhow::Result<()> {
         &current_exe,
         &plan.trippy_args,
         plan.json_output,
+        plan.csv_output.as_deref(),
         EMBEDDED_TRIPPY_ENV,
     )
     .context("failed to run embedded trippy")?;
@@ -524,6 +535,7 @@ mod tests {
             source_port: None,
             report: false,
             json_output: None,
+            csv_output: None,
             count: None,
             interval_seconds: None,
             timeout_seconds: None,

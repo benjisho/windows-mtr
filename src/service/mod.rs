@@ -2,9 +2,11 @@ pub mod api_models;
 pub mod rest_api;
 pub mod rest_server;
 use anyhow::Context;
+use csv::Writer;
+use serde_json::{Map, Value};
 use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -40,6 +42,7 @@ pub struct ProbeRequest {
     pub source_port: Option<u16>,
     pub report: bool,
     pub json_output: Option<JsonOutput>,
+    pub csv_output: Option<PathBuf>,
     pub count: Option<usize>,
     pub interval_seconds: Option<f32>,
     pub timeout_seconds: Option<f32>,
@@ -64,6 +67,7 @@ pub struct ProbePlan {
     pub validated_host: String,
     pub trippy_args: Vec<String>,
     pub json_output: Option<JsonOutput>,
+    pub csv_output: Option<PathBuf>,
     pub ui_mode: UiMode,
 }
 
@@ -165,12 +169,13 @@ pub fn build_probe_plan(request: &ProbeRequest) -> Result<ProbePlan, ProbeError>
         validated_host,
         trippy_args,
         json_output: request.json_output,
+        csv_output: request.csv_output.clone(),
         ui_mode: request.ui_mode,
     })
 }
 
 fn mode_from_request(request: &ProbeRequest) -> &'static str {
-    if request.json_output.is_some() {
+    if request.json_output.is_some() || request.csv_output.is_some() {
         "json"
     } else if request.report || request.report_wide {
         "pretty"
@@ -414,6 +419,7 @@ pub fn run_embedded_trippy(
     current_exe: &Path,
     args: &[String],
     json_output: Option<JsonOutput>,
+    csv_output: Option<&Path>,
     embedded_env_name: &str,
 ) -> anyhow::Result<ProbeResult> {
     if let Some(format) = json_output {
@@ -432,19 +438,39 @@ pub fn run_embedded_trippy(
             );
         }
 
-        match format {
-            JsonOutput::Compact => {
-                let value: serde_json::Value = serde_json::from_slice(&output.stdout)
-                    .context("failed to parse trippy JSON output")?;
-                serde_json::to_writer(std::io::stdout(), &value)
-                    .context("failed to write compact JSON output")?;
-                std::io::stdout().write_all(b"\n")?;
-            }
-            JsonOutput::Pretty => {
-                std::io::stdout().write_all(&output.stdout)?;
-            }
-        }
+        let mut value: Value =
+            serde_json::from_slice(&output.stdout).context("failed to parse trippy JSON output")?;
+        inject_schema_version(&mut value);
 
+        match format {
+            JsonOutput::Compact => serde_json::to_writer(std::io::stdout(), &value)
+                .context("failed to write compact JSON output")?,
+            JsonOutput::Pretty => serde_json::to_writer_pretty(std::io::stdout(), &value)
+                .context("failed to write pretty JSON output")?,
+        };
+        std::io::stdout().write_all(b"\n")?;
+
+        return Ok(ProbeResult {
+            exit_code: output.status.code().unwrap_or(2),
+        });
+    }
+    if let Some(csv_path) = csv_output {
+        let output = Command::new(current_exe)
+            .env(embedded_env_name, "1")
+            .args(args.iter().skip(1))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .output()
+            .context("failed to launch embedded trippy runner")?;
+        if !output.status.success() {
+            anyhow::bail!(
+                "embedded trippy exited with status {}",
+                output.status.code().unwrap_or(2)
+            );
+        }
+        let value: Value =
+            serde_json::from_slice(&output.stdout).context("failed to parse trippy JSON output")?;
+        write_csv_report(csv_path, &value)?;
         return Ok(ProbeResult {
             exit_code: output.status.code().unwrap_or(2),
         });
@@ -458,4 +484,111 @@ pub fn run_embedded_trippy(
     Ok(ProbeResult {
         exit_code: status.code().unwrap_or(2),
     })
+}
+
+const CLI_JSON_SCHEMA_VERSION: &str = "1.0";
+
+fn inject_schema_version(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            map.insert(
+                "schema_version".to_string(),
+                Value::String(CLI_JSON_SCHEMA_VERSION.to_string()),
+            );
+        }
+        _ => {
+            let mut map = Map::new();
+            map.insert(
+                "schema_version".to_string(),
+                Value::String(CLI_JSON_SCHEMA_VERSION.to_string()),
+            );
+            map.insert("data".to_string(), value.clone());
+            *value = Value::Object(map);
+        }
+    }
+}
+
+fn write_csv_report(path: &Path, value: &Value) -> anyhow::Result<()> {
+    let hops = value
+        .get("report")
+        .and_then(|v| v.get("hops"))
+        .and_then(Value::as_array)
+        .context("trippy JSON report did not include report.hops array")?;
+    let mut writer = Writer::from_path(path)
+        .with_context(|| format!("failed to create CSV file at {}", path.display()))?;
+    writer.write_record([
+        "hop", "ip", "hostname", "avg_ms", "best_ms", "worst_ms", "loss_pct",
+    ])?;
+    for hop in hops {
+        let hop_num = hop
+            .get("ttl")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            .to_string();
+        let host = hop.get("host").and_then(Value::as_str).unwrap_or("");
+        let (hostname, ip) = parse_host_label(host);
+        writer.write_record([
+            hop_num,
+            ip,
+            hostname,
+            number_to_string(hop.get("avg_ms")),
+            number_to_string(hop.get("best_ms")),
+            number_to_string(hop.get("worst_ms")),
+            number_to_string(hop.get("loss_pct")),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+fn number_to_string(value: Option<&Value>) -> String {
+    value
+        .and_then(Value::as_f64)
+        .map(|v| v.to_string())
+        .unwrap_or_default()
+}
+
+fn parse_host_label(host: &str) -> (String, String) {
+    if let Some((name, rest)) = host.rsplit_once(" (")
+        && let Some(ip) = rest.strip_suffix(')')
+    {
+        return (name.to_string(), ip.to_string());
+    }
+    if host.parse::<IpAddr>().is_ok() {
+        return (String::new(), host.to_string());
+    }
+    (host.to_string(), String::new())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn inject_schema_version_sets_top_level_field() {
+        let mut value = serde_json::json!({"report":{"hops":[]}});
+        inject_schema_version(&mut value);
+        assert_eq!(value["schema_version"], "1.0");
+    }
+
+    #[test]
+    fn write_csv_report_emits_expected_header_and_fields() {
+        let json = serde_json::json!({
+            "report": {
+                "hops": [
+                    {"ttl":1,"host":"192.168.1.1","avg_ms":1.5,"best_ms":1.1,"worst_ms":2.0,"loss_pct":0.0},
+                    {"ttl":2,"host":"dns.google (8.8.8.8)","avg_ms":20.0,"best_ms":18.0,"worst_ms":23.0,"loss_pct":5.0}
+                ]
+            }
+        });
+        let path =
+            std::env::temp_dir().join(format!("windows-mtr-csv-test-{}.csv", std::process::id()));
+        write_csv_report(&path, &json).expect("csv export should succeed");
+        let csv = fs::read_to_string(&path).expect("csv file should exist");
+        let _ = fs::remove_file(&path);
+        assert!(csv.contains("hop,ip,hostname,avg_ms,best_ms,worst_ms,loss_pct"));
+        assert!(csv.contains("1,192.168.1.1,,1.5,1.1,2,0"));
+        assert!(csv.contains("2,8.8.8.8,dns.google,20,18,23,5"));
+    }
 }
