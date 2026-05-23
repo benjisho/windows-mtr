@@ -570,11 +570,11 @@ mod tests {
                 {"ttl": 1, "host": "router.local (192.168.1.1)", "avg_ms": 1.5, "best_ms": 1.1, "worst_ms": 2.0, "loss_ratio": 0.05}
             ]}
         });
-        let path = std::env::temp_dir().join("windows_mtr_csv_test.csv");
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+        let path = temp_dir.path().join("windows_mtr_csv_test.csv");
         write_csv_report(&path, &fixture).expect("csv should write");
         let data = std::fs::read_to_string(&path).expect("csv should be readable");
         assert!(data.contains("hop,ip,hostname,avg_ms,best_ms,worst_ms,loss_pct"));
         assert!(data.contains("1,192.168.1.1,router.local,1.5,1.1,2,5"));
-        let _ = std::fs::remove_file(path);
     }
 }
