@@ -26,10 +26,11 @@ For release-by-release details, see the [changelog](../CHANGELOG.md).
 | CodeQL workflow for Rust | ✅ Released | v1.2.x |
 | Container publishing to GHCR + Docker Hub | ✅ Released | v1.2.x |
 | REST API (API key + mTLS auth, rate limiting, concurrency controls) | ✅ Released | v1.1.3 |
-| SNMP Integration | 📅 Planned | H2 2026 |
+| SNMP Integration (optional) | 🛣️ Long-term roadmap | 2027+ |
 | Dashboard UI (tabs, hop table, charts) | 🚧 In Progress (experimental preview via `--ui dashboard`, with deprecated alias `--ui native`) | H2 2026 |
-| ETW + Windows observability integrations | 🛣️ Roadmap | H2 2026 |
-| Versioned JSON schema + CSV export | 🛣️ Roadmap | H2 2026 |
+| Dashboard fallback UI improvements | 🚧 In Progress / Next | H2 2026 |
+| ETW + Windows observability integrations (optional) | 🛣️ Long-term roadmap | 2027+ |
+| Versioned JSON & CSV export | 🚧 In Progress / Next | H2 2026 |
 | Security hardening gates (cargo-deny + cargo-audit + fuzz smoke in CI) | ✅ Released | v1.2.x |
 | Advanced security hardening (long-running/scheduled fuzzing, advisory cleanup) | 🛣️ Roadmap | H2 2026 |
 | Cross-platform probe parity/privilege smoke tests | ✅ Released (CI `Probe parity (windows-latest\|ubuntu-latest)` + privilege smoke lanes: `Privilege probe smoke (ubuntu-latest\|windows-latest, non-elevated)`, `Privilege probe smoke (ubuntu-latest, elevated)`, and optional `Privilege probe smoke (windows, elevated self-hosted)`; coverage includes non-elevated failures on Windows/Ubuntu and elevated success on Ubuntu + Windows self-hosted; constraint: elevated Windows lane requires self-hosted runner because GitHub-hosted `windows-latest` cannot be interactively elevated.) | H2 2026 |
