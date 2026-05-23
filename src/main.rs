@@ -1,5 +1,5 @@
 use anyhow::Context;
-use clap::{ArgGroup, Args, Parser, ValueEnum};
+use clap::{Args, Parser, ValueEnum};
 use std::env;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
@@ -80,11 +80,6 @@ struct Cli {
 }
 
 #[derive(Args, Debug)]
-#[command(group(
-    ArgGroup::new("output_mode")
-        .args(["report", "report_wide", "json", "json_pretty", "csv"])
-        .multiple(false)
-))]
 struct TraceCli {
     /// Target host to trace (hostname or IP)
     host: Option<String>,
@@ -110,15 +105,19 @@ struct TraceCli {
     report: bool,
 
     /// Generate JSON report output
-    #[arg(short = 'j', long = "json")]
+    #[arg(short = 'j', long = "json", conflicts_with = "json_pretty")]
     json: bool,
 
     /// Generate pretty-formatted JSON report output
-    #[arg(long = "json-pretty")]
+    #[arg(long = "json-pretty", conflicts_with = "json")]
     json_pretty: bool,
 
     /// Write report output as CSV to a file path
-    #[arg(long = "csv", value_name = "PATH")]
+    #[arg(
+        long = "csv",
+        value_name = "PATH",
+        conflicts_with_all = ["json", "json_pretty", "report", "report_wide"]
+    )]
     csv: Option<PathBuf>,
 
     /// Number of pings (cycles) to send to each host
