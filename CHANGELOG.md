@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Updated to Rust 2024 edition.
 - Updated Trippy integration to `trippy`/`trippy-tui` 0.13.0.
-- Updated documentation and roadmap to reflect delivered v2.0 capabilities.
+- Updated documentation and roadmap to reflect delivered v1.1.3 capabilities.
 
 ### Fixed
 - Fixed `--ui enhanced` handling for bundled Trippy 0.13.0: stop passing unsupported `--tui-*` flags and return a clear unavailable-with-action message.
