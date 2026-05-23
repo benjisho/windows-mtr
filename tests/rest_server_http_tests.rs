@@ -116,6 +116,48 @@ async fn create_probe_payload(
     create_res.json().await.expect("json body expected")
 }
 
+#[tokio::test]
+async fn responses_include_request_id_and_rate_limit_headers() {
+    let (addr, shutdown) = spawn_server().await;
+    let client = build_http_client();
+
+    let health = client
+        .get(format!("http://{addr}/api/v1/health"))
+        .send()
+        .await
+        .expect("health request should succeed");
+    assert!(health.headers().get("X-Request-ID").is_some());
+
+    let create = client
+        .post(format!("http://{addr}/api/v1/probes"))
+        .json(&serde_json::json!({
+            "targets": ["127.0.0.1"],
+            "protocol": "icmp",
+            "count": 1
+        }))
+        .send()
+        .await
+        .expect("create request should succeed");
+
+    assert!(create.headers().get("X-Request-ID").is_some());
+    let limit = create
+        .headers()
+        .get("X-RateLimit-Limit")
+        .expect("rate limit limit header should exist")
+        .to_str()
+        .expect("header should be utf-8")
+        .parse::<usize>()
+        .expect("header should be numeric");
+    assert!(limit >= 1);
+    assert!(create.headers().get("X-RateLimit-Remaining").is_some());
+    assert!(create.headers().get("X-RateLimit-Reset").is_some());
+    assert!(create.headers().get("RateLimit-Limit").is_some());
+    assert!(create.headers().get("RateLimit-Remaining").is_some());
+    assert!(create.headers().get("RateLimit-Reset").is_some());
+
+    let _ = shutdown.send(());
+}
+
 async fn create_probe(
     client: &reqwest::Client,
     addr: SocketAddr,
@@ -548,6 +590,22 @@ async fn create_probe_rejects_burst_traffic_with_429() {
         .await
         .expect("third create probe request should succeed");
     assert_eq!(third.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+
+    assert!(third.headers().get("X-RateLimit-Limit").is_some());
+    assert!(third.headers().get("X-RateLimit-Remaining").is_some());
+    assert!(third.headers().get("X-RateLimit-Reset").is_some());
+    assert!(third.headers().get("RateLimit-Limit").is_some());
+    assert!(third.headers().get("RateLimit-Remaining").is_some());
+    assert!(third.headers().get("RateLimit-Reset").is_some());
+    let remaining = third
+        .headers()
+        .get("X-RateLimit-Remaining")
+        .expect("remaining header should exist")
+        .to_str()
+        .expect("header should be utf-8")
+        .parse::<usize>()
+        .expect("header should be numeric");
+    assert_eq!(remaining, 0);
 
     let body: serde_json::Value = third.json().await.expect("json body expected");
     assert_error_shape(&body, 429, "rate_limited");
