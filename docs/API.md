@@ -80,7 +80,7 @@ All REST responses also include:
 
 ## API Probe Execution Timeout
 
-API-launched probes are bounded by a configurable execution timeout (default: **60 seconds**). If a probe does not complete within the timeout, the job transitions to `failed` with an error message containing `"probe timed out after <N>s"`. The concurrency permit is released immediately when the timeout fires.
+API-launched probes are bounded by a configurable execution timeout (default: **60 seconds**). If a probe does not complete within the timeout, the job transitions to `failed` with an error message like `"probe timed out after 60.0s"` (sub-second durations render in milliseconds, e.g. `"1.0ms"`). The concurrency permit is released immediately when the timeout fires.
 
 Configure via CLI flag:
 

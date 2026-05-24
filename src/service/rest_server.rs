@@ -492,7 +492,7 @@ async fn run_probe_job(
             }
         }
         Err(_elapsed) => {
-            let message = format!("probe timed out after {}s", probe_timeout.as_secs());
+            let message = format!("probe timed out after {probe_timeout:.1?}");
             eprintln!("probe {id}: {message}");
             if let Err(store_error) =
                 update_job_status(&state, &id, ProbeJobStatus::Failed, None, Some(message))
