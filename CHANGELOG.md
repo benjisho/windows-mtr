@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Added an experimental dashboard preview mode via `--ui dashboard` (deprecated compatibility alias: `--ui native`) with tabs, hop table rendering, and live latency/loss charts.
+- Added `--csv <PATH>` CLI flag for CSV report export (mutually exclusive with `--json`/`--json-pretty`/`-r`/`-w`).
+- Added `schema_version` field (`"1.0"`) to CLI JSON output (`--json` / `--json-pretty`).
 
 ### Changed
 - Updated README/USAGE roadmap and examples to document the dashboard fallback UI and controls.
