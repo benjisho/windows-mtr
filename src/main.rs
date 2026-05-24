@@ -11,8 +11,8 @@ use windows_mtr::service::{
     run_embedded_trippy,
 };
 
-mod error;
 mod dashboard_ui;
+mod error;
 use error::MtrError;
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";

@@ -248,8 +248,7 @@ mod tests {
 
     #[test]
     fn io_error_maps_to_internal_server_error() {
-        let api_error =
-            ApiError::from(MtrError::IoError(std::io::Error::other("disk full")));
+        let api_error = ApiError::from(MtrError::IoError(std::io::Error::other("disk full")));
 
         assert_eq!(api_error.status, StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(api_error.code, "internal_io_error");
