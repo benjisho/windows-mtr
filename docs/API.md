@@ -78,6 +78,16 @@ All REST responses also include:
 
 - `X-Request-ID`: per-request correlation identifier for logs and troubleshooting.
 
+## API Probe Execution Timeout
+
+API-launched probes are bounded by a configurable execution timeout (default: **60 seconds**). If a probe does not complete within the timeout, the job transitions to `failed` with an error message like `"probe timed out after 60.0s"` (sub-second durations render in milliseconds, e.g. `"1.0ms"`). The concurrency permit is released immediately when the timeout fires.
+
+Configure via CLI flag:
+
+```bash
+mtr --api --api-probe-timeout-seconds 120
+```
+
 ## Compatibility Notes
 
 - CLI compatibility with Linux `mtr` is a goal, but not every flag is identical.

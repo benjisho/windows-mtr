@@ -155,6 +155,9 @@ mtr --api --api-max-requests-per-window 20 --api-rate-limit-window-seconds 30
 # Tune REST API completed-job retention controls
 mtr --api --api-max-completed-jobs 512 --api-completed-job-ttl-seconds 1200
 
+# Set API probe execution timeout to 2 minutes
+mtr --api --api-probe-timeout-seconds 120
+
 # Secure remote bind with mTLS
 mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 
@@ -172,6 +175,7 @@ mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls --api-mtls-trusted-ingress 10.
 - Max request body size: `16 KiB`
 - Max retained completed jobs: `1024`
 - Completed job TTL: `15m`
+- Probe execution timeout: `60s`
 
 Authentication enforcement in v1:
 - Local-only bind: `none-local-only` is acceptable

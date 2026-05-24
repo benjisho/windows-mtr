@@ -35,6 +35,7 @@ pub struct RestApiConfig {
     pub max_payload_bytes: usize,
     pub max_completed_jobs: usize,
     pub completed_job_ttl: Duration,
+    pub probe_execution_timeout: Duration,
     pub trusted_mtls_ingress_ips: Vec<IpAddr>,
 }
 
@@ -53,6 +54,7 @@ impl Default for RestApiConfig {
             max_payload_bytes: 16 * 1024,
             max_completed_jobs: 1024,
             completed_job_ttl: Duration::from_secs(15 * 60),
+            probe_execution_timeout: Duration::from_secs(60),
             trusted_mtls_ingress_ips: vec![
                 IpAddr::from([127, 0, 0, 1]),
                 "::1".parse().expect("valid localhost ipv6 literal"),
@@ -112,6 +114,12 @@ impl RestApiConfig {
         if self.completed_job_ttl.is_zero() {
             return Err(RestApiValidationError::InvalidOption(
                 "completed_job_ttl must be greater than zero".to_string(),
+            ));
+        }
+
+        if self.probe_execution_timeout.is_zero() {
+            return Err(RestApiValidationError::InvalidOption(
+                "probe_execution_timeout must be greater than zero".to_string(),
             ));
         }
 
@@ -688,6 +696,18 @@ mod tests {
 
         config.max_completed_jobs = 1;
         config.completed_job_ttl = Duration::ZERO;
+        assert!(matches!(
+            config.validate_security_defaults(),
+            Err(RestApiValidationError::InvalidOption(_))
+        ));
+    }
+
+    #[test]
+    fn zero_probe_execution_timeout_is_rejected() {
+        let config = RestApiConfig {
+            probe_execution_timeout: Duration::ZERO,
+            ..RestApiConfig::default()
+        };
         assert!(matches!(
             config.validate_security_defaults(),
             Err(RestApiValidationError::InvalidOption(_))
