@@ -60,13 +60,6 @@ impl ApiError {
             "invalid_option" => "https://windows-mtr.dev/problems/invalid-option",
             "missing_port" => "https://windows-mtr.dev/problems/missing-port",
             "insufficient_privileges" => "https://windows-mtr.dev/problems/insufficient-privileges",
-            "probe_backend_unavailable" => {
-                "https://windows-mtr.dev/problems/probe-backend-unavailable"
-            }
-            "probe_backend_install_failed" => {
-                "https://windows-mtr.dev/problems/probe-backend-install-failed"
-            }
-            "probe_execution_failed" => "https://windows-mtr.dev/problems/probe-execution-failed",
             "internal_io_error" => "https://windows-mtr.dev/problems/internal-io-error",
             _ => "https://windows-mtr.dev/problems/internal-error",
         }
@@ -151,24 +144,6 @@ impl From<MtrError> for ApiError {
                 StatusCode::FORBIDDEN,
                 "insufficient_privileges",
                 "Insufficient privileges",
-                value.to_string(),
-            ),
-            MtrError::TrippyNotFound => Self::new(
-                StatusCode::BAD_GATEWAY,
-                "probe_backend_unavailable",
-                "Probe backend unavailable",
-                value.to_string(),
-            ),
-            MtrError::TrippyInstallFailed(_) => Self::new(
-                StatusCode::BAD_GATEWAY,
-                "probe_backend_install_failed",
-                "Probe backend failure",
-                value.to_string(),
-            ),
-            MtrError::TrippyExecutionFailed(_) => Self::new(
-                StatusCode::BAD_GATEWAY,
-                "probe_execution_failed",
-                "Probe execution failure",
                 value.to_string(),
             ),
             MtrError::IoError(_) => Self::new(
@@ -272,20 +247,20 @@ mod tests {
     }
 
     #[test]
-    fn runtime_probe_failure_maps_to_bad_gateway() {
-        let api_error = ApiError::from(MtrError::TrippyExecutionFailed("spawn failed".to_string()));
+    fn io_error_maps_to_internal_server_error() {
+        let api_error = ApiError::from(MtrError::IoError(std::io::Error::other("disk full")));
 
-        assert_eq!(api_error.status, StatusCode::BAD_GATEWAY);
-        assert_eq!(api_error.code, "probe_execution_failed");
+        assert_eq!(api_error.status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(api_error.code, "internal_io_error");
 
         let body = api_error.response();
         assert_eq!(body.meta.schema_version, "v1");
         assert_eq!(body.meta.request_id, None);
-        assert_eq!(body.error.status, 502);
-        assert_eq!(body.error.code, "probe_execution_failed");
+        assert_eq!(body.error.status, 500);
+        assert_eq!(body.error.code, "internal_io_error");
         assert_eq!(
             body.error.type_url,
-            "https://windows-mtr.dev/problems/probe-execution-failed"
+            "https://windows-mtr.dev/problems/internal-io-error"
         );
     }
 }

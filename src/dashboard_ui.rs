@@ -35,7 +35,7 @@ struct HopStat {
     worst_ms: f64,
 }
 
-pub struct NativeUiApp {
+pub struct DashboardApp {
     target: String,
     tab_index: usize,
     hops: Vec<HopStat>,
@@ -46,7 +46,7 @@ pub struct NativeUiApp {
     consecutive_poll_failures: u32,
 }
 
-impl NativeUiApp {
+impl DashboardApp {
     fn new(target: &str) -> Self {
         Self {
             target: target.to_string(),
@@ -100,7 +100,7 @@ impl NativeUiApp {
     }
 }
 
-pub fn run_native_ui(target: &str, snapshot_args: &[String]) -> anyhow::Result<i32> {
+pub fn run_dashboard_ui(target: &str, snapshot_args: &[String]) -> anyhow::Result<i32> {
     enable_raw_mode().context("failed to enable raw mode for dashboard UI")?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
@@ -140,7 +140,7 @@ fn run_ui_loop(
     target: &str,
     snapshot_args: &[String],
 ) -> anyhow::Result<i32> {
-    let mut app = NativeUiApp::new(target);
+    let mut app = DashboardApp::new(target);
     let tick_rate = Duration::from_millis(250);
     let poll_rate = Duration::from_millis(900);
     let (snapshot_tx, snapshot_rx) = mpsc::channel::<anyhow::Result<Vec<HopStat>>>();
@@ -338,7 +338,7 @@ fn read_f64(item: &Value, keys: &[&str]) -> Option<f64> {
     None
 }
 
-fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
+fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &DashboardApp) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -384,7 +384,7 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &NativeUiApp) {
     frame.render_widget(help, chunks[2]);
 }
 
-fn build_help_text(app: &NativeUiApp) -> String {
+fn build_help_text(app: &DashboardApp) -> String {
     let base = "Fallback dashboard: JSON snapshot polling, limited fields. For full UI use default mode. • Controls: ←/→ or Tab switch tabs • q quits";
     let mut notes = Vec::new();
 
@@ -422,7 +422,7 @@ fn build_help_text(app: &NativeUiApp) -> String {
 
 fn render_hop_table(
     frame: &mut ratatui::Frame<'_>,
-    app: &NativeUiApp,
+    app: &DashboardApp,
     area: ratatui::layout::Rect,
 ) {
     let rows = app.hops.iter().map(|hop| {
@@ -461,7 +461,7 @@ fn render_hop_table(
 
 fn render_latency_chart(
     frame: &mut ratatui::Frame<'_>,
-    app: &NativeUiApp,
+    app: &DashboardApp,
     area: ratatui::layout::Rect,
 ) {
     let inner = Layout::default()
@@ -530,7 +530,7 @@ fn render_latency_chart(
 
 fn render_loss_chart(
     frame: &mut ratatui::Frame<'_>,
-    app: &NativeUiApp,
+    app: &DashboardApp,
     area: ratatui::layout::Rect,
 ) {
     let dataset = Dataset::default()
@@ -636,7 +636,7 @@ mod tests {
 
     #[test]
     fn build_help_text_includes_live_troubleshooting_when_ui_has_no_data() {
-        let mut app = NativeUiApp::new("example.com");
+        let mut app = DashboardApp::new("example.com");
         app.started_at = Instant::now() - Duration::from_secs(16);
         app.ingest_error(anyhow!("poll failed"));
         app.ingest_error(anyhow!("poll failed"));
@@ -652,7 +652,7 @@ mod tests {
 
     #[test]
     fn build_help_text_is_compact_when_data_stream_is_healthy() {
-        let mut app = NativeUiApp::new("example.com");
+        let mut app = DashboardApp::new("example.com");
         app.ingest_snapshot(vec![HopStat {
             hop: 1,
             host: "1.1.1.1".to_string(),

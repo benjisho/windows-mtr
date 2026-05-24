@@ -691,17 +691,20 @@ jobs:
       - name: Run cargo audit
         run: cargo audit --deny warnings --deny unmaintained --deny unsound --deny yanked
 
+      - name: Install pinned nightly toolchain for fuzzing
+        run: rustup toolchain install nightly-2025-06-23 --profile minimal
+
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
+        run: cargo +nightly-2025-06-23 install cargo-fuzz --locked
 
       - name: Build fuzz targets
-        run: cargo fuzz build --fuzz-dir fuzz
+        run: cargo +nightly-2025-06-23 fuzz build --fuzz-dir fuzz
 
       - name: Run fuzz targets (short regression lane)
         shell: bash
         run: |
           set -euo pipefail
-          targets=$(cargo fuzz list --fuzz-dir fuzz)
+          targets=$(cargo +nightly-2025-06-23 fuzz list --fuzz-dir fuzz)
           if [ -z "$targets" ]; then
             echo "No fuzz targets found under fuzz/." >&2
             exit 1
@@ -710,7 +713,7 @@ jobs:
           while IFS= read -r target; do
             [ -z "$target" ] && continue
             echo "Running fuzz target: $target"
-            timeout --preserve-status 30s cargo fuzz run "$target" --fuzz-dir fuzz -- -max_total_time=20
+            timeout --preserve-status 30s cargo +nightly-2025-06-23 fuzz run "$target" --fuzz-dir fuzz -- -max_total_time=20
             status=$?
             if [ "$status" -eq 124 ]; then
               echo "Target $target reached CI timeout as expected; continuing."
