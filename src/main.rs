@@ -804,13 +804,8 @@ mod tests {
 
     #[test]
     fn api_mode_applies_probe_timeout_override() {
-        let cli = Cli::try_parse_from([
-            "mtr",
-            "--api",
-            "--api-probe-timeout-seconds",
-            "120",
-        ])
-        .expect("flags should parse for probe timeout override validation");
+        let cli = Cli::try_parse_from(["mtr", "--api", "--api-probe-timeout-seconds", "120"])
+            .expect("flags should parse for probe timeout override validation");
 
         let mut config = RestApiConfig::default();
         apply_rest_api_cli_overrides(&cli, &mut config).expect("overrides should apply");

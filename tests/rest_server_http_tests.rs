@@ -956,9 +956,7 @@ async fn probe_execution_timeout_releases_concurrency_permit() {
     let client = build_http_client();
 
     let first = create_probe(&client, addr, "127.0.0.1").await;
-    let first_id = first["data"]["id"]
-        .as_str()
-        .expect("id should be a string");
+    let first_id = first["data"]["id"].as_str().expect("id should be a string");
     let _ = wait_for_probe_status(&client, addr, first_id, "failed").await;
 
     let second = create_probe(&client, addr, "127.0.0.1").await;
