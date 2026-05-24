@@ -532,6 +532,7 @@ async fn execute_probe(
                 &trippy_args,
                 json_output,
                 EMBEDDED_TRIPPY_ENV,
+                None,
             )
         })
         .await;
@@ -632,6 +633,7 @@ fn normalized_to_probe_request(
         source_port: None,
         report: true,
         json_output: None,
+        csv_output_path: None,
         count: normalized.count.or(Some(1)),
         interval_seconds: normalized.interval_seconds,
         timeout_seconds: normalized.timeout_seconds,

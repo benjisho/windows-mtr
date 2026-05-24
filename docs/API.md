@@ -18,7 +18,7 @@ Primary categories:
 
 - **Probe selection:** `-T`, `-U`, `-P`, `--source-port`
 - **Routing scope:** `-m`, `-S`, `--interface`
-- **Output mode:** `-r`, `-w`, `--json`, `--json-pretty`
+- **Output mode:** `-r`, `-w`, `--json`, `--json-pretty`, `--csv <PATH>`
 - **Sampling/timing:** `-c`, `-i`, `-W`
 - **Name/ASN rendering:** `-n`, `-b`, `-z`
 
@@ -49,9 +49,19 @@ mtr --json -c 10 1.1.1.1 > mtr-report.json
 
 Consumer best practices:
 
+- Read and validate the top-level `schema_version` string (current value: `"1.0"`).
+- If the JSON structure changes in a future release, the schema version will be bumped.
 - Treat unknown fields as forward-compatible additions.
 - Avoid strict ordering assumptions.
 - Validate required fields in your own schema.
+
+## CSV Output Contract
+
+When `--csv <PATH>` is used, windows-mtr writes a CSV file at the provided path. CSV mode is mutually exclusive with `--json` and `--json-pretty`.
+
+Current header set:
+
+- `hop,ip,hostname,avg_ms,best_ms,worst_ms,loss_pct`
 
 ## REST API Response Headers
 

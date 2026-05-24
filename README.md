@@ -239,6 +239,14 @@ mtr -c 10 -r 8.8.8.8 > network-report.txt
 mtr --json -c 20 8.8.8.8 > network-report.json
 ```
 
+JSON output includes a top-level `schema_version` field (current: `"1.0"`). This value is bumped when the CLI JSON schema changes.
+
+### Generate CSV for spreadsheets/ETL
+
+```bash
+mtr --csv network-report.csv -c 20 8.8.8.8
+```
+
 ### Test HTTPS Connectivity
 
 ```bash
