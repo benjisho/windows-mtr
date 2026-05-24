@@ -465,15 +465,22 @@ async fn run_probe_job(
         return;
     }
 
-    match execute_probe(normalized, state.probe_runner_path.clone()).await {
-        Ok(result) => {
+    let probe_timeout = state.config.probe_execution_timeout;
+    let probe_result = timeout(
+        probe_timeout,
+        execute_probe(normalized, state.probe_runner_path.clone()),
+    )
+    .await;
+
+    match probe_result {
+        Ok(Ok(result)) => {
             if let Err(error) =
                 update_job_status(&state, &id, ProbeJobStatus::Completed, Some(result), None)
             {
                 eprintln!("probe {id}: failed to set completed state: {error}");
             }
         }
-        Err(error) => {
+        Ok(Err(error)) => {
             if let Err(store_error) = update_job_status(
                 &state,
                 &id,
@@ -482,6 +489,15 @@ async fn run_probe_job(
                 Some(error.clone()),
             ) {
                 eprintln!("probe {id}: failed to set failed state: {store_error}");
+            }
+        }
+        Err(_elapsed) => {
+            let message = format!("probe timed out after {}s", probe_timeout.as_secs());
+            eprintln!("probe {id}: {message}");
+            if let Err(store_error) =
+                update_job_status(&state, &id, ProbeJobStatus::Failed, None, Some(message))
+            {
+                eprintln!("probe {id}: failed to set timed-out state: {store_error}");
             }
         }
     }

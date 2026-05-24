@@ -918,3 +918,62 @@ async fn error_response_does_not_leak_internal_details() {
 
     let _ = shutdown.send(());
 }
+
+#[tokio::test]
+async fn probe_execution_timeout_marks_job_failed() {
+    let config = RestApiConfig {
+        probe_execution_timeout: Duration::from_millis(1),
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let created = create_probe(&client, addr, "127.0.0.1").await;
+    let id = created["data"]["id"]
+        .as_str()
+        .expect("id should be a string");
+
+    let failed = wait_for_probe_status(&client, addr, id, "failed").await;
+    let error = failed["data"]["error"]
+        .as_str()
+        .expect("error text should exist");
+    assert!(
+        error.contains("timed out"),
+        "expected timeout error, got: {error}"
+    );
+
+    let _ = shutdown.send(());
+}
+
+#[tokio::test]
+async fn probe_execution_timeout_releases_concurrency_permit() {
+    let config = RestApiConfig {
+        probe_execution_timeout: Duration::from_millis(1),
+        max_concurrent_probes: 1,
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+
+    let first = create_probe(&client, addr, "127.0.0.1").await;
+    let first_id = first["data"]["id"]
+        .as_str()
+        .expect("id should be a string");
+    let _ = wait_for_probe_status(&client, addr, first_id, "failed").await;
+
+    let second = create_probe(&client, addr, "127.0.0.1").await;
+    let second_id = second["data"]["id"]
+        .as_str()
+        .expect("id should be a string");
+    assert_ne!(first_id, second_id, "second probe should be accepted");
+    let second_terminal = wait_for_probe_status(&client, addr, second_id, "failed").await;
+    assert!(
+        second_terminal["data"]["error"]
+            .as_str()
+            .expect("error should exist")
+            .contains("timed out"),
+        "second probe should also time out (not be rejected for concurrency)"
+    );
+
+    let _ = shutdown.send(());
+}

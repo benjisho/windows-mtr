@@ -71,6 +71,10 @@ struct Cli {
     #[arg(long = "api-completed-job-ttl-seconds", value_name = "SECONDS")]
     api_completed_job_ttl_seconds: Option<u64>,
 
+    /// Maximum execution time in seconds for an API-launched probe (default: 60)
+    #[arg(long = "api-probe-timeout-seconds", value_name = "SECONDS")]
+    api_probe_timeout_seconds: Option<u64>,
+
     /// Trusted ingress source IP(s) allowed to forward mTLS identity headers (repeatable)
     #[arg(long = "api-mtls-trusted-ingress", value_name = "IP")]
     api_mtls_trusted_ingress: Vec<IpAddr>,
@@ -361,6 +365,10 @@ fn apply_rest_api_cli_overrides(args: &Cli, config: &mut RestApiConfig) -> anyho
 
     if let Some(completed_job_ttl_seconds) = args.api_completed_job_ttl_seconds {
         config.completed_job_ttl = Duration::from_secs(completed_job_ttl_seconds);
+    }
+
+    if let Some(probe_timeout_seconds) = args.api_probe_timeout_seconds {
+        config.probe_execution_timeout = Duration::from_secs(probe_timeout_seconds);
     }
 
     if !args.api_mtls_trusted_ingress.is_empty() {
@@ -792,6 +800,22 @@ mod tests {
 
         assert_eq!(config.max_completed_jobs, 512);
         assert_eq!(config.completed_job_ttl, Duration::from_secs(1200));
+    }
+
+    #[test]
+    fn api_mode_applies_probe_timeout_override() {
+        let cli = Cli::try_parse_from([
+            "mtr",
+            "--api",
+            "--api-probe-timeout-seconds",
+            "120",
+        ])
+        .expect("flags should parse for probe timeout override validation");
+
+        let mut config = RestApiConfig::default();
+        apply_rest_api_cli_overrides(&cli, &mut config).expect("overrides should apply");
+
+        assert_eq!(config.probe_execution_timeout, Duration::from_secs(120));
     }
 
     #[test]
