@@ -125,7 +125,6 @@ SKIP=hadolint pre-commit run --all-files
 - [Usage Guide](docs/USAGE.md)
 - [API Reference](docs/API.md)
 
-
 ## Security & Fuzzing
 
 - `cargo audit` runs in CI on every push/PR and fails on known vulnerability advisories.
