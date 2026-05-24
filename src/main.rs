@@ -12,7 +12,7 @@ use windows_mtr::service::{
 };
 
 mod error;
-mod native_ui;
+mod dashboard_ui;
 use error::MtrError;
 
 const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
@@ -467,7 +467,7 @@ fn main() -> anyhow::Result<()> {
                 .map_err(to_cli_error)
                 .map_err(|error| anyhow::anyhow!(error.to_string()))
                 .context("invalid --ui dashboard configuration")?;
-        let code = native_ui::run_native_ui(&plan.validated_host, &dashboard_args)?;
+        let code = dashboard_ui::run_dashboard_ui(&plan.validated_host, &dashboard_args)?;
         process::exit(code);
     }
 
@@ -640,6 +640,19 @@ mod tests {
         let alias = Cli::try_parse_from(["mtr", "--ui", "native", "8.8.8.8"])
             .expect("native alias should parse");
         assert!(matches!(alias.trace.ui, UiPreset::Dashboard));
+    }
+
+    #[test]
+    fn default_ui_is_the_default_preset() {
+        let cli = Cli::try_parse_from(["mtr", "8.8.8.8"]).expect("default should parse");
+        assert!(matches!(cli.trace.ui, UiPreset::Default));
+    }
+
+    #[test]
+    fn ui_mode_from_cli_maps_all_presets() {
+        assert_eq!(ui_mode_from_cli(UiPreset::Default), UiMode::Default);
+        assert_eq!(ui_mode_from_cli(UiPreset::Enhanced), UiMode::Enhanced);
+        assert_eq!(ui_mode_from_cli(UiPreset::Dashboard), UiMode::Dashboard);
     }
 
     #[test]
