@@ -444,6 +444,9 @@ jobs:
         run: ./scripts/release/verify-release-artifacts.ps1 -ZipPath "pr-build/windows-mtr-x86_64.zip"
         shell: pwsh
 
+      - name: Smoke test packaged PR binary
+        run: ./scripts/release/test-release-artifact.ps1 -ZipPath "pr-build/windows-mtr-x86_64.zip"
+        shell: pwsh
       - name: Dry-run release metadata update scripts
         run: |
           ./scripts/release/update-winget-manifest.ps1 -Version "1.1.3" -ZipPath "pr-build/windows-mtr-x86_64.zip"
