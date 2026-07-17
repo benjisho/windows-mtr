@@ -13,6 +13,7 @@ on:
       - 'deny.toml'
       - 'src/**'
       - 'xtask/**'
+      - 'fuzz/**'
       - '.github/workflows/security.yml'
   push:
     branches: [ master ]
@@ -23,6 +24,7 @@ on:
       - 'deny.toml'
       - 'src/**'
       - 'xtask/**'
+      - 'fuzz/**'
       - '.github/workflows/security.yml'
 
 permissions:
@@ -30,6 +32,7 @@ permissions:
 
 jobs:
   cargo-security:
+    name: Cargo deny and audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -65,17 +68,6 @@ jobs:
         run: cargo audit
 
 
-      - name: Install pinned nightly toolchain for fuzzing
-        run: rustup toolchain install nightly-2025-06-23 --profile minimal
-
-      - name: Install cargo-fuzz
-        run: cargo +nightly-2025-06-23 install cargo-fuzz --locked
-
-      - name: Run fuzz harness smoke
-        id: fuzz_harness
-        working-directory: fuzz
-        run: cargo +nightly-2025-06-23 fuzz run fuzz_passthrough_flags -- -runs=2000
-
       - name: Security summary
         if: always()
         run: |
@@ -84,10 +76,9 @@ jobs:
             echo ""
             echo "- cargo-deny: ${{ steps.cargo_deny.outcome }}"
             echo "- cargo-audit: ${{ steps.cargo_audit.outcome }}"
-            echo "- fuzz harness smoke: ${{ steps.fuzz_harness.outcome }}"
             echo ""
             echo "### Notes"
             echo "- cargo-deny config: \`deny.toml\`"
             echo "- Rust toolchain pinned to 1.88.0 for security checks"
-            echo "- Fuzz toolchain pinned to nightly-2025-06-23 (stable historical nightly)"
+            echo "- Extended fuzz regression runs on the weekly schedule"
           } >> "$GITHUB_STEP_SUMMARY"
