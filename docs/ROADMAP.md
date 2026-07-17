@@ -25,14 +25,15 @@ For release-by-release details, see the [changelog](../CHANGELOG.md).
 | CI matrix coverage (Windows + Ubuntu, MSRV + stable) | ✅ Released | v1.2.x |
 | CodeQL workflow for Rust | ✅ Released | v1.2.x |
 | Container publishing to GHCR + Docker Hub | ✅ Released | v1.2.x |
-| REST API (API key + mTLS auth, rate limiting, concurrency controls) | ✅ Released | v1.1.3 |
+| REST API (API key + trusted-ingress mTLS identity forwarding, rate limiting, concurrency controls) | ✅ Released | v1.1.3 |
 | SNMP Integration (optional) | 🛣️ Long-term roadmap | 2027+ |
 | Dashboard UI (tabs, hop table, charts) | 🚧 In Progress (experimental preview via `--ui dashboard`, with deprecated alias `--ui native`) | H2 2026 |
 | Dashboard fallback UI improvements | 🚧 In Progress / Next | H2 2026 |
 | ETW + Windows observability integrations (optional) | 🛣️ Long-term roadmap | 2027+ |
 | Versioned JSON schema & CSV export | ✅ Released (`schema_version: "1.0"` added to CLI JSON output; `--csv <PATH>` introduced for CSV export) | v1.3.x |
-| Security hardening gates (cargo-deny + cargo-audit + fuzz smoke in CI) | ✅ Released | v1.2.x |
-| Advanced security hardening (long-running/scheduled fuzzing, advisory cleanup) | 🛣️ Roadmap | H2 2026 |
+| Release-artifact validation (JSON, CSV, TCP, UDP, REST API health) | ✅ Released | v1.3.x |
+| Security hardening gates (cargo-deny + cargo-audit per PR; extended fuzz regression scheduled weekly) | ✅ Released | v1.3.x |
+| Advanced security hardening (fuzz corpus/time-budget expansion, advisory cleanup) | 🛣️ Roadmap | H2 2026 |
 | Cross-platform probe parity/privilege smoke tests | ✅ Released (CI `Probe parity (windows-latest\|ubuntu-latest)` + privilege smoke lanes: `Privilege probe smoke (ubuntu-latest\|windows-latest, non-elevated)`, `Privilege probe smoke (ubuntu-latest, elevated)`, and optional `Privilege probe smoke (windows, elevated self-hosted)`; coverage includes non-elevated failures on Windows/Ubuntu and elevated success on Ubuntu + Windows self-hosted; constraint: elevated Windows lane requires self-hosted runner because GitHub-hosted `windows-latest` cannot be interactively elevated.) | H2 2026 |
 | GitHub Actions hardening (pin workflow actions by commit SHA) | ✅ Released | v1.2.x |
 | API probe execution timeout and job lifecycle hardening | ✅ Released (bounded execution with configurable `--api-probe-timeout-seconds`, default 60s) | v1.3.x |
