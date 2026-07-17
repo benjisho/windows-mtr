@@ -27,8 +27,8 @@ For release-by-release details, see the [changelog](../CHANGELOG.md).
 | Container publishing to GHCR + Docker Hub | ✅ Released | v1.2.x |
 | REST API (API key + trusted-ingress mTLS identity forwarding, rate limiting, concurrency controls) | ✅ Released | v1.1.3 |
 | SNMP Integration (optional) | 🛣️ Long-term roadmap | 2027+ |
-| Dashboard UI (tabs, hop table, charts) | 🚧 In Progress (experimental preview via `--ui dashboard`, with deprecated alias `--ui native`) | H2 2026 |
-| Dashboard fallback UI improvements | 🚧 In Progress / Next | H2 2026 |
+| Dashboard UI (Overview/Hops/Charts, hop table, charts) | Experimental MVP via `--ui dashboard` (`--ui native` remains a deprecated alias) | H2 2026 |
+| Dashboard fallback UI improvements (sorting, filtering, export, heatmaps) | Deferred | Post-MVP |
 | ETW + Windows observability integrations (optional) | 🛣️ Long-term roadmap | 2027+ |
 | Versioned JSON schema & CSV export | ✅ Released (`schema_version: "1.0"` added to CLI JSON output; `--csv <PATH>` introduced for CSV export) | v1.3.x |
 | Release-artifact validation (JSON, CSV, TCP, UDP, REST API health) | ✅ Released | v1.3.x |

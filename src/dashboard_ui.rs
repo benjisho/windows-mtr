@@ -29,10 +29,18 @@ const EMBEDDED_TRIPPY_ENV: &str = "WINDOWS_MTR_EMBEDDED_TRIPPY";
 struct HopStat {
     hop: usize,
     host: String,
-    loss_pct: f64,
-    best_ms: f64,
-    avg_ms: f64,
-    worst_ms: f64,
+    loss_pct: Option<f64>,
+    best_ms: Option<f64>,
+    avg_ms: Option<f64>,
+    worst_ms: Option<f64>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DashboardAction {
+    Quit,
+    NextTab,
+    PreviousTab,
+    ToggleHelp,
 }
 
 pub struct DashboardApp {
@@ -44,6 +52,7 @@ pub struct DashboardApp {
     started_at: Instant,
     last_error: Option<String>,
     consecutive_poll_failures: u32,
+    show_help: bool,
 }
 
 impl DashboardApp {
@@ -57,6 +66,7 @@ impl DashboardApp {
             started_at: Instant::now(),
             last_error: None,
             consecutive_poll_failures: 0,
+            show_help: false,
         }
     }
 
@@ -71,12 +81,13 @@ impl DashboardApp {
         self.last_error = None;
         self.consecutive_poll_failures = 0;
 
-        let latest_latency = self.hops.last().map(|h| h.avg_ms).unwrap_or_default();
-        let latest_loss = self.hops.last().map(|h| h.loss_pct).unwrap_or_default();
-        let x = self.latency_history.len() as f64;
-
-        self.latency_history.push((x, latest_latency));
-        self.loss_history.push((x, latest_loss));
+        let x = self.latency_history.len().max(self.loss_history.len()) as f64;
+        if let Some(latency) = self.hops.last().and_then(|hop| hop.avg_ms) {
+            self.latency_history.push((x, latency));
+        }
+        if let Some(loss) = self.hops.last().and_then(|hop| hop.loss_pct) {
+            self.loss_history.push((x, loss));
+        }
 
         if self.latency_history.len() > 120 {
             self.latency_history.remove(0);
@@ -97,6 +108,34 @@ impl DashboardApp {
 
     fn prev_tab(&mut self) {
         self.tab_index = (self.tab_index + 2) % 3;
+    }
+
+    fn apply_action(&mut self, action: DashboardAction) -> bool {
+        match action {
+            DashboardAction::Quit => true,
+            DashboardAction::NextTab => {
+                self.next_tab();
+                false
+            }
+            DashboardAction::PreviousTab => {
+                self.prev_tab();
+                false
+            }
+            DashboardAction::ToggleHelp => {
+                self.show_help = !self.show_help;
+                false
+            }
+        }
+    }
+}
+
+fn dashboard_action(key: KeyCode) -> Option<DashboardAction> {
+    match key {
+        KeyCode::Char('q') => Some(DashboardAction::Quit),
+        KeyCode::Right | KeyCode::Tab => Some(DashboardAction::NextTab),
+        KeyCode::Left | KeyCode::BackTab => Some(DashboardAction::PreviousTab),
+        KeyCode::Char('?') | KeyCode::Char('h') => Some(DashboardAction::ToggleHelp),
+        _ => None,
     }
 }
 
@@ -170,11 +209,10 @@ fn run_ui_loop(
         if event::poll(tick_rate).context("failed to poll terminal events")?
             && let Event::Key(key) = event::read().context("failed to read terminal event")?
         {
-            match key.code {
-                KeyCode::Char('q') => return Ok(0),
-                KeyCode::Right | KeyCode::Tab => app.next_tab(),
-                KeyCode::Left => app.prev_tab(),
-                _ => {}
+            if let Some(action) = dashboard_action(key.code)
+                && app.apply_action(action)
+            {
+                return Ok(0);
             }
         }
     }
@@ -223,11 +261,10 @@ fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
                 format!("hop-{hop}")
             }
         });
-        let loss_pct = read_loss_percent(item).unwrap_or(0.0);
-        let avg_ms =
-            read_f64(item, &["avg_ms", "avg", "average_ms", "last_ms", "last"]).unwrap_or(0.0);
-        let best_ms = read_f64(item, &["best_ms", "best", "min_ms", "min"]).unwrap_or(avg_ms);
-        let worst_ms = read_f64(item, &["worst_ms", "worst", "max_ms", "max"]).unwrap_or(avg_ms);
+        let loss_pct = read_loss_percent(item).map(|value| value.clamp(0.0, 100.0));
+        let avg_ms = read_f64(item, &["avg_ms", "avg", "average_ms", "last_ms", "last"]);
+        let best_ms = read_f64(item, &["best_ms", "best", "min_ms", "min"]).or(avg_ms);
+        let worst_ms = read_f64(item, &["worst_ms", "worst", "max_ms", "max"]).or(avg_ms);
 
         hops.push(HopStat {
             hop,
@@ -296,7 +333,13 @@ fn looks_like_hop_array(array: &[Value]) -> bool {
 }
 
 fn read_usize(item: &Value, keys: &[&str]) -> Option<usize> {
-    read_f64(item, keys).map(|v| v.max(0.0) as usize)
+    read_f64(item, keys).and_then(|value| {
+        if value >= 0.0 && value <= usize::MAX as f64 {
+            Some(value as usize)
+        } else {
+            None
+        }
+    })
 }
 
 fn read_string(item: &Value, keys: &[&str]) -> Option<String> {
@@ -318,7 +361,7 @@ fn read_f64(item: &Value, keys: &[&str]) -> Option<f64> {
         };
         match value {
             Value::Number(number) => {
-                if let Some(n) = number.as_f64() {
+                if let Some(n) = number.as_f64().filter(|n| n.is_finite()) {
                     return Some(n);
                 }
             }
@@ -328,7 +371,9 @@ fn read_f64(item: &Value, keys: &[&str]) -> Option<f64> {
                     .trim_end_matches("ms")
                     .trim_end_matches('%')
                     .trim();
-                if let Ok(n) = trimmed.parse::<f64>() {
+                if let Ok(n) = trimmed.parse::<f64>()
+                    && n.is_finite()
+                {
                     return Some(n);
                 }
             }
@@ -348,7 +393,7 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &DashboardApp) {
         ])
         .split(frame.area());
 
-    let titles = ["Hops", "Latency", "Loss"]
+    let titles = ["Overview", "Hops", "Charts"]
         .iter()
         .map(|t| Line::from(*t))
         .collect::<Vec<_>>();
@@ -373,9 +418,9 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &DashboardApp) {
     frame.render_widget(tabs, chunks[0]);
 
     match app.tab_index {
-        0 => render_hop_table(frame, app, chunks[1]),
-        1 => render_latency_chart(frame, app, chunks[1]),
-        _ => render_loss_chart(frame, app, chunks[1]),
+        0 => render_overview(frame, app, chunks[1]),
+        1 => render_hop_table(frame, app, chunks[1]),
+        _ => render_charts(frame, app, chunks[1]),
     }
 
     let help_text = build_help_text(app);
@@ -384,8 +429,36 @@ fn draw_ui(frame: &mut ratatui::Frame<'_>, app: &DashboardApp) {
     frame.render_widget(help, chunks[2]);
 }
 
+fn render_overview(
+    frame: &mut ratatui::Frame<'_>,
+    app: &DashboardApp,
+    area: ratatui::layout::Rect,
+) {
+    let message = if let Some(error) = &app.last_error {
+        format!("Polling error: {error}\nThe dashboard will keep showing the last valid hop data.")
+    } else if app.hops.is_empty() {
+        format!("Loading probe snapshots for {}...", app.target)
+    } else {
+        let destination = app.hops.last().expect("non-empty hops checked above");
+        format!(
+            "{} hops received. Destination: {}\nLatest avg: {} ms   Latest loss: {}%",
+            app.hops.len(),
+            destination.host,
+            format_metric(destination.avg_ms),
+            format_metric(destination.loss_pct)
+        )
+    };
+    let overview =
+        Paragraph::new(message).block(Block::default().borders(Borders::ALL).title("Overview"));
+    frame.render_widget(overview, area);
+}
+
 fn build_help_text(app: &DashboardApp) -> String {
-    let base = "Fallback dashboard: JSON snapshot polling, limited fields. For full UI use default mode. • Controls: ←/→ or Tab switch tabs • q quits";
+    let base = if app.show_help {
+        "Help: Tab/Right next tab, Shift+Tab/Left previous tab, h/? toggle this help, q quit. JSON polling has no hidden retries."
+    } else {
+        "Fallback dashboard: JSON snapshot polling, limited fields. Tab/Right navigate; h/? help; q quit."
+    };
     let mut notes = Vec::new();
 
     if app.hops.is_empty() {
@@ -416,7 +489,7 @@ fn build_help_text(app: &DashboardApp) -> String {
     if notes.is_empty() {
         base.to_string()
     } else {
-        format!("{base} • {}", notes.join(" • "))
+        format!("{base} | {}", notes.join(" | "))
     }
 }
 
@@ -425,14 +498,26 @@ fn render_hop_table(
     app: &DashboardApp,
     area: ratatui::layout::Rect,
 ) {
+    if app.hops.is_empty() {
+        let state = app
+            .last_error
+            .as_deref()
+            .map(|error| format!("Unable to load hop data: {error}"))
+            .unwrap_or_else(|| format!("Loading hop data for {}...", app.target));
+        let placeholder =
+            Paragraph::new(state).block(Block::default().borders(Borders::ALL).title("Hop table"));
+        frame.render_widget(placeholder, area);
+        return;
+    }
+
     let rows = app.hops.iter().map(|hop| {
         Row::new(vec![
             hop.hop.to_string(),
             hop.host.clone(),
-            format!("{:.1}", hop.loss_pct),
-            format!("{:.1}", hop.best_ms),
-            format!("{:.1}", hop.avg_ms),
-            format!("{:.1}", hop.worst_ms),
+            format_metric(hop.loss_pct),
+            format_metric(hop.best_ms),
+            format_metric(hop.avg_ms),
+            format_metric(hop.worst_ms),
         ])
     });
 
@@ -457,6 +542,21 @@ fn render_hop_table(
     .block(Block::default().borders(Borders::ALL).title("Hop table"));
 
     frame.render_widget(table, area);
+}
+
+fn format_metric(value: Option<f64>) -> String {
+    value
+        .map(|metric| format!("{metric:.1}"))
+        .unwrap_or_else(|| "N/A".to_string())
+}
+
+fn render_charts(frame: &mut ratatui::Frame<'_>, app: &DashboardApp, area: ratatui::layout::Rect) {
+    let charts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+        .split(area);
+    render_latency_chart(frame, app, charts[0]);
+    render_loss_chart(frame, app, charts[1]);
 }
 
 fn render_latency_chart(
@@ -599,14 +699,14 @@ mod tests {
 
         assert_eq!(hops[0].hop, 1);
         assert_eq!(hops[0].host, "10.0.0.1");
-        assert_eq!(hops[0].loss_pct, 1.0);
+        assert_eq!(hops[0].loss_pct, Some(1.0));
 
         assert_eq!(hops[1].hop, 2);
         assert_eq!(hops[1].host, "target.example");
-        assert_eq!(hops[1].loss_pct, 0.5);
-        assert_eq!(hops[1].best_ms, 15.0);
-        assert_eq!(hops[1].avg_ms, 20.0);
-        assert_eq!(hops[1].worst_ms, 25.0);
+        assert_eq!(hops[1].loss_pct, Some(0.5));
+        assert_eq!(hops[1].best_ms, Some(15.0));
+        assert_eq!(hops[1].avg_ms, Some(20.0));
+        assert_eq!(hops[1].worst_ms, Some(25.0));
     }
 
     #[test]
@@ -656,15 +756,58 @@ mod tests {
         app.ingest_snapshot(vec![HopStat {
             hop: 1,
             host: "1.1.1.1".to_string(),
-            loss_pct: 0.0,
-            best_ms: 1.0,
-            avg_ms: 2.0,
-            worst_ms: 3.0,
+            loss_pct: Some(0.0),
+            best_ms: Some(1.0),
+            avg_ms: Some(2.0),
+            worst_ms: Some(3.0),
         }]);
 
         assert_eq!(
             build_help_text(&app),
-            "Fallback dashboard: JSON snapshot polling, limited fields. For full UI use default mode. • Controls: ←/→ or Tab switch tabs • q quits"
+            "Fallback dashboard: JSON snapshot polling, limited fields. Tab/Right navigate; h/? help; q quit."
         );
+    }
+
+    #[test]
+    fn dashboard_keyboard_actions_are_discoverable_and_apply_without_loop_io() {
+        assert_eq!(
+            dashboard_action(KeyCode::Tab),
+            Some(DashboardAction::NextTab)
+        );
+        assert_eq!(
+            dashboard_action(KeyCode::BackTab),
+            Some(DashboardAction::PreviousTab)
+        );
+        assert_eq!(
+            dashboard_action(KeyCode::Char('?')),
+            Some(DashboardAction::ToggleHelp)
+        );
+        assert_eq!(
+            dashboard_action(KeyCode::Char('q')),
+            Some(DashboardAction::Quit)
+        );
+
+        let mut app = DashboardApp::new("example.com");
+        assert!(!app.apply_action(DashboardAction::NextTab));
+        assert_eq!(app.tab_index, 1);
+        assert!(!app.apply_action(DashboardAction::ToggleHelp));
+        assert!(app.show_help);
+        assert!(app.apply_action(DashboardAction::Quit));
+    }
+
+    #[test]
+    fn partial_or_malformed_metrics_remain_missing_and_do_not_enter_charts() {
+        let payload =
+            json!({"hops": [{"ttl": 1, "host": "router", "avg": "NaN", "loss": "not-a-number"}]});
+        let hops = extract_hops(&payload, "target.example");
+        assert_eq!(hops.len(), 1);
+        assert_eq!(hops[0].avg_ms, None);
+        assert_eq!(hops[0].loss_pct, None);
+        assert_eq!(format_metric(hops[0].avg_ms), "N/A");
+
+        let mut app = DashboardApp::new("target.example");
+        app.ingest_snapshot(hops);
+        assert!(app.latency_history.is_empty());
+        assert!(app.loss_history.is_empty());
     }
 }
