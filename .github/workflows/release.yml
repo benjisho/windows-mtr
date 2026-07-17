@@ -273,12 +273,8 @@ jobs:
         run: ./scripts/release/verify-release-artifacts.ps1 -ZipPath "dist/windows-mtr-x86_64.zip"
         shell: pwsh
 
-      - name: Release ZIP executable smoke tests
-        run: |
-          Expand-Archive -Path "dist/windows-mtr-x86_64.zip" -DestinationPath "dist/unpacked" -Force
-          & "dist/unpacked/mtr.exe" --help | Out-Null
-          & "dist/unpacked/windows-mtr.exe" --version | Out-Null
-          & "dist/unpacked/mtr.exe" -n -r -c 1 127.0.0.1 | Out-Null
+      - name: Smoke test packaged release binary
+        run: ./scripts/release/test-release-artifact.ps1 -ZipPath "dist/windows-mtr-x86_64.zip"
         shell: pwsh
 
       - name: Smoke check release asset names

@@ -407,7 +407,7 @@ components:
           description: Stable probe identifier.
         status:
           type: string
-          enum: [pending, running, completed, failed]
+          enum: [queued, running, completed, failed]
       additionalProperties: false
     CreateProbeResponse:
       type: object

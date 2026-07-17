@@ -28,7 +28,7 @@
 ## Maintainer workflow
 
 1. Build release binary and package canonical ZIP.
-2. Run `scripts/release/verify-release-artifacts.ps1`.
+2. Run `scripts/release/verify-release-artifacts.ps1` and `scripts/release/test-release-artifact.ps1` against the ZIP.
 3. Update package-manager metadata locally:
    - `scripts/release/update-winget-manifest.ps1`
    - `scripts/release/update-scoop-manifest.ps1`

@@ -1,0 +1,52 @@
+name: Fuzz regression
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz-regression:
+    name: Extended fuzz regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FUZZ_TOOLCHAIN: nightly-2025-06-23
+      CARGO_FUZZ_VERSION: 0.13.1
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install pinned fuzz toolchain
+        run: rustup toolchain install "$FUZZ_TOOLCHAIN" --profile minimal
+
+      - name: Install pinned cargo-fuzz
+        run: cargo +"$FUZZ_TOOLCHAIN" install cargo-fuzz --version "$CARGO_FUZZ_VERSION" --locked
+
+      - name: Build fuzz targets
+        run: cargo +"$FUZZ_TOOLCHAIN" fuzz build --fuzz-dir fuzz
+
+      - name: Run all fuzz targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          targets=$(cargo +"$FUZZ_TOOLCHAIN" fuzz list --fuzz-dir fuzz)
+          if [ -z "$targets" ]; then
+            echo "No fuzz targets found under fuzz/." >&2
+            exit 1
+          fi
+
+          while IFS= read -r target; do
+            [ -z "$target" ] && continue
+            echo "Running fuzz target: $target"
+            set +e
+            timeout --preserve-status 330s cargo +"$FUZZ_TOOLCHAIN" fuzz run "$target" --fuzz-dir fuzz -- -max_total_time=300
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ]; then
+              echo "Target $target failed with status $status" >&2
+              exit "$status"
+            fi
+          done <<< "$targets"

@@ -165,16 +165,7 @@ fn dist_windows() -> Result<()> {
         }
     }
 
-    let source_binary = match found_binary {
-        Some(path) => path,
-        None => {
-            println!("No Windows binary found. Creating placeholder...");
-            // Create a placeholder executable
-            let dummy_exe = dist_dir.join("mtr.exe");
-            create_placeholder_exe(&dummy_exe)?;
-            dummy_exe
-        }
-    };
+    let source_binary = found_binary.context("No Windows binary found after a successful build")?;
 
     // Create a standard ZIP archive
     let zip_path = dist_dir.join("windows-mtr.zip");
@@ -301,22 +292,19 @@ fn package_win_manually() -> Result<()> {
     let dist_dir = PathBuf::from("dist");
     fs::create_dir_all(&dist_dir).context("Failed to create dist directory")?;
 
-    // Create a dummy Windows executable if not cross-compiling
-    let dummy_exe = dist_dir.join("mtr.exe");
-    if !dummy_exe.exists() {
-        println!("Creating placeholder Windows executable...");
-        create_placeholder_exe(&dummy_exe).context("Failed to create dummy Windows executable")?;
-        println!(
-            "Created placeholder Windows executable at: {}",
-            dummy_exe.display()
+    let source_binary = dist_dir.join("mtr.exe");
+    if !source_binary.exists() {
+        anyhow::bail!(
+            "No Windows executable found at {}. Build a real Windows binary before packaging.",
+            source_binary.display()
         );
     }
 
     // Create a standard ZIP archive
     let zip_path = dist_dir.join("windows-mtr.zip");
     println!("Creating ZIP archive: {:?}", zip_path);
-    create_zip_archive(&dummy_exe, &zip_path)?;
 
+    create_zip_archive(&source_binary, &zip_path)?;
     // Create an XZ compressed ZIP for smaller size
     let xz_path = dist_dir.join("windows-mtr.zip.xz");
     println!("Creating XZ compressed archive: {:?}", xz_path);
@@ -326,9 +314,6 @@ fn package_win_manually() -> Result<()> {
     generate_checksums(&dist_dir)?;
 
     println!("Windows packaging completed!");
-    println!("Note: This is a demonstration package with a placeholder executable.");
-    println!("For a real Windows binary, you would need to build on a Windows machine or");
-    println!("configure a proper cross-compilation environment.");
 
     Ok(())
 }
@@ -446,7 +431,8 @@ fn generate_checksums(dist_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-// Helper function to create a placeholder Windows executable
+// Legacy helper retained only for source compatibility; no task invokes it.
+#[allow(dead_code)]
 fn create_placeholder_exe(path: &Path) -> Result<()> {
     println!("Creating placeholder Windows executable...");
     let mut file = File::create(path).context("Failed to create dummy Windows executable")?;
