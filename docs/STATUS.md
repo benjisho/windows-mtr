@@ -25,7 +25,7 @@ This document serves as the single source of truth for feature delivery status.
 
 ## Dashboard UI
 - **Status**: 🚧 In Progress (experimental preview via `--ui dashboard`, with deprecated alias `--ui native`)
-- **Notes**: Preview available on `master`. Provides live hop table, latency/loss charts, and multi-tab interface. Not yet promoted to a stable release; expect rough edges.
+- **Notes**: Preview available on `master`. Provides Overview / Hops / Charts navigation, stable hop columns, explicit loading/poll-error states, and latency/loss charts that ignore invalid samples. Not yet promoted to a stable release; expect rough edges.
 
 ## ETW/Windows Observability Integration
 - **Status**: 🛣️ Roadmap

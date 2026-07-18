@@ -48,9 +48,12 @@ mtr --ui dashboard 8.8.8.8
 ```
 
 Controls:
-- `Tab` / `→` switch to next tab
-- `←` switch to previous tab
-- `q` quit
+- Tab / Right Arrow: next view (Overview, Hops, Charts)
+- Shift+Tab / Left Arrow: previous view
+- h or ?: detailed keyboard help
+- q: quit cleanly
+
+The Hops view keeps stable columns and displays loading or poll-error text when data is unavailable. Missing or malformed metrics display as unavailable rather than zero; charts omit invalid samples.
 
 When probe snapshots fail repeatedly, the help footer surfaces the latest poll error and live troubleshooting hints (run with Administrator privileges, review firewall policy, or try report mode with `-r`). If no hop data is detected for 15 seconds, the footer also prompts you to quit (`q`) and retry in report mode for immediate diagnostics.
 
