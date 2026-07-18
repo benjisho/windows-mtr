@@ -276,6 +276,9 @@ mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 
 Visit our [detailed usage guide](USAGE.md) for comprehensive examples.
 
+<img width="745" height="440" alt="image" src="https://github.com/user-attachments/assets/18809978-545c-40ea-b9fa-b74b2c8fdc42" />
+<img width="951" height="597" alt="image" src="https://github.com/user-attachments/assets/0e8e0b85-2acc-48f2-a7ee-886c53209336" />
+
 ## 📈 Advanced Features
 
 <details>
