@@ -832,4 +832,47 @@ mod tests {
         assert!(app.latency_history.is_empty());
         assert!(app.loss_history.is_empty());
     }
+
+    #[test]
+    fn dashboard_keyboard_actions_are_discoverable_and_apply_without_loop_io() {
+        assert_eq!(
+            dashboard_action(KeyCode::Tab),
+            Some(DashboardAction::NextTab)
+        );
+        assert_eq!(
+            dashboard_action(KeyCode::BackTab),
+            Some(DashboardAction::PreviousTab)
+        );
+        assert_eq!(
+            dashboard_action(KeyCode::Char('?')),
+            Some(DashboardAction::ToggleHelp)
+        );
+        assert_eq!(
+            dashboard_action(KeyCode::Char('q')),
+            Some(DashboardAction::Quit)
+        );
+
+        let mut app = DashboardApp::new("example.com");
+        assert!(!app.apply_action(DashboardAction::NextTab));
+        assert_eq!(app.tab_index, 1);
+        assert!(!app.apply_action(DashboardAction::ToggleHelp));
+        assert!(app.show_help);
+        assert!(app.apply_action(DashboardAction::Quit));
+    }
+
+    #[test]
+    fn partial_or_malformed_metrics_remain_missing_and_do_not_enter_charts() {
+        let payload =
+            json!({"hops": [{"ttl": 1, "host": "router", "avg": "NaN", "loss": "not-a-number"}]});
+        let hops = extract_hops(&payload, "target.example");
+        assert_eq!(hops.len(), 1);
+        assert_eq!(hops[0].avg_ms, None);
+        assert_eq!(hops[0].loss_pct, None);
+        assert_eq!(format_metric(hops[0].avg_ms), "N/A");
+
+        let mut app = DashboardApp::new("target.example");
+        app.ingest_snapshot(hops);
+        assert!(app.latency_history.is_empty());
+        assert!(app.loss_history.is_empty());
+    }
 }
