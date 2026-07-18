@@ -22,7 +22,7 @@
 
 ---
 
-Windows MTR is a Windows-focused network diagnostics CLI inspired by Linux mtr. On Windows, the default interactive UI plus IPv4 ICMP report, JSON, and dashboard probes use the system ICMP Helper API; TCP and UDP probes continue to use embedded Trippy. The experimental dashboard provides Overview, Hops, and Charts views with explicit loading and poll-error states; it is not a stable replacement for the embedded interactive TUI.
+Windows MTR is a Windows-focused network diagnostics CLI inspired by Linux mtr. On Windows, the default interactive UI plus IPv4 ICMP report, JSON, CSV, and dashboard probes use the system ICMP Helper API; TCP and UDP probes continue to use embedded Trippy. The experimental dashboard provides Overview, Hops, and Charts views with explicit loading and poll-error states; it is not a stable replacement for the embedded interactive TUI.
 
 <img width="951" height="597" alt="image" src="https://github.com/user-attachments/assets/0e8e0b85-2acc-48f2-a7ee-886c53209336" />
 

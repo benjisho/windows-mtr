@@ -2,7 +2,7 @@ use anyhow::Context;
 use clap::{Args, Parser, ValueEnum};
 use std::env;
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::time::Duration;
 use windows_mtr::service::rest_api::{AuthStrategy, RestApiConfig};
@@ -471,11 +471,14 @@ fn run_native_icmp_output(
     target: &str,
     config: &windows_mtr::native_icmp::Config,
     json_output: Option<JsonOutput>,
+    csv_output_path: Option<&Path>,
 ) -> anyhow::Result<()> {
     let hops = windows_mtr::native_icmp::trace(target, config)
         .context("Windows ICMP Helper trace failed")?;
 
-    if let Some(format) = json_output {
+    if let Some(path) = csv_output_path {
+        windows_mtr::native_icmp::write_csv_report(path, &hops)?;
+    } else if let Some(format) = json_output {
         let report = windows_mtr::native_icmp::json_report(target, &hops);
         match format {
             JsonOutput::Compact => println!("{}", serde_json::to_string(&report)?),
@@ -549,9 +552,17 @@ fn main() -> anyhow::Result<()> {
     }
 
     if let Some(config) = native_windows_icmp_config(&request)
-        && (request.report || request.report_wide || plan.json_output.is_some())
+        && (request.report
+            || request.report_wide
+            || plan.json_output.is_some()
+            || plan.csv_output_path.is_some())
     {
-        return run_native_icmp_output(&plan.validated_host, &config, plan.json_output);
+        return run_native_icmp_output(
+            &plan.validated_host,
+            &config,
+            plan.json_output,
+            plan.csv_output_path.as_deref(),
+        );
     }
 
     // SAFETY: this path is used only to re-exec ourselves for local output handling,

@@ -1,5 +1,6 @@
 use serde_json::{Value, json};
 use std::net::{IpAddr, Ipv4Addr, ToSocketAddrs};
+use std::path::Path;
 use std::time::Duration;
 
 #[derive(Clone, Debug)]
@@ -203,10 +204,35 @@ pub fn format_report(target: &str, hops: &[Hop]) -> String {
     report
 }
 
+pub fn write_csv_report(path: &Path, hops: &[Hop]) -> anyhow::Result<()> {
+    let mut writer = csv::Writer::from_path(path)?;
+    writer.write_record([
+        "hop", "ip", "hostname", "avg_ms", "best_ms", "worst_ms", "loss_pct",
+    ])?;
+    for hop in hops {
+        writer.write_record([
+            hop.ttl.to_string(),
+            hop.address
+                .map(|address| address.to_string())
+                .unwrap_or_default(),
+            String::new(),
+            csv_metric(hop.avg()),
+            csv_metric(hop.best()),
+            csv_metric(hop.worst()),
+            format!("{:.1}", hop.loss_pct()),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
+}
 fn format_ms(value: Option<f64>) -> String {
     value
         .map(|value| format!("{value:.1}"))
         .unwrap_or_else(|| "???".to_string())
+}
+
+fn csv_metric(value: Option<f64>) -> String {
+    value.map(|value| format!("{value:.1}")).unwrap_or_default()
 }
 
 #[cfg(test)]
