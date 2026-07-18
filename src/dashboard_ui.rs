@@ -1,5 +1,5 @@
 use anyhow::{Context, anyhow};
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
@@ -139,6 +139,14 @@ fn dashboard_action(key: KeyCode) -> Option<DashboardAction> {
     }
 }
 
+fn dashboard_action_for_event(key: KeyEvent) -> Option<DashboardAction> {
+    if key.kind == KeyEventKind::Press {
+        dashboard_action(key.code)
+    } else {
+        None
+    }
+}
+
 pub fn run_dashboard_ui(target: &str, snapshot_args: &[String]) -> anyhow::Result<i32> {
     enable_raw_mode().context("failed to enable raw mode for dashboard UI")?;
     let mut stdout = io::stdout();
@@ -209,7 +217,7 @@ fn run_ui_loop(
         if event::poll(tick_rate).context("failed to poll terminal events")?
             && let Event::Key(key) = event::read().context("failed to read terminal event")?
         {
-            if let Some(action) = dashboard_action(key.code)
+            if let Some(action) = dashboard_action_for_event(key)
                 && app.apply_action(action)
             {
                 return Ok(0);
@@ -667,6 +675,7 @@ fn render_loss_chart(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossterm::event::{KeyEventState, KeyModifiers};
     use serde_json::json;
 
     #[test]
@@ -786,6 +795,19 @@ mod tests {
             dashboard_action(KeyCode::Char('q')),
             Some(DashboardAction::Quit)
         );
+
+        assert_eq!(
+            dashboard_action_for_event(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE)),
+            Some(DashboardAction::NextTab)
+        );
+
+        let release = KeyEvent {
+            code: KeyCode::Right,
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Release,
+            state: KeyEventState::NONE,
+        };
+        assert_eq!(dashboard_action_for_event(release), None);
 
         let mut app = DashboardApp::new("example.com");
         assert!(!app.apply_action(DashboardAction::NextTab));
