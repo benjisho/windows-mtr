@@ -24,6 +24,8 @@
 
 Windows MTR is a Windows-focused network diagnostics CLI inspired by Linux mtr. It embeds Trippy for probing/reporting and includes an experimental dashboard fallback for terminals where the embedded interactive TUI crashes. The fallback provides Overview, Hops, and Charts views with explicit loading and poll-error states; it is not a stable replacement for the embedded TUI.
 
+<img width="951" height="597" alt="image" src="https://github.com/user-attachments/assets/0e8e0b85-2acc-48f2-a7ee-886c53209336" />
+
 ## 📚 Table of Contents
 
 - [🌟 Features](#-features)
@@ -275,8 +277,6 @@ mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 ### Full Usage Examples
 
 Visit our [detailed usage guide](USAGE.md) for comprehensive examples.
-
-<img width="951" height="597" alt="image" src="https://github.com/user-attachments/assets/0e8e0b85-2acc-48f2-a7ee-886c53209336" />
 
 ## 📈 Advanced Features
 
