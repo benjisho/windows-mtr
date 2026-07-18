@@ -65,6 +65,9 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
     };
 
     let target = resolve_ipv4(target)?;
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+    // SAFETY: `IcmpCreateFile` accepts no caller-provided pointers and returns a handle that
+    // is closed by `Handle` below.
     let handle = unsafe { IcmpCreateFile() };
     if handle == INVALID_HANDLE_VALUE {
         anyhow::bail!("IcmpCreateFile failed: {}", std::io::Error::last_os_error());
@@ -73,6 +76,8 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
     struct Handle(HANDLE);
     impl Drop for Handle {
         fn drop(&mut self) {
+            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+            // SAFETY: the handle was returned by `IcmpCreateFile` and this `Drop` runs once.
             unsafe { IcmpCloseHandle(self.0) };
         }
     }
@@ -90,7 +95,7 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
         };
 
         for _ in 0..sent {
-            let mut options = IP_OPTION_INFORMATION {
+            let options = IP_OPTION_INFORMATION {
                 Ttl: ttl,
                 Tos: 0,
                 Flags: 0,
@@ -99,13 +104,16 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
             };
             let payload = [0u8; 32];
             let mut reply_buffer = vec![0u8; size_of::<ICMP_ECHO_REPLY>() + payload.len() + 8];
+            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+            // SAFETY: all input and output pointers remain valid for the synchronous call; the
+            // reply buffer has the size required by `IcmpSendEcho` for this payload.
             let replies = unsafe {
                 IcmpSendEcho(
                     handle,
                     u32::from_ne_bytes(target.octets()),
                     payload.as_ptr().cast::<c_void>(),
                     payload.len() as u16,
-                    &mut options,
+                    &options,
                     reply_buffer.as_mut_ptr().cast::<c_void>(),
                     reply_buffer.len() as u32,
                     timeout_ms,
@@ -115,6 +123,9 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
                 continue;
             }
 
+            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
+            // SAFETY: a non-zero return means the buffer starts with an `ICMP_ECHO_REPLY`.
+            // `read_unaligned` avoids assuming alignment for the byte buffer.
             let reply = unsafe {
                 std::ptr::read_unaligned(reply_buffer.as_ptr().cast::<ICMP_ECHO_REPLY>())
             };

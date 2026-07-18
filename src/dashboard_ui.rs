@@ -226,12 +226,10 @@ fn run_ui_loop(
 
         if event::poll(tick_rate).context("failed to poll terminal events")?
             && let Event::Key(key) = event::read().context("failed to read terminal event")?
+            && let Some(action) = dashboard_action_for_event(key)
+            && app.apply_action(action)
         {
-            if let Some(action) = dashboard_action_for_event(key)
-                && app.apply_action(action)
-            {
-                return Ok(0);
-            }
+            return Ok(0);
         }
     }
 }
