@@ -459,8 +459,13 @@ fn native_windows_icmp_config(_request: &ProbeRequest) -> Option<windows_mtr::na
     None
 }
 
-fn should_run_native_dashboard(ui_mode: UiMode, native_icmp_available: bool) -> bool {
-    ui_mode == UiMode::Dashboard || (ui_mode == UiMode::Default && native_icmp_available)
+fn should_run_native_dashboard(
+    ui_mode: UiMode,
+    native_icmp_available: bool,
+    interactive: bool,
+) -> bool {
+    interactive
+        && (ui_mode == UiMode::Dashboard || (ui_mode == UiMode::Default && native_icmp_available))
 }
 fn run_native_icmp_output(
     target: &str,
@@ -522,7 +527,11 @@ fn main() -> anyhow::Result<()> {
         .context("invalid command-line options")?;
 
     let native_icmp_config = native_windows_icmp_config(&request);
-    if should_run_native_dashboard(plan.ui_mode, native_icmp_config.is_some()) {
+    let interactive = !request.report
+        && !request.report_wide
+        && plan.json_output.is_none()
+        && plan.csv_output_path.is_none();
+    if should_run_native_dashboard(plan.ui_mode, native_icmp_config.is_some(), interactive) {
         let dashboard_args = if native_icmp_config.is_some() {
             Vec::new()
         } else {
@@ -761,10 +770,11 @@ mod tests {
 
     #[test]
     fn native_icmp_uses_dashboard_for_default_or_explicit_dashboard_ui() {
-        assert!(should_run_native_dashboard(UiMode::Default, true));
-        assert!(should_run_native_dashboard(UiMode::Dashboard, true));
-        assert!(should_run_native_dashboard(UiMode::Dashboard, false));
-        assert!(!should_run_native_dashboard(UiMode::Default, false));
+        assert!(should_run_native_dashboard(UiMode::Default, true, true));
+        assert!(should_run_native_dashboard(UiMode::Dashboard, true, true));
+        assert!(should_run_native_dashboard(UiMode::Dashboard, false, true));
+        assert!(!should_run_native_dashboard(UiMode::Default, false, true));
+        assert!(!should_run_native_dashboard(UiMode::Default, true, false));
     }
     #[test]
     fn default_ui_is_the_default_preset() {
