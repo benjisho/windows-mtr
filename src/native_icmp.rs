@@ -65,9 +65,9 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
     };
 
     let target = resolve_ipv4(target)?;
-    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     // SAFETY: `IcmpCreateFile` accepts no caller-provided pointers and returns a handle that
     // is closed by `Handle` below.
+    // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
     let handle = unsafe { IcmpCreateFile() };
     if handle == INVALID_HANDLE_VALUE {
         anyhow::bail!("IcmpCreateFile failed: {}", std::io::Error::last_os_error());
@@ -76,8 +76,8 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
     struct Handle(HANDLE);
     impl Drop for Handle {
         fn drop(&mut self) {
-            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
             // SAFETY: the handle was returned by `IcmpCreateFile` and this `Drop` runs once.
+            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
             unsafe { IcmpCloseHandle(self.0) };
         }
     }
@@ -104,9 +104,9 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
             };
             let payload = [0u8; 32];
             let mut reply_buffer = vec![0u8; size_of::<ICMP_ECHO_REPLY>() + payload.len() + 8];
-            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
             // SAFETY: all input and output pointers remain valid for the synchronous call; the
             // reply buffer has the size required by `IcmpSendEcho` for this payload.
+            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
             let replies = unsafe {
                 IcmpSendEcho(
                     handle,
@@ -123,9 +123,9 @@ pub fn trace(target: &str, config: &Config) -> anyhow::Result<Vec<Hop>> {
                 continue;
             }
 
-            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
             // SAFETY: a non-zero return means the buffer starts with an `ICMP_ECHO_REPLY`.
             // `read_unaligned` avoids assuming alignment for the byte buffer.
+            // nosemgrep: rust.lang.security.unsafe-usage.unsafe-usage
             let reply = unsafe {
                 std::ptr::read_unaligned(reply_buffer.as_ptr().cast::<ICMP_ECHO_REPLY>())
             };
