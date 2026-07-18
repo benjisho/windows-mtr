@@ -12,7 +12,7 @@ mtr [options] <hostname-or-ip>
 
 | Option | Description |
 |---|---|
-| `<hostname-or-ip>` | Target host to trace (required) |
+| `<hostname-or-ip>` | Target host to trace (required); Windows IPv4 ICMP default UI/report/JSON/dashboard uses the system ICMP Helper API |
 | `-T` | TCP SYN probes |
 | `-U` | UDP probes |
 | `-P, --port <PORT>` | Target port for TCP/UDP (`-T`/`-U`) |
@@ -39,7 +39,7 @@ mtr [options] <hostname-or-ip>
 
 ## Dashboard UI (experimental fallback)
 
-Use `--ui dashboard` to run the windows-mtr dashboard that polls Trippy JSON snapshots. This is a fallback if the embedded Trippy interactive TUI crashes in your terminal.
+On Windows IPv4 ICMP, the default interactive command automatically opens the windows-mtr dashboard; use `--ui dashboard` to select it explicitly. For the default Windows IPv4 ICMP mode, it polls the system ICMP Helper API directly; TCP and UDP dashboard probes continue to poll Trippy JSON snapshots. This is a fallback if the embedded Trippy interactive TUI crashes in your terminal.
 
 `--ui native` is kept as a deprecated compatibility alias.
 
@@ -57,7 +57,7 @@ The Hops view keeps stable columns and displays loading or poll-error text when 
 
 When probe snapshots fail repeatedly, the help footer surfaces the latest poll error and live troubleshooting hints (run with Administrator privileges, review firewall policy, or try report mode with `-r`). If no hop data is detected for 15 seconds, the footer also prompts you to quit (`q`) and retry in report mode for immediate diagnostics.
 
-`--ui dashboard` accepts probe-related flags and builds dedicated JSON snapshot args (no `--tui-*` flags).
+`--ui dashboard` accepts probe-related flags. Native ICMP polling honors `-c`, `-m`, and `--timeout`; TCP and UDP builds dedicated Trippy JSON snapshot args (no `--tui-*` flags).
 
 ## Troubleshooting
 
