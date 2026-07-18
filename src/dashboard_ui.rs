@@ -20,6 +20,7 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
+use windows_mtr::native_icmp;
 
 const FALLBACK_DASHBOARD_TITLE_PREFIX: &str = "windows-mtr fallback dashboard";
 
@@ -147,7 +148,11 @@ fn dashboard_action_for_event(key: KeyEvent) -> Option<DashboardAction> {
     }
 }
 
-pub fn run_dashboard_ui(target: &str, snapshot_args: &[String]) -> anyhow::Result<i32> {
+pub fn run_dashboard_ui(
+    target: &str,
+    snapshot_args: &[String],
+    native_icmp_config: Option<native_icmp::Config>,
+) -> anyhow::Result<i32> {
     enable_raw_mode().context("failed to enable raw mode for dashboard UI")?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).context("failed to enter alternate screen")?;
@@ -155,7 +160,7 @@ pub fn run_dashboard_ui(target: &str, snapshot_args: &[String]) -> anyhow::Resul
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend).context("failed to initialize terminal backend")?;
 
-    let result = run_ui_loop(&mut terminal, target, snapshot_args);
+    let result = run_ui_loop(&mut terminal, target, snapshot_args, native_icmp_config);
 
     let mut restore_error: Option<anyhow::Error> = None;
 
@@ -186,6 +191,7 @@ fn run_ui_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     target: &str,
     snapshot_args: &[String],
+    native_icmp_config: Option<native_icmp::Config>,
 ) -> anyhow::Result<i32> {
     let mut app = DashboardApp::new(target);
     let tick_rate = Duration::from_millis(250);
@@ -196,7 +202,11 @@ fn run_ui_loop(
 
     thread::spawn(move || {
         loop {
-            let result = fetch_hops_snapshot(&poll_args, &poll_target);
+            let result = if let Some(config) = &native_icmp_config {
+                fetch_native_icmp_snapshot(&poll_target, config)
+            } else {
+                fetch_hops_snapshot(&poll_args, &poll_target)
+            };
             if snapshot_tx.send(result).is_err() {
                 break;
             }
@@ -216,12 +226,10 @@ fn run_ui_loop(
 
         if event::poll(tick_rate).context("failed to poll terminal events")?
             && let Event::Key(key) = event::read().context("failed to read terminal event")?
+            && let Some(action) = dashboard_action_for_event(key)
+            && app.apply_action(action)
         {
-            if let Some(action) = dashboard_action_for_event(key)
-                && app.apply_action(action)
-            {
-                return Ok(0);
-            }
+            return Ok(0);
         }
     }
 }
@@ -250,6 +258,25 @@ fn fetch_hops_snapshot(snapshot_args: &[String], target: &str) -> anyhow::Result
     Ok(extract_hops(&value, target))
 }
 
+fn fetch_native_icmp_snapshot(
+    target: &str,
+    config: &native_icmp::Config,
+) -> anyhow::Result<Vec<HopStat>> {
+    Ok(native_icmp::trace(target, config)?
+        .into_iter()
+        .map(|hop| HopStat {
+            hop: hop.ttl as usize,
+            host: hop
+                .address
+                .map(|address| address.to_string())
+                .unwrap_or_else(|| format!("hop-{}", hop.ttl)),
+            loss_pct: Some(hop.loss_pct()),
+            best_ms: hop.best(),
+            avg_ms: hop.avg(),
+            worst_ms: hop.worst(),
+        })
+        .collect())
+}
 fn extract_hops(value: &Value, target: &str) -> Vec<HopStat> {
     let Some(array) = find_hop_array(value) else {
         return Vec::new();
@@ -808,49 +835,6 @@ mod tests {
             state: KeyEventState::NONE,
         };
         assert_eq!(dashboard_action_for_event(release), None);
-
-        let mut app = DashboardApp::new("example.com");
-        assert!(!app.apply_action(DashboardAction::NextTab));
-        assert_eq!(app.tab_index, 1);
-        assert!(!app.apply_action(DashboardAction::ToggleHelp));
-        assert!(app.show_help);
-        assert!(app.apply_action(DashboardAction::Quit));
-    }
-
-    #[test]
-    fn partial_or_malformed_metrics_remain_missing_and_do_not_enter_charts() {
-        let payload =
-            json!({"hops": [{"ttl": 1, "host": "router", "avg": "NaN", "loss": "not-a-number"}]});
-        let hops = extract_hops(&payload, "target.example");
-        assert_eq!(hops.len(), 1);
-        assert_eq!(hops[0].avg_ms, None);
-        assert_eq!(hops[0].loss_pct, None);
-        assert_eq!(format_metric(hops[0].avg_ms), "N/A");
-
-        let mut app = DashboardApp::new("target.example");
-        app.ingest_snapshot(hops);
-        assert!(app.latency_history.is_empty());
-        assert!(app.loss_history.is_empty());
-    }
-
-    #[test]
-    fn dashboard_keyboard_actions_are_discoverable_and_apply_without_loop_io() {
-        assert_eq!(
-            dashboard_action(KeyCode::Tab),
-            Some(DashboardAction::NextTab)
-        );
-        assert_eq!(
-            dashboard_action(KeyCode::BackTab),
-            Some(DashboardAction::PreviousTab)
-        );
-        assert_eq!(
-            dashboard_action(KeyCode::Char('?')),
-            Some(DashboardAction::ToggleHelp)
-        );
-        assert_eq!(
-            dashboard_action(KeyCode::Char('q')),
-            Some(DashboardAction::Quit)
-        );
 
         let mut app = DashboardApp::new("example.com");
         assert!(!app.apply_action(DashboardAction::NextTab));

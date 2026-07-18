@@ -29,6 +29,9 @@ axum = "0.8.4"
 serde = { version = "1.0.228", features = ["derive"] }
 subtle = "2.6.1"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_NetworkManagement_IpHelper"] }
+
 [dev-dependencies]
 regex = "1.10.3"
 serde_yaml = "0.9.34"

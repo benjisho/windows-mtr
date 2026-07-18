@@ -2,3 +2,5 @@ pub mod api_error;
 pub mod error;
 pub mod passthrough;
 pub mod service;
+
+pub mod native_icmp;

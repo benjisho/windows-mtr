@@ -441,6 +441,52 @@ fn build_probe_request(args: &TraceCli) -> anyhow::Result<ProbeRequest> {
     })
 }
 
+#[cfg(windows)]
+fn native_windows_icmp_config(request: &ProbeRequest) -> Option<windows_mtr::native_icmp::Config> {
+    if request.tcp || request.udp {
+        return None;
+    }
+
+    Some(windows_mtr::native_icmp::Config {
+        count: request.count.unwrap_or(1),
+        max_hops: request.max_hops.unwrap_or(30),
+        timeout: Duration::from_secs_f32(request.timeout_seconds.unwrap_or(1.0)),
+    })
+}
+
+#[cfg(not(windows))]
+fn native_windows_icmp_config(_request: &ProbeRequest) -> Option<windows_mtr::native_icmp::Config> {
+    None
+}
+
+fn should_run_native_dashboard(
+    ui_mode: UiMode,
+    native_icmp_available: bool,
+    interactive: bool,
+) -> bool {
+    interactive
+        && (ui_mode == UiMode::Dashboard || (ui_mode == UiMode::Default && native_icmp_available))
+}
+fn run_native_icmp_output(
+    target: &str,
+    config: &windows_mtr::native_icmp::Config,
+    json_output: Option<JsonOutput>,
+) -> anyhow::Result<()> {
+    let hops = windows_mtr::native_icmp::trace(target, config)
+        .context("Windows ICMP Helper trace failed")?;
+
+    if let Some(format) = json_output {
+        let report = windows_mtr::native_icmp::json_report(target, &hops);
+        match format {
+            JsonOutput::Compact => println!("{}", serde_json::to_string(&report)?),
+            JsonOutput::Pretty => println!("{}", serde_json::to_string_pretty(&report)?),
+        }
+    } else {
+        print!("{}", windows_mtr::native_icmp::format_report(target, &hops));
+    }
+
+    Ok(())
+}
 fn to_cli_error(error: ProbeError) -> MtrError {
     match error {
         ProbeError::HostResolutionError(host) => MtrError::HostResolutionError(host),
@@ -480,14 +526,32 @@ fn main() -> anyhow::Result<()> {
         .map_err(|error| anyhow::anyhow!(error.to_string()))
         .context("invalid command-line options")?;
 
-    if plan.ui_mode == UiMode::Dashboard {
-        let dashboard_args =
+    let native_icmp_config = native_windows_icmp_config(&request);
+    let interactive = !request.report
+        && !request.report_wide
+        && plan.json_output.is_none()
+        && plan.csv_output_path.is_none();
+    if should_run_native_dashboard(plan.ui_mode, native_icmp_config.is_some(), interactive) {
+        let dashboard_args = if native_icmp_config.is_some() {
+            Vec::new()
+        } else {
             windows_mtr::service::build_json_snapshot_args(&request, &plan.validated_host)
                 .map_err(to_cli_error)
                 .map_err(|error| anyhow::anyhow!(error.to_string()))
-                .context("invalid --ui dashboard configuration")?;
-        let code = dashboard_ui::run_dashboard_ui(&plan.validated_host, &dashboard_args)?;
+                .context("invalid --ui dashboard configuration")?
+        };
+        let code = dashboard_ui::run_dashboard_ui(
+            &plan.validated_host,
+            &dashboard_args,
+            native_icmp_config,
+        )?;
         process::exit(code);
+    }
+
+    if let Some(config) = native_windows_icmp_config(&request)
+        && (request.report || request.report_wide || plan.json_output.is_some())
+    {
+        return run_native_icmp_output(&plan.validated_host, &config, plan.json_output);
     }
 
     // SAFETY: this path is used only to re-exec ourselves for local output handling,
@@ -704,6 +768,14 @@ mod tests {
         assert!(matches!(alias.trace.ui, UiPreset::Dashboard));
     }
 
+    #[test]
+    fn native_icmp_uses_dashboard_for_default_or_explicit_dashboard_ui() {
+        assert!(should_run_native_dashboard(UiMode::Default, true, true));
+        assert!(should_run_native_dashboard(UiMode::Dashboard, true, true));
+        assert!(should_run_native_dashboard(UiMode::Dashboard, false, true));
+        assert!(!should_run_native_dashboard(UiMode::Default, false, true));
+        assert!(!should_run_native_dashboard(UiMode::Default, true, false));
+    }
     #[test]
     fn default_ui_is_the_default_preset() {
         let cli = Cli::try_parse_from(["mtr", "8.8.8.8"]).expect("default should parse");
