@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.8] - 2026-07-18
+
 ### Added
 - Added an experimental dashboard preview mode via `--ui dashboard` (deprecated compatibility alias: `--ui native`) with tabs, hop table rendering, and live latency/loss charts.
+- Added a native Windows IPv4 ICMP backend for the default interactive UI, report, JSON, and dashboard modes, plus loopback end-to-end coverage.
 - Added --csv <PATH> CLI flag for CSV report export (mutually exclusive with --json/--json-pretty/-r/-w).
 - Added schema_version field ("1.0") to CLI JSON output (--json / --json-pretty).
 - Added packaged-binary smoke tests for release and PR ZIP artifacts, covering JSON, CSV, TCP, UDP, and REST API health paths.
@@ -17,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Updated README/USAGE roadmap and examples to document the dashboard fallback UI and controls.
 - Improved the dashboard UI help footer to show elapsed "awaiting data" time and add a 15-second timeout troubleshooting prompt when hop snapshots never arrive.
 - Packaging tasks now fail when a real Windows executable is missing; they no longer create placeholder artifacts.
+- Release workflow dispatches now build, package, validate, and smoke-test the canonical ZIP without publishing it.
 
 ## [1.1.3] - 2026-02-28
 
