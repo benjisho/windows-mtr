@@ -59,3 +59,30 @@ fn native_icmp_json_reports_ipv4_loopback() {
     assert_eq!(report["report"]["backend"], "windows-icmp-helper");
     assert_eq!(report["report"]["hops"][0]["host"], "127.0.0.1");
 }
+
+#[test]
+fn native_icmp_csv_reports_ipv4_loopback() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let csv_path = directory.path().join("report.csv");
+    let output = run_mtr(&[
+        "-n",
+        "--csv",
+        csv_path.to_str().expect("UTF-8 temporary path"),
+        "-c",
+        "1",
+        "-m",
+        "1",
+        "--timeout",
+        "1",
+        "127.0.0.1",
+    ]);
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let csv = std::fs::read_to_string(csv_path).expect("CSV report must be written");
+    assert!(csv.starts_with("hop,ip,hostname,avg_ms,best_ms,worst_ms,loss_pct"));
+    assert!(csv.contains("1,127.0.0.1"));
+}

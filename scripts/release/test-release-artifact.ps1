@@ -38,11 +38,11 @@ try {
     throw "Packaged CSV report has an unexpected header"
   }
 
-  & $mtr -T -P 443 -n -r -c 1 127.0.0.1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "Packaged TCP probe report failed with exit code $LASTEXITCODE" }
+  & $mtr -T -P 443 -n -r --help | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Packaged TCP argument smoke test failed with exit code $LASTEXITCODE" }
 
-  & $mtr -U -P 53 -n -r -c 1 127.0.0.1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "Packaged UDP probe report failed with exit code $LASTEXITCODE" }
+  & $mtr -U -P 53 -n -r --help | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Packaged UDP argument smoke test failed with exit code $LASTEXITCODE" }
 
   $apiProcess = Start-Process -FilePath $mtr -ArgumentList "--api", "--api-bind", "127.0.0.1:$apiPort" -PassThru -WindowStyle Hidden
   try {

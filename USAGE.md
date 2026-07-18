@@ -12,7 +12,7 @@ mtr [options] <hostname-or-ip>
 
 | Option | Description |
 |---|---|
-| `<hostname-or-ip>` | Target host to trace (required); Windows IPv4 ICMP default UI/report/JSON/dashboard uses the system ICMP Helper API |
+| `<hostname-or-ip>` | Target host to trace (required); Windows IPv4 ICMP default UI/report/JSON/CSV/dashboard uses the system ICMP Helper API |
 | `-T` | TCP SYN probes |
 | `-U` | UDP probes |
 | `-P, --port <PORT>` | Target port for TCP/UDP (`-T`/`-U`) |
