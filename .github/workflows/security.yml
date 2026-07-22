@@ -52,7 +52,7 @@ jobs:
 
       - name: Run cargo-deny
         id: cargo_deny
-        uses: EmbarkStudios/cargo-deny-action@a531616d8ce3b9177443e48a1159bc945a099823 # v2
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
         with:
           rust-version: 1.88.0
           command: check
