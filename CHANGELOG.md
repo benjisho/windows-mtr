@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Routed default Windows IPv4 ICMP CSV output through the system ICMP Helper API so release smoke tests do not invoke embedded Trippy packet probes on hosted Windows runners.
+- Fixed bare hostname resolution in the native Windows IPv4 ICMP backend.
 
 ## [1.2.8] - 2026-07-18
 

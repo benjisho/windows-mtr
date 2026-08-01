@@ -35,6 +35,30 @@ fn native_icmp_report_reaches_ipv4_loopback() {
 }
 
 #[test]
+fn native_icmp_report_resolves_hostname() {
+    let output = run_mtr(&[
+        "-n",
+        "-r",
+        "-c",
+        "1",
+        "-m",
+        "1",
+        "--timeout",
+        "1",
+        "localhost",
+    ]);
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).expect("report must be UTF-8");
+    assert!(stdout.contains("windows-mtr ICMP report for localhost"));
+    assert!(stdout.contains("127.0.0.1"));
+}
+
+#[test]
 fn native_icmp_json_reports_ipv4_loopback() {
     let output = run_mtr(&[
         "-n",

@@ -1,3 +1,4 @@
+use anyhow::Context;
 use serde_json::{Value, json};
 use std::net::{IpAddr, Ipv4Addr, ToSocketAddrs};
 use std::path::Path;
@@ -46,8 +47,9 @@ pub fn resolve_ipv4(target: &str) -> anyhow::Result<Ipv4Addr> {
         return Ok(addr);
     }
 
-    target
-        .to_socket_addrs()?
+    (target, 0)
+        .to_socket_addrs()
+        .with_context(|| format!("failed to resolve hostname: {target}"))?
         .find_map(|addr| match addr.ip() {
             IpAddr::V4(ip) => Some(ip),
             IpAddr::V6(_) => None,
@@ -238,6 +240,11 @@ fn csv_metric(value: Option<f64>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolve_ipv4_accepts_bare_hostname() {
+        assert_eq!(resolve_ipv4("localhost").unwrap(), Ipv4Addr::LOCALHOST);
+    }
 
     #[test]
     fn aggregate_metrics_use_received_samples_only() {
