@@ -132,7 +132,7 @@ struct TraceCli {
     #[arg(short = 'i')]
     interval: Option<f32>,
 
-    /// Maximum time in seconds to keep a probe alive
+    /// Maximum positive, finite time in seconds to keep a probe alive
     #[arg(short = 'W', long = "timeout")]
     timeout: Option<f32>,
 
@@ -709,6 +709,19 @@ mod tests {
         let msg = err.to_string();
         assert!(msg.contains("-w"));
         assert!(msg.contains("--csv"));
+    }
+
+    #[test]
+    fn cli_rejects_negative_timeout_before_probe_execution() {
+        let cli = Cli::try_parse_from(["mtr", "--timeout=-1", "127.0.0.1"])
+            .expect("negative timeout should parse before application validation");
+        let request = build_probe_request(&cli.trace).expect("host should build into a request");
+
+        assert!(matches!(
+            build_probe_plan(&request),
+            Err(ProbeError::InvalidOption(message))
+                if message == "timeout must be a positive finite number of seconds"
+        ));
     }
 
     #[test]

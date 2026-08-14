@@ -60,6 +60,29 @@ fn plan_requires_port_for_tcp_udp() {
 }
 
 #[test]
+fn plan_rejects_invalid_timeout_values() {
+    for timeout in [f32::NAN, f32::INFINITY, -1.0] {
+        let mut request = base_request();
+        request.timeout_seconds = Some(timeout);
+
+        assert!(matches!(
+            build_probe_plan(&request),
+            Err(ProbeError::InvalidOption(message))
+                if message == "timeout must be a positive finite number of seconds"
+        ));
+    }
+
+    let mut request = base_request();
+    request.timeout_seconds = Some(f32::MAX);
+
+    assert!(matches!(
+        build_probe_plan(&request),
+        Err(ProbeError::InvalidOption(message))
+            if message == "timeout is too large to represent as a duration"
+    ));
+}
+
+#[test]
 fn plan_rejects_report_wide_without_report_or_json() {
     let mut request = base_request();
     request.report_wide = true;
