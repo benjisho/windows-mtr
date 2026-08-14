@@ -6,6 +6,7 @@ use crate::service::rest_server::{
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreateProbeRequestDto {
     pub targets: Vec<String>,
     pub protocol: ApiProbeProtocol,

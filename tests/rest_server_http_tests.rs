@@ -70,14 +70,14 @@ fn assert_error_shape(body: &serde_json::Value, status: u16, code: &str) {
 async fn request_health_with_connect_info(
     config: RestApiConfig,
     remote_addr: SocketAddr,
-    mtls_identity_header: Option<(&str, &str)>,
+    mtls_identity_headers: &[(&str, &str)],
 ) -> (axum::http::StatusCode, serde_json::Value) {
     let state = RestServerState::new_with_probe_runner(config, probe_runner_path())
         .expect("state should initialize");
     let app = build_router(state);
 
     let mut request_builder = Request::builder().uri("/api/v1/health").method("GET");
-    if let Some((name, value)) = mtls_identity_header {
+    for (name, value) in mtls_identity_headers {
         request_builder = request_builder.header(name, value);
     }
 
@@ -710,7 +710,7 @@ async fn none_local_only_auth_rejects_non_loopback_requests_with_strategy_violat
     let (status, body) = request_health_with_connect_info(
         config,
         SocketAddr::from((IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10)), 43120)),
-        None,
+        &[],
     )
     .await;
 
@@ -732,7 +732,7 @@ async fn mtls_auth_accepts_identity_header_from_loopback_ingress() {
     let (status, body) = request_health_with_connect_info(
         config,
         SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 43120)),
-        Some(("X-Client-Cert", "present")),
+        &[("X-Client-Cert", "present")],
     )
     .await;
 
@@ -751,7 +751,7 @@ async fn mtls_auth_rejects_identity_header_from_untrusted_non_loopback_ingress()
     let (status, body) = request_health_with_connect_info(
         config,
         SocketAddr::from((IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10)), 43120)),
-        Some(("X-Client-Cert", "present")),
+        &[("X-Client-Cert", "present")],
     )
     .await;
 
@@ -776,7 +776,7 @@ async fn mtls_auth_accepts_identity_header_from_configured_trusted_ingress_ip() 
     let (status, body) = request_health_with_connect_info(
         config,
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 10, 10, 10)), 54321),
-        Some(("X-Client-Cert", "subject=CN=test-client")),
+        &[("X-Client-Cert", "subject=CN=test-client")],
     )
     .await;
 
@@ -794,12 +794,158 @@ async fn mtls_auth_requires_upstream_client_identity_header() {
     let (status, body) = request_health_with_connect_info(
         config,
         SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 43120)),
-        None,
+        &[],
     )
     .await;
 
     assert_eq!(status, axum::http::StatusCode::UNAUTHORIZED);
     assert_error_shape(&body, 401, "missing_mtls_identity");
+}
+
+#[tokio::test]
+async fn mtls_auth_accepts_verified_ingress_header() {
+    let config = RestApiConfig {
+        auth_strategy: AuthStrategy::Mtls,
+        ..RestApiConfig::default()
+    };
+
+    let (status, body) = request_health_with_connect_info(
+        config,
+        SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 43120)),
+        &[("X-SSL-Client-Verify", "SUCCESS")],
+    )
+    .await;
+
+    assert_eq!(status, axum::http::StatusCode::OK);
+    assert_eq!(body["data"]["status"], "ok");
+}
+
+#[tokio::test]
+async fn mtls_auth_rejects_empty_failed_or_duplicated_identity_headers() {
+    let remote_addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::LOCALHOST), 43120));
+
+    let (empty_status, empty_body) = request_health_with_connect_info(
+        RestApiConfig {
+            auth_strategy: AuthStrategy::Mtls,
+            ..RestApiConfig::default()
+        },
+        remote_addr,
+        &[("X-Client-Cert", "   ")],
+    )
+    .await;
+    assert_eq!(empty_status, axum::http::StatusCode::UNAUTHORIZED);
+    assert_error_shape(&empty_body, 401, "invalid_mtls_identity");
+
+    let (failed_status, failed_body) = request_health_with_connect_info(
+        RestApiConfig {
+            auth_strategy: AuthStrategy::Mtls,
+            ..RestApiConfig::default()
+        },
+        remote_addr,
+        &[("X-SSL-Client-Verify", "FAILED")],
+    )
+    .await;
+    assert_eq!(failed_status, axum::http::StatusCode::UNAUTHORIZED);
+    assert_error_shape(&failed_body, 401, "invalid_mtls_identity");
+
+    let (duplicate_status, duplicate_body) = request_health_with_connect_info(
+        RestApiConfig {
+            auth_strategy: AuthStrategy::Mtls,
+            ..RestApiConfig::default()
+        },
+        remote_addr,
+        &[
+            ("X-Client-Cert", "subject=CN=first"),
+            ("X-Client-Cert", "subject=CN=second"),
+        ],
+    )
+    .await;
+    assert_eq!(duplicate_status, axum::http::StatusCode::UNAUTHORIZED);
+    assert_error_shape(&duplicate_body, 401, "invalid_mtls_identity");
+}
+
+#[tokio::test]
+async fn probe_guard_authenticates_before_rate_limiting_and_returns_retry_guidance() {
+    let config = RestApiConfig {
+        auth_strategy: AuthStrategy::ApiKey,
+        api_key: Some("secret-key".to_string()),
+        max_requests_per_window: 1,
+        rate_limit_window: Duration::from_millis(500),
+        ..RestApiConfig::default()
+    };
+    let (addr, shutdown) = spawn_server_with_config(config).await;
+    let client = build_http_client();
+    let url = format!("http://{addr}/api/v1/probes");
+    let payload = serde_json::json!({
+        "targets": ["127.0.0.1"],
+        "protocol": "icmp",
+        "unexpected": true
+    });
+
+    let unauthenticated = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .expect("unauthenticated request should receive a response");
+    assert_eq!(unauthenticated.status(), reqwest::StatusCode::UNAUTHORIZED);
+    assert!(unauthenticated.headers().get("X-RateLimit-Limit").is_none());
+
+    let first_authenticated = client
+        .post(&url)
+        .header("X-API-Key", "secret-key")
+        .json(&payload)
+        .send()
+        .await
+        .expect("authenticated request should receive a response");
+    assert_eq!(
+        first_authenticated.status(),
+        reqwest::StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        first_authenticated
+            .headers()
+            .get("X-RateLimit-Remaining")
+            .expect("rate limit header should exist"),
+        "0"
+    );
+
+    let throttled = client
+        .post(&url)
+        .header("X-API-Key", "secret-key")
+        .json(&payload)
+        .send()
+        .await
+        .expect("throttled request should receive a response");
+    assert_eq!(throttled.status(), reqwest::StatusCode::TOO_MANY_REQUESTS);
+
+    let reset = throttled
+        .headers()
+        .get("RateLimit-Reset")
+        .expect("standard reset header should exist")
+        .to_str()
+        .expect("reset header should be text")
+        .parse::<u64>()
+        .expect("reset header should be an integer");
+    let retry_after = throttled
+        .headers()
+        .get("Retry-After")
+        .expect("retry-after header should exist")
+        .to_str()
+        .expect("retry-after header should be text")
+        .parse::<u64>()
+        .expect("retry-after header should be an integer");
+    assert!(reset >= 1);
+    assert_eq!(retry_after, reset);
+    assert_eq!(
+        throttled
+            .headers()
+            .get("X-RateLimit-Reset")
+            .expect("legacy reset header should exist"),
+        reset.to_string().as_str()
+    );
+
+    let _ = shutdown.send(());
 }
 
 #[tokio::test]
