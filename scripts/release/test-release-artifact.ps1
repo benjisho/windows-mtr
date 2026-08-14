@@ -1,10 +1,21 @@
 param(
-  [string]$ZipPath = "dist/windows-mtr-x86_64.zip"
+  [string]$ZipPath = "dist/windows-mtr-x86_64.zip",
+  [string]$ExpectedVersion = ""
 )
 
 $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path $ZipPath)) { throw "Release ZIP not found: $ZipPath" }
+
+if ([string]::IsNullOrWhiteSpace($ExpectedVersion)) {
+  $cargoToml = Join-Path $PSScriptRoot "..\..\Cargo.toml"
+  if (-not (Test-Path $cargoToml)) { throw "Cargo.toml not found; pass -ExpectedVersion explicitly" }
+  $cargoText = Get-Content -Raw $cargoToml
+  if ($cargoText -notmatch '(?m)^version\s*=\s*"([^\"]+)"') {
+    throw "Could not determine package version from $cargoToml"
+  }
+  $ExpectedVersion = $Matches[1]
+}
 
 $temp = Join-Path ([System.IO.Path]::GetTempPath()) ("windows-mtr-smoke-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $temp | Out-Null
@@ -23,8 +34,11 @@ try {
   & $mtr --help | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Packaged mtr.exe --help failed with exit code $LASTEXITCODE" }
 
-  & $windowsMtr --version | Out-Null
+  $versionOutput = (& $windowsMtr --version | Out-String).Trim()
   if ($LASTEXITCODE -ne 0) { throw "Packaged windows-mtr.exe --version failed with exit code $LASTEXITCODE" }
+  if ($versionOutput -notmatch [regex]::Escape($ExpectedVersion)) {
+    throw "Packaged binary version '$versionOutput' does not contain expected version '$ExpectedVersion'"
+  }
 
   $json = & $mtr --json -n -c 1 127.0.0.1
   if ($LASTEXITCODE -ne 0) { throw "Packaged JSON report failed with exit code $LASTEXITCODE" }
