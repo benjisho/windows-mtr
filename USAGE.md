@@ -75,7 +75,7 @@ For stable diagnostics, use report mode:
 
 ## Enhanced UI options
 
-`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Running enhanced mode now returns a clear validation error that recommends default UI or dashboard fallback.
+`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Running enhanced mode returns a clear validation error.
 
 Enhanced tuning flags are retained for forward compatibility but require future bundled Trippy support before they can be used again.
 
@@ -134,9 +134,7 @@ mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.
 
 ## Interactive mode recommendation
 
-Use `mtr 8.8.8.8` as the primary interactive experience (embedded Trippy TUI).
-
-Use `mtr --ui dashboard 8.8.8.8` only as a fallback dashboard for terminals where the embedded TUI crashes.
+On Windows IPv4 ICMP, `mtr 8.8.8.8` opens the experimental dashboard by default. TCP/UDP continue through embedded Trippy; use `--ui dashboard` to select the dashboard explicitly.
 
 ## REST API startup and operational limits (v1, implemented)
 

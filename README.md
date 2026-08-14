@@ -50,7 +50,7 @@ Windows MTR is a Windows-focused network diagnostics CLI inspired by Linux mtr. 
       <li>Multi-protocol support: ICMP, TCP SYN, and UDP</li>
       <li>Interactive TUI for live monitoring</li>
       <li>Report mode for static output generation</li>
-      <li>IPv4 and IPv6 support</li>
+      <li>IPv4 native ICMP; IPv6 through supported Trippy paths</li>
       <li>Cross-platform compatibility</li>
       <li>Simple, clean command-line interface</li>
     </ul>
@@ -207,7 +207,7 @@ mtr 8.8.8.8
 mtr --ui dashboard 8.8.8.8
 ```
 
-`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Use default mode (`mtr 8.8.8.8`) for the full embedded Trippy TUI.
+`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. On Windows IPv4 ICMP, default mode opens the experimental dashboard; TCP/UDP continue through embedded Trippy.
 
 ### Report mode with DNS disabled (faster + script-friendly)
 
@@ -392,7 +392,8 @@ The full roadmap now lives in [docs/ROADMAP.md](docs/ROADMAP.md), which is the s
 
 Quick snapshot:
 
-- ✅ Released: Core MTR functionality, IPv6, Docker, JSON output, DNS cache TTL, REST API v1 (authentication, rate limiting, concurrency controls).
+- ✅ Released: Core MTR functionality, JSON/CSV output, and the Windows release ZIP.
+- ⚠️ Partial: IPv6, Docker, DNS cache TTL, REST API lifecycle controls, and cross-platform privilege parity.
 - 🚧 In progress: experimental dashboard fallback UI (`--ui dashboard`, `--ui native` alias).
 - ✅ Released: versioned JSON schema, CSV export, release-artifact smoke validation, and weekly extended fuzz regression.
 - 📅 Planned / 🛣️ Roadmap: SNMP integration, ETW observability, native TLS termination (if adopted), and runtime cleanup.
