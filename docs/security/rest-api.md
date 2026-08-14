@@ -23,7 +23,7 @@ This document defines baseline security assumptions and controls for the impleme
 2. **Non-local deployments**: explicit authentication is required.
    - Choose one of:
      - **API key** (`X-API-Key`) for simple service-to-service deployments.
-     - **mTLS** for environments with certificate-based workload identity via a trusted ingress that terminates TLS.
+     - **Trusted-ingress identity headers** for environments where a separate ingress terminates and validates mTLS. The application does not terminate TLS or validate certificates.
 3. **Prohibited**: non-local bind with no authentication.
 
 ## Secure defaults
@@ -38,6 +38,8 @@ This document defines baseline security assumptions and controls for the impleme
 - Max payload size default: `16KiB`.
 - Completed probe job retention cap default: `1024`.
 - Completed probe job TTL default: `15m`.
+- Probe count maximum: `100` per request.
+- Interval and request-timeout maximum: `60s` each.
 
 ## Input validation and normalization requirements
 
@@ -53,12 +55,13 @@ All untrusted request fields MUST be validated before probe execution:
   - Integer in range `1..=65535`.
 - **Intervals/timeouts**
   - Positive finite numbers only.
+  - At most `60s` each.
   - `timeout_seconds >= interval_seconds` when both are present.
 
 ## Abuse prevention controls
 
-- **Rate limiting**: reject request bursts above configured fixed-window limit.
-- **Concurrency limiting**: reject probe starts when in-flight probe count exceeds limit.
+- **Rate limiting**: reject request bursts above configured fixed-window limit and expose a ceil-rounded reset plus `Retry-After` on 429 responses.
+- **Concurrency limiting**: bound accepted work, while noting that a timed-out blocking child is not yet proven to be terminated.
 - **Payload limiting**: reject oversized request bodies with 413.
 - **Target cardinality limiting**: reject requests with too many targets.
 - **Result-store retention**: prune expired/old terminal probe jobs to bound memory growth.
@@ -67,7 +70,7 @@ All untrusted request fields MUST be validated before probe execution:
 
 - **Unauthenticated remote use** → prevented by local-only default and non-local auth requirement.
 - **SSRF-like probing abuse** → constrained by auth, request validation, and target count limits.
-- **Resource exhaustion (CPU/socket saturation)** → constrained by timeout + concurrency + rate limits.
+- **Resource exhaustion (CPU/socket saturation)** → constrained by request bounds, concurrency bookkeeping, and rate limits; hard child-process cancellation remains follow-up work.
 - **Large-body denial attempts** → constrained by payload size cap.
 - **Input parsing edge cases** → constrained by strict normalization + explicit validation failures.
 
@@ -81,7 +84,7 @@ All untrusted request fields MUST be validated before probe execution:
 ## Operational guidance
 
 - Keep v1 local-only unless an integration requires remote access.
-- Prefer mTLS over API keys in production.
+- Prefer a private backend behind a certificate-validating mTLS ingress in production; do not treat the application identity headers as native mTLS.
 - API keys are verified with constant-time comparison in-process to reduce timing side-channels.
 - Add perimeter controls (firewall/ingress allow-list) even when auth is enabled.
 - Monitor 413/429 rates for abuse or client misconfiguration.

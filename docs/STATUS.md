@@ -12,16 +12,16 @@ This document serves as the single source of truth for feature delivery status.
 - **Notes**: Fully implemented with `schema_version: "1.0"`; CSV export is available through `--csv <PATH>`. Check the [documentation](USAGE.md#output--report-options) for examples on usage.
 
 ## DNS Caching (TTL)
-- **Status**: ✅ Released in v1.1.3
-- **Notes**: Provides improved performance. Refer to the [DNS Caching Documentation](USAGE.md#timing--dns-cache) for detailed implementation and considerations.
+- **Status**: ⚠️ Partial
+- **Notes**: Available on Trippy-backed paths; the native Windows ICMP route does not apply the TTL setting.
 
 ## REST API v1
-- **Status**: ✅ Released in v1.1.3
-- **Notes**: Implemented with API key and trusted-ingress mTLS identity forwarding, rate limiting, and concurrency controls. Default bind is localhost-only (`127.0.0.1:3000`). It does not terminate TLS itself; see [REST API Documentation](security/rest-api.md) for the deployment model and threat model.
+- **Status**: ⚠️ Partial
+- **Notes**: Implemented with API key and trusted-ingress identity headers, bounded request validation, rate limiting, and concurrency bookkeeping. Default bind is localhost-only (`127.0.0.1:3000`). It does not terminate TLS itself, does not yet return hop-by-hop MTR data, and timeout does not prove child-process cancellation; see [REST API Documentation](security/rest-api.md).
 
 ## Release Artifact Validation
-- **Status**: ✅ Released in v1.3.x
-- **Notes**: PR and release ZIPs are smoke-tested for JSON, CSV, TCP, UDP, and REST API health paths.
+- **Status**: ⚠️ Partial
+- **Notes**: PR and release ZIPs smoke-test JSON, CSV, TCP/UDP argument parsing, and REST API health. They do not perform live TCP/UDP probes.
 
 ## Dashboard UI
 - **Status**: 🚧 In Progress (experimental preview via `--ui dashboard`, with deprecated alias `--ui native`)
@@ -32,5 +32,5 @@ This document serves as the single source of truth for feature delivery status.
 - **Notes**: Planned for future release. This integration is critical for observability.
 
 ## Security Hardening (audit + scheduled fuzzing)
-- **Status**: ✅ Released in v1.3.x
+- **Status**: ✅ Core gates released; advanced hardening remains roadmap
 - **Notes**: `cargo-deny` and `cargo-audit` run in the PR security gate. Extended fuzz regression runs weekly (and can be started manually) in `fuzz-regression.yml`, with its nightly toolchain and `cargo-fuzz` version pinned. Future work is fuzz corpus/time-budget expansion and advisory cleanup.

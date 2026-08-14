@@ -38,6 +38,7 @@ const REQUEST_ID_HEADER: &str = "X-Request-ID";
 const RATE_LIMIT_LIMIT_HEADER: &str = "X-RateLimit-Limit";
 const RATE_LIMIT_REMAINING_HEADER: &str = "X-RateLimit-Remaining";
 const RATE_LIMIT_RESET_HEADER: &str = "X-RateLimit-Reset";
+const RETRY_AFTER_HEADER: &str = "Retry-After";
 const RATE_LIMIT_LIMIT_STANDARD_HEADER: &str = "RateLimit-Limit";
 const RATE_LIMIT_REMAINING_STANDARD_HEADER: &str = "RateLimit-Remaining";
 const RATE_LIMIT_RESET_STANDARD_HEADER: &str = "RateLimit-Reset";
@@ -268,6 +269,13 @@ async fn enforce_probe_request_guards(
     request: Request,
     next: Next,
 ) -> ApiResult<axum::response::Response> {
+    let remote_addr = request
+        .extensions()
+        .get::<ConnectInfo<std::net::SocketAddr>>()
+        .map(|ConnectInfo(addr)| *addr)
+        .ok_or_else(|| internal_error_response("request connection info unavailable"))?;
+    enforce_request_auth(&state.config, remote_addr, request.headers())?;
+
     let (snapshot, allow_result) = {
         let mut limiter = state
             .probe_rate_limiter
@@ -325,7 +333,7 @@ fn attach_rate_limit_headers(
         HeaderValue::from_str(&snapshot.remaining.to_string())
             .map_err(|_| internal_error_response("invalid rate limit header value"))?,
     );
-    let reset_seconds = snapshot.reset_after.as_secs();
+    let reset_seconds = snapshot.reset_after.as_secs_f32().ceil() as u64;
     let reset_value = HeaderValue::from_str(&reset_seconds.to_string())
         .map_err(|_| internal_error_response("invalid rate limit header value"))?;
     response
@@ -334,6 +342,13 @@ fn attach_rate_limit_headers(
     response
         .headers_mut()
         .insert(RATE_LIMIT_RESET_STANDARD_HEADER, reset_value);
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        let retry_after = HeaderValue::from_str(&reset_seconds.max(1).to_string())
+            .map_err(|_| internal_error_response("invalid rate limit header value"))?;
+        response
+            .headers_mut()
+            .insert(RETRY_AFTER_HEADER, retry_after);
+    }
     Ok(())
 }
 
@@ -861,11 +876,20 @@ fn enforce_request_auth(
                 return Err(RequestAuthError::UntrustedMtlsIngress.into_api_error());
             }
 
-            headers
+            let client_cert_present = headers
                 .get("X-Client-Cert")
-                .or_else(|| headers.get("X-SSL-Client-Verify"))
-                .map(|_| ())
-                .ok_or_else(|| RequestAuthError::MissingMtlsIdentity.into_api_error())
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| !value.trim().is_empty());
+            let verify_success = headers
+                .get("X-SSL-Client-Verify")
+                .and_then(|value| value.to_str().ok())
+                .is_some_and(|value| value.trim().eq_ignore_ascii_case("SUCCESS"));
+
+            if client_cert_present || verify_success {
+                Ok(())
+            } else {
+                Err(RequestAuthError::MissingMtlsIdentity.into_api_error())
+            }
         }
     }
 }

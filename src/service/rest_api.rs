@@ -6,6 +6,12 @@ use std::time::{Duration, Instant};
 
 const MAX_HOSTNAME_LEN: usize = 253;
 const MAX_LABEL_LEN: usize = 63;
+// Keep one API request bounded even when the caller supplies optional probe
+// tuning values. These limits are deliberately independent of the CLI flags:
+// the REST endpoint queues work asynchronously and must reject unbounded work
+// before it receives a job id.
+const MAX_API_COUNT: usize = 100;
+const MAX_API_DURATION_SECONDS: f32 = 60.0;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum AuthStrategy {
@@ -217,9 +223,16 @@ impl CreateProbeApiRequest {
         let resolve_dns = self.resolve_dns.unwrap_or(true);
         let include_asn = self.include_asn.unwrap_or(false);
 
-        let interval_seconds =
-            validate_optional_positive("interval_seconds", self.interval_seconds)?;
-        let timeout_seconds = validate_optional_positive("timeout_seconds", self.timeout_seconds)?;
+        let interval_seconds = validate_optional_bounded_positive(
+            "interval_seconds",
+            self.interval_seconds,
+            MAX_API_DURATION_SECONDS,
+        )?;
+        let timeout_seconds = validate_optional_bounded_positive(
+            "timeout_seconds",
+            self.timeout_seconds,
+            MAX_API_DURATION_SECONDS,
+        )?;
 
         if let (Some(interval), Some(timeout)) = (interval_seconds, timeout_seconds)
             && timeout < interval
@@ -258,10 +271,10 @@ fn validate_optional_count(value: Option<usize>) -> Result<Option<usize>, RestAp
         return Ok(None);
     };
 
-    if raw == 0 {
-        return Err(RestApiValidationError::InvalidOption(
-            "count must be greater than or equal to 1".to_string(),
-        ));
+    if raw == 0 || raw > MAX_API_COUNT {
+        return Err(RestApiValidationError::InvalidOption(format!(
+            "count must be between 1 and {MAX_API_COUNT}"
+        )));
     }
 
     Ok(Some(raw))
@@ -281,17 +294,18 @@ fn validate_optional_max_hops(value: Option<u16>) -> Result<Option<u8>, RestApiV
     Ok(Some(raw as u8))
 }
 
-fn validate_optional_positive(
+fn validate_optional_bounded_positive(
     field_name: &str,
     value: Option<f32>,
+    maximum: f32,
 ) -> Result<Option<f32>, RestApiValidationError> {
     let Some(raw) = value else {
         return Ok(None);
     };
 
-    if !raw.is_finite() || raw <= 0.0 {
+    if !raw.is_finite() || raw <= 0.0 || raw > maximum {
         return Err(RestApiValidationError::InvalidOption(format!(
-            "{field_name} must be a positive finite number"
+            "{field_name} must be a positive finite number no greater than {maximum}"
         )));
     }
 
@@ -609,6 +623,41 @@ mod tests {
         assert!(matches!(
             request.normalize_and_validate(&RestApiConfig::default()),
             Err(RestApiValidationError::InvalidPort(_))
+        ));
+    }
+
+    #[test]
+    fn normalize_rejects_unbounded_probe_work() {
+        let count_request = CreateProbeApiRequest {
+            targets: vec!["127.0.0.1".to_string()],
+            protocol: ProbeProtocol::Icmp,
+            port: None,
+            count: Some(MAX_API_COUNT + 1),
+            max_hops: None,
+            resolve_dns: None,
+            include_asn: None,
+            interval_seconds: None,
+            timeout_seconds: None,
+        };
+        assert!(matches!(
+            count_request.normalize_and_validate(&RestApiConfig::default()),
+            Err(RestApiValidationError::InvalidOption(_))
+        ));
+
+        let timeout_request = CreateProbeApiRequest {
+            targets: vec!["127.0.0.1".to_string()],
+            protocol: ProbeProtocol::Icmp,
+            port: None,
+            count: None,
+            max_hops: None,
+            resolve_dns: None,
+            include_asn: None,
+            interval_seconds: None,
+            timeout_seconds: Some(MAX_API_DURATION_SECONDS + 1.0),
+        };
+        assert!(matches!(
+            timeout_request.normalize_and_validate(&RestApiConfig::default()),
+            Err(RestApiValidationError::InvalidOption(_))
         ));
     }
 

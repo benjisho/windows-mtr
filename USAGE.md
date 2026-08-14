@@ -75,7 +75,7 @@ For stable diagnostics, use report mode:
 
 ## Enhanced UI options
 
-`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Running enhanced mode now returns a clear validation error that recommends default UI or dashboard fallback.
+`--ui enhanced` is currently unavailable with bundled Trippy 0.13.0. Running enhanced mode now returns a clear validation error that recommends the dashboard route.
 
 Enhanced tuning flags are retained for forward compatibility but require future bundled Trippy support before they can be used again.
 
@@ -134,9 +134,7 @@ mtr --trippy-flags "--log-format json --verbose --tui-refresh-rate 150ms" 8.8.8.
 
 ## Interactive mode recommendation
 
-Use `mtr 8.8.8.8` as the primary interactive experience (embedded Trippy TUI).
-
-Use `mtr --ui dashboard 8.8.8.8` only as a fallback dashboard for terminals where the embedded TUI crashes.
+On Windows IPv4 ICMP, `mtr 8.8.8.8` opens the dashboard route by default. TCP/UDP interactive probes continue through embedded Trippy. Use `--ui dashboard` explicitly for the dashboard route; `--ui enhanced` is unavailable with the bundled Trippy version.
 
 ## REST API startup and operational limits (v1, implemented)
 
@@ -161,7 +159,7 @@ mtr --api --api-max-completed-jobs 512 --api-completed-job-ttl-seconds 1200
 # Set API probe execution timeout to 2 minutes
 mtr --api --api-probe-timeout-seconds 120
 
-# Secure remote bind with mTLS
+# Secure remote bind with trusted-ingress identity headers
 mtr --api --api-bind 0.0.0.0:4000 --api-auth mtls
 
 # mTLS ingress trust list (header-based mode) for non-loopback trusted reverse proxy hops
@@ -189,6 +187,6 @@ Authentication enforcement in v1:
 Input validation before probe execution:
 - Hostnames/IPs normalized and validated
 - Ports validated in `1..=65535` (required for TCP/UDP)
-- Intervals/timeouts validated as positive finite numbers (`timeout >= interval`)
+- Intervals/timeouts validated as positive finite numbers no greater than 60 seconds (`timeout >= interval`); API request count is bounded to 100
 
 See [docs/security/rest-api.md](docs/security/rest-api.md).

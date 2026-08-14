@@ -6,6 +6,7 @@ use crate::service::rest_server::{
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreateProbeRequestDto {
     pub targets: Vec<String>,
     pub protocol: ApiProbeProtocol,
@@ -168,5 +169,19 @@ impl From<&ProbeJob> for ProbeResultResponseDto {
                 error: value.error.clone(),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CreateProbeRequestDto;
+
+    #[test]
+    fn create_probe_rejects_unknown_fields() {
+        let result = serde_json::from_str::<CreateProbeRequestDto>(
+            r#"{"targets":["127.0.0.1"],"protocol":"icmp","unexpected":true}"#,
+        );
+
+        assert!(result.is_err());
     }
 }
