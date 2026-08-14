@@ -84,7 +84,7 @@ Enhanced tuning flags are retained for forward compatibility but require future 
 | Option | Description |
 |---|---|
 | `-i <SECONDS>` | Minimum round duration |
-| `-W, --timeout <SECONDS>` | Probe grace timeout |
+| `-W, --timeout <SECONDS>` | Probe grace timeout (positive, finite duration) |
 | `--dns-cache-ttl <SECONDS>` | Per-run DNS cache TTL |
 
 ## Power User Passthrough

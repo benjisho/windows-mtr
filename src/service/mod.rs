@@ -6,6 +6,7 @@ use std::io::Write;
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum UiMode {
@@ -100,6 +101,20 @@ pub fn validate_target(host: &str) -> Result<String, ProbeError> {
 }
 
 pub fn verify_options(request: &ProbeRequest) -> Result<(), ProbeError> {
+    if let Some(timeout) = request.timeout_seconds {
+        if !timeout.is_finite() || timeout <= 0.0 {
+            return Err(ProbeError::InvalidOption(
+                "timeout must be a positive finite number of seconds".to_string(),
+            ));
+        }
+
+        if Duration::try_from_secs_f32(timeout).is_err() {
+            return Err(ProbeError::InvalidOption(
+                "timeout is too large to represent as a duration".to_string(),
+            ));
+        }
+    }
+
     if (request.tcp || request.udp) && request.port.is_none() {
         let (protocol, flag) = if request.tcp {
             ("TCP", 'T')

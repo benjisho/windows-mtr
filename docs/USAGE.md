@@ -60,7 +60,7 @@ mtr --json-pretty -c 20 8.8.4.4
 - `-b` / `--show-asn` — include ASN info
 - `-m <hops>` — max hops/TTL
 - `-i <seconds>` — minimum round duration
-- `-W <seconds>` — probe grace timeout
+- `-W <seconds>` — probe grace timeout (must be positive and finite)
 - `-S <ip>` — source IP
 - `--interface <name>` — source interface
 
