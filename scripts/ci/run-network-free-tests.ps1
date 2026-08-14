@@ -7,9 +7,9 @@ Set-StrictMode -Version Latest
 # Keep normal CI deterministic and free of live probes. Loopback and externally
 # reachable probe suites are invoked only from their dedicated workflow lanes.
 $commands = @(
-    @('test', '--locked', '--workspace', '--lib', '--bins'),
+    @('test', '--workspace', '--lib', '--bins'),
     @(
-        'test', '--locked',
+        'test',
         '--test', 'api_contract_tests',
         '--test', 'api_integration_tests',
         '--test', 'cli_tests',

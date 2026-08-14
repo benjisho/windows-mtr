@@ -31,7 +31,7 @@ jobs:
           cache-bin: true
 
       - name: Build
-        run: cargo build --locked --release
+        run: cargo build --release
 
       - name: Run network-free tests
         shell: pwsh
@@ -49,7 +49,7 @@ jobs:
             $mtrPath = "target\release\mtr.exe"
           } else {
             # Run cargo build again to make sure we have a binary
-            cargo build --locked --release
+            cargo build --release
 
             # Check again for the binary
             if (Test-Path "target\release\mtr.exe") {

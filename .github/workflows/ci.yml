@@ -163,12 +163,12 @@ jobs:
           cache-on-failure: true
 
       - name: Check
-        run: cargo check --locked --all-targets
+        run: cargo check --all-targets
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Run clippy
-        run: cargo clippy --locked --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
         env:
           CARGO_INCREMENTAL: 0
 
@@ -213,12 +213,12 @@ jobs:
           cache-on-failure: true
 
       - name: Check
-        run: cargo check --locked --all-targets
+        run: cargo check --all-targets
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Run clippy
-        run: cargo clippy --locked --all-targets -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
         env:
           CARGO_INCREMENTAL: 0
 
@@ -263,7 +263,7 @@ jobs:
         env:
           PARITY_SUMMARY_PATH: ${{ runner.temp }}/probe-parity-summary.md
           CARGO_INCREMENTAL: 0
-        run: cargo test --locked --test probe_parity_tests -- --nocapture
+        run: cargo test --test probe_parity_tests -- --nocapture
 
       - name: Publish parity summary
         if: always()
@@ -297,7 +297,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Install OpenAPI validation tooling
         shell: bash
@@ -308,12 +308,12 @@ jobs:
         run: python3 scripts/validate_openapi_schema.py docs/api/openapi.yaml
 
       - name: Run API contract tests
-        run: cargo test --locked --test api_contract_tests -- --nocapture
+        run: cargo test --test api_contract_tests -- --nocapture
         env:
           CARGO_INCREMENTAL: 0
 
       - name: Run API integration tests
-        run: cargo test --locked --test api_integration_tests -- --nocapture
+        run: cargo test --test api_integration_tests -- --nocapture
         env:
           CARGO_INCREMENTAL: 0
 
@@ -394,7 +394,7 @@ jobs:
           cache-on-failure: true
 
       - name: Build release binary
-        run: cargo build --locked --release --target x86_64-pc-windows-msvc
+        run: cargo build --release --target x86_64-pc-windows-msvc
         env:
           CARGO_INCREMENTAL: 0
 
@@ -499,7 +499,7 @@ jobs:
           cache-on-failure: true
 
       - name: Check (smoke)
-        run: cargo check --locked --all-targets
+        run: cargo check --all-targets
         env:
           CARGO_INCREMENTAL: 0
 
@@ -530,7 +530,7 @@ jobs:
           cache-on-failure: true
 
       - name: Run loopback-only native ICMP tests
-        run: cargo test --locked --test native_icmp_e2e_tests -- --nocapture
+        run: cargo test --test native_icmp_e2e_tests -- --nocapture
         env:
           CARGO_INCREMENTAL: 0
 
@@ -551,7 +551,7 @@ jobs:
           toolchain: stable
 
       - name: Run opt-in external probe tests
-        run: cargo test --locked --test rest_server_http_tests -- --nocapture
+        run: cargo test --test rest_server_http_tests -- --nocapture
         env:
           CARGO_INCREMENTAL: 0
 
@@ -592,7 +592,7 @@ jobs:
           cache-on-failure: true
 
       - name: Run non-elevated privilege smoke harness
-        run: cargo test --locked --test privilege_probe_smoke -- --exact privilege_probe_smoke --nocapture
+        run: cargo test --test privilege_probe_smoke -- --exact privilege_probe_smoke --nocapture
         env:
           CARGO_INCREMENTAL: 0
           EXPECT_EXIT_CODE: ${{ matrix.expected_exit_code }}
@@ -627,7 +627,7 @@ jobs:
           cache-on-failure: true
 
       - name: Build smoke harness without running
-        run: cargo test --locked --test privilege_probe_smoke --no-run
+        run: cargo test --test privilege_probe_smoke --no-run
         env:
           CARGO_INCREMENTAL: 0
 
@@ -663,7 +663,7 @@ jobs:
           $env:EXPECT_EXIT_CODE = "0"
           $env:EXPECT_STDOUT_CONTAINS = "Hop"
           $env:SMOKE_ARGS = "-n -r -c 1 127.0.0.1"
-          cargo test --locked --test privilege_probe_smoke -- --exact privilege_probe_smoke --nocapture
+          cargo test --test privilege_probe_smoke -- --exact privilege_probe_smoke --nocapture
 
 
   privilege-probe-smoke-windows-elevated-note:
