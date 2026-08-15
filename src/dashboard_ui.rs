@@ -703,6 +703,8 @@ fn render_loss_chart(
 mod tests {
     use super::*;
     use crossterm::event::{KeyEventState, KeyModifiers};
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
     use serde_json::json;
 
     #[test]
@@ -858,5 +860,33 @@ mod tests {
         app.ingest_snapshot(hops);
         assert!(app.latency_history.is_empty());
         assert!(app.loss_history.is_empty());
+    }
+
+    #[test]
+    fn dashboard_renders_with_headless_test_backend() {
+        let backend = TestBackend::new(120, 40);
+        let mut terminal = Terminal::new(backend).expect("test terminal should initialize");
+        let mut app = DashboardApp::new("127.0.0.1");
+        app.ingest_snapshot(vec![HopStat {
+            hop: 1,
+            host: "127.0.0.1".to_string(),
+            loss_pct: Some(0.0),
+            best_ms: Some(0.1),
+            avg_ms: Some(0.2),
+            worst_ms: Some(0.4),
+        }]);
+
+        terminal
+            .draw(|frame| draw_ui(frame, &app))
+            .expect("dashboard should render without a real terminal");
+        let buffer = terminal.backend().buffer();
+        let rendered = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(rendered.contains(FALLBACK_DASHBOARD_TITLE_PREFIX));
+        assert!(rendered.contains("127.0.0.1"));
     }
 }
