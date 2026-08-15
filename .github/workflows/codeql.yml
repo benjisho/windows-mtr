@@ -43,3 +43,10 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
+        with:
+          # GitHub default setup owns code-scanning alert uploads for this
+          # repository. Keep this advanced PR analysis local to avoid duplicate
+          # SARIF uploads being rejected by GitHub.
+          upload: never
+          upload-database: false
+          wait-for-processing: false
