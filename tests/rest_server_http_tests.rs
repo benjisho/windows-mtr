@@ -77,7 +77,7 @@ async fn request_health_with_connect_info(
     let app = build_router(state);
 
     let mut request_builder = Request::builder().uri("/api/v1/health").method("GET");
-    for (name, value) in mtls_identity_headers {
+    for &(name, value) in mtls_identity_headers {
         request_builder = request_builder.header(name, value);
     }
 
