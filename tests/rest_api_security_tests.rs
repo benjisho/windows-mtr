@@ -1,9 +1,25 @@
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 use windows_mtr::service::rest_api::{
-    AuthStrategy, CreateProbeApiRequest, FixedWindowRateLimiter, ProbeConcurrencyGate,
+    AuthStrategy, CreateProbeApiRequest, FixedWindowRateLimiter, MAX_API_PROBE_COUNT,
+    MAX_API_PROBE_EXECUTION_TIMEOUT, MAX_API_PROBE_INTERVAL_SECONDS, MAX_API_PROBE_TIMEOUT_SECONDS,
+    MIN_API_PROBE_INTERVAL_SECONDS, MIN_API_PROBE_TIMEOUT_SECONDS, ProbeConcurrencyGate,
     ProbeProtocol, RestApiConfig, RestApiValidationError, validate_payload_size,
 };
+
+fn valid_request() -> CreateProbeApiRequest {
+    CreateProbeApiRequest {
+        targets: vec!["example.com".to_string()],
+        protocol: ProbeProtocol::Icmp,
+        port: None,
+        count: Some(1),
+        max_hops: Some(1),
+        resolve_dns: None,
+        include_asn: None,
+        interval_seconds: None,
+        timeout_seconds: None,
+    }
+}
 
 #[test]
 fn default_config_binds_localhost_and_validates() {
@@ -254,6 +270,72 @@ fn rejects_out_of_bounds_count_and_max_hops() {
     };
     assert!(matches!(
         invalid_max_hops.normalize_and_validate(&config),
+        Err(RestApiValidationError::InvalidOption(_))
+    ));
+}
+
+#[test]
+fn request_validation_bounds_probe_work_and_execution_timeout() {
+    let config = RestApiConfig::default();
+
+    let mut at_limit = valid_request();
+    at_limit.count = Some(MAX_API_PROBE_COUNT);
+    at_limit.interval_seconds = Some(MAX_API_PROBE_INTERVAL_SECONDS);
+    at_limit.timeout_seconds = Some(MAX_API_PROBE_TIMEOUT_SECONDS);
+    assert!(at_limit.normalize_and_validate(&config).is_ok());
+
+    let mut excessive_count = valid_request();
+    excessive_count.count = Some(MAX_API_PROBE_COUNT + 1);
+    assert!(matches!(
+        excessive_count.normalize_and_validate(&config),
+        Err(RestApiValidationError::InvalidOption(_))
+    ));
+
+    let mut too_short_interval = valid_request();
+    too_short_interval.interval_seconds = Some(MIN_API_PROBE_INTERVAL_SECONDS / 2.0);
+    assert!(matches!(
+        too_short_interval.normalize_and_validate(&config),
+        Err(RestApiValidationError::InvalidOption(_))
+    ));
+
+    let mut excessive_interval = valid_request();
+    excessive_interval.interval_seconds = Some(MAX_API_PROBE_INTERVAL_SECONDS + 1.0);
+    assert!(matches!(
+        excessive_interval.normalize_and_validate(&config),
+        Err(RestApiValidationError::InvalidOption(_))
+    ));
+
+    let mut too_short_timeout = valid_request();
+    too_short_timeout.timeout_seconds = Some(MIN_API_PROBE_TIMEOUT_SECONDS / 2.0);
+    assert!(matches!(
+        too_short_timeout.normalize_and_validate(&config),
+        Err(RestApiValidationError::InvalidOption(_))
+    ));
+
+    let mut excessive_timeout = valid_request();
+    excessive_timeout.timeout_seconds = Some(MAX_API_PROBE_TIMEOUT_SECONDS + 1.0);
+    assert!(matches!(
+        excessive_timeout.normalize_and_validate(&config),
+        Err(RestApiValidationError::InvalidOption(_))
+    ));
+
+    let constrained_config = RestApiConfig {
+        probe_execution_timeout: Duration::from_secs(1),
+        ..RestApiConfig::default()
+    };
+    let mut timeout_exceeding_job_budget = valid_request();
+    timeout_exceeding_job_budget.timeout_seconds = Some(2.0);
+    assert!(matches!(
+        timeout_exceeding_job_budget.normalize_and_validate(&constrained_config),
+        Err(RestApiValidationError::InvalidTimeout(_))
+    ));
+
+    let excessive_execution_timeout = RestApiConfig {
+        probe_execution_timeout: Duration::from_secs(MAX_API_PROBE_EXECUTION_TIMEOUT.as_secs() + 1),
+        ..RestApiConfig::default()
+    };
+    assert!(matches!(
+        excessive_execution_timeout.validate_security_defaults(),
         Err(RestApiValidationError::InvalidOption(_))
     ));
 }

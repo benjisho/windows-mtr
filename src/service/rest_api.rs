@@ -6,6 +6,12 @@ use std::time::{Duration, Instant};
 
 const MAX_HOSTNAME_LEN: usize = 253;
 const MAX_LABEL_LEN: usize = 63;
+pub const MAX_API_PROBE_COUNT: usize = 100;
+pub const MIN_API_PROBE_INTERVAL_SECONDS: f32 = 0.01;
+pub const MAX_API_PROBE_INTERVAL_SECONDS: f32 = 60.0;
+pub const MIN_API_PROBE_TIMEOUT_SECONDS: f32 = 0.01;
+pub const MAX_API_PROBE_TIMEOUT_SECONDS: f32 = 60.0;
+pub const MAX_API_PROBE_EXECUTION_TIMEOUT: Duration = Duration::from_secs(300);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum AuthStrategy {
@@ -122,6 +128,12 @@ impl RestApiConfig {
                 "probe_execution_timeout must be greater than zero".to_string(),
             ));
         }
+        if self.probe_execution_timeout > MAX_API_PROBE_EXECUTION_TIMEOUT {
+            return Err(RestApiValidationError::InvalidOption(format!(
+                "probe_execution_timeout must not exceed {} seconds",
+                MAX_API_PROBE_EXECUTION_TIMEOUT.as_secs()
+            )));
+        }
 
         if self.auth_strategy == AuthStrategy::NoneLocalOnly && !self.bind_addr.ip().is_loopback() {
             return Err(RestApiValidationError::AuthStrategyViolation(
@@ -217,9 +229,30 @@ impl CreateProbeApiRequest {
         let resolve_dns = self.resolve_dns.unwrap_or(true);
         let include_asn = self.include_asn.unwrap_or(false);
 
-        let interval_seconds =
-            validate_optional_positive("interval_seconds", self.interval_seconds)?;
-        let timeout_seconds = validate_optional_positive("timeout_seconds", self.timeout_seconds)?;
+        let interval_seconds = validate_optional_bounded_positive(
+            "interval_seconds",
+            self.interval_seconds,
+            MIN_API_PROBE_INTERVAL_SECONDS,
+            MAX_API_PROBE_INTERVAL_SECONDS,
+        )?;
+        let timeout_seconds = validate_optional_bounded_positive(
+            "timeout_seconds",
+            self.timeout_seconds,
+            MIN_API_PROBE_TIMEOUT_SECONDS,
+            MAX_API_PROBE_TIMEOUT_SECONDS,
+        )?;
+
+        let probe_execution_timeout_seconds = config.probe_execution_timeout.as_secs_f32();
+        if interval_seconds.is_some_and(|interval| interval > probe_execution_timeout_seconds) {
+            return Err(RestApiValidationError::InvalidOption(format!(
+                "interval_seconds must not exceed the configured probe execution timeout ({probe_execution_timeout_seconds} seconds)"
+            )));
+        }
+        if timeout_seconds.is_some_and(|timeout| timeout > probe_execution_timeout_seconds) {
+            return Err(RestApiValidationError::InvalidTimeout(format!(
+                "timeout_seconds must not exceed the configured probe execution timeout ({probe_execution_timeout_seconds} seconds)"
+            )));
+        }
 
         if let (Some(interval), Some(timeout)) = (interval_seconds, timeout_seconds)
             && timeout < interval
@@ -258,10 +291,10 @@ fn validate_optional_count(value: Option<usize>) -> Result<Option<usize>, RestAp
         return Ok(None);
     };
 
-    if raw == 0 {
-        return Err(RestApiValidationError::InvalidOption(
-            "count must be greater than or equal to 1".to_string(),
-        ));
+    if !(1..=MAX_API_PROBE_COUNT).contains(&raw) {
+        return Err(RestApiValidationError::InvalidOption(format!(
+            "count must be between 1 and {MAX_API_PROBE_COUNT}"
+        )));
     }
 
     Ok(Some(raw))
@@ -281,17 +314,19 @@ fn validate_optional_max_hops(value: Option<u16>) -> Result<Option<u8>, RestApiV
     Ok(Some(raw as u8))
 }
 
-fn validate_optional_positive(
+fn validate_optional_bounded_positive(
     field_name: &str,
     value: Option<f32>,
+    minimum: f32,
+    maximum: f32,
 ) -> Result<Option<f32>, RestApiValidationError> {
     let Some(raw) = value else {
         return Ok(None);
     };
 
-    if !raw.is_finite() || raw <= 0.0 {
+    if !raw.is_finite() || !(minimum..=maximum).contains(&raw) {
         return Err(RestApiValidationError::InvalidOption(format!(
-            "{field_name} must be a positive finite number"
+            "{field_name} must be a finite number between {minimum} and {maximum} seconds"
         )));
     }
 
@@ -421,6 +456,17 @@ pub struct RateLimitSnapshot {
     pub limit: usize,
     pub remaining: usize,
     pub reset_after: Duration,
+}
+
+impl RateLimitSnapshot {
+    pub fn reset_after_seconds(self) -> u64 {
+        let whole_seconds = self.reset_after.as_secs();
+        if self.reset_after.subsec_nanos() == 0 {
+            whole_seconds
+        } else {
+            whole_seconds.saturating_add(1)
+        }
+    }
 }
 
 impl FixedWindowRateLimiter {

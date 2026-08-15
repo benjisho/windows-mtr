@@ -41,6 +41,10 @@ const RATE_LIMIT_RESET_HEADER: &str = "X-RateLimit-Reset";
 const RATE_LIMIT_LIMIT_STANDARD_HEADER: &str = "RateLimit-Limit";
 const RATE_LIMIT_REMAINING_STANDARD_HEADER: &str = "RateLimit-Remaining";
 const RATE_LIMIT_RESET_STANDARD_HEADER: &str = "RateLimit-Reset";
+const RETRY_AFTER_HEADER: &str = "Retry-After";
+const MTLS_CLIENT_CERT_HEADER: &str = "X-Client-Cert";
+const MTLS_VERIFY_HEADER: &str = "X-SSL-Client-Verify";
+const MTLS_VERIFY_SUCCESS: &str = "SUCCESS";
 
 type ApiResult<T> = Result<T, ApiError>;
 
@@ -49,6 +53,7 @@ enum RequestAuthError {
     MissingApiKeyHeader,
     InvalidApiKey,
     MissingMtlsIdentity,
+    InvalidMtlsIdentity,
     UntrustedMtlsIngress,
     NoneLocalOnlyRemoteAccessDenied,
 }
@@ -74,6 +79,12 @@ impl RequestAuthError {
                 title: "Authentication required",
                 detail: "mTLS is configured but request identity was not provided by upstream"
                     .to_string(),
+            },
+            Self::InvalidMtlsIdentity => ApiError {
+                status: StatusCode::UNAUTHORIZED,
+                code: "invalid_mtls_identity",
+                title: "Authentication required",
+                detail: "mTLS identity headers must be singular, valid text, and non-empty; X-SSL-Client-Verify must equal SUCCESS when present".to_string(),
             },
             Self::UntrustedMtlsIngress => ApiError {
                 status: StatusCode::FORBIDDEN,
@@ -268,6 +279,13 @@ async fn enforce_probe_request_guards(
     request: Request,
     next: Next,
 ) -> ApiResult<axum::response::Response> {
+    let remote_addr = request
+        .extensions()
+        .get::<ConnectInfo<std::net::SocketAddr>>()
+        .map(|connect_info| connect_info.0)
+        .ok_or_else(|| internal_error_response("missing remote address for probe request"))?;
+    enforce_request_auth(&state.config, remote_addr, request.headers())?;
+
     let (snapshot, allow_result) = {
         let mut limiter = state
             .probe_rate_limiter
@@ -325,7 +343,7 @@ fn attach_rate_limit_headers(
         HeaderValue::from_str(&snapshot.remaining.to_string())
             .map_err(|_| internal_error_response("invalid rate limit header value"))?,
     );
-    let reset_seconds = snapshot.reset_after.as_secs();
+    let reset_seconds = snapshot.reset_after_seconds();
     let reset_value = HeaderValue::from_str(&reset_seconds.to_string())
         .map_err(|_| internal_error_response("invalid rate limit header value"))?;
     response
@@ -334,6 +352,13 @@ fn attach_rate_limit_headers(
     response
         .headers_mut()
         .insert(RATE_LIMIT_RESET_STANDARD_HEADER, reset_value);
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        response.headers_mut().insert(
+            RETRY_AFTER_HEADER,
+            HeaderValue::from_str(&reset_seconds.to_string())
+                .map_err(|_| internal_error_response("invalid retry-after header value"))?,
+        );
+    }
     Ok(())
 }
 
@@ -386,13 +411,9 @@ async fn get_health(
 }
 
 async fn create_probe(
-    ConnectInfo(remote_addr): ConnectInfo<std::net::SocketAddr>,
     State(state): State<RestServerState>,
-    headers: HeaderMap,
     Json(payload): Json<CreateProbeRequestDto>,
 ) -> ApiResult<(StatusCode, Json<CreateProbeResponseDto>)> {
-    enforce_request_auth(&state.config, remote_addr, &headers)?;
-
     run_with_timeout(state.config.request_timeout, async move {
         let create_request: CreateProbeApiRequest = payload.into();
         let normalized = create_request
@@ -861,13 +882,48 @@ fn enforce_request_auth(
                 return Err(RequestAuthError::UntrustedMtlsIngress.into_api_error());
             }
 
-            headers
-                .get("X-Client-Cert")
-                .or_else(|| headers.get("X-SSL-Client-Verify"))
-                .map(|_| ())
-                .ok_or_else(|| RequestAuthError::MissingMtlsIdentity.into_api_error())
+            validate_mtls_identity_headers(headers).map_err(RequestAuthError::into_api_error)
         }
     }
+}
+
+fn validate_mtls_identity_headers(headers: &HeaderMap) -> Result<(), RequestAuthError> {
+    let certificate = single_nonempty_header_value(headers, MTLS_CLIENT_CERT_HEADER)?;
+    let verification = single_nonempty_header_value(headers, MTLS_VERIFY_HEADER)?;
+
+    if certificate.is_none() && verification.is_none() {
+        return Err(RequestAuthError::MissingMtlsIdentity);
+    }
+
+    if verification.is_some_and(|value| !value.eq_ignore_ascii_case(MTLS_VERIFY_SUCCESS)) {
+        return Err(RequestAuthError::InvalidMtlsIdentity);
+    }
+
+    Ok(())
+}
+
+fn single_nonempty_header_value<'a>(
+    headers: &'a HeaderMap,
+    header_name: &str,
+) -> Result<Option<&'a str>, RequestAuthError> {
+    let mut values = headers.get_all(header_name).iter();
+    let Some(value) = values.next() else {
+        return Ok(None);
+    };
+
+    if values.next().is_some() {
+        return Err(RequestAuthError::InvalidMtlsIdentity);
+    }
+
+    let value = value
+        .to_str()
+        .map_err(|_| RequestAuthError::InvalidMtlsIdentity)?
+        .trim();
+    if value.is_empty() {
+        return Err(RequestAuthError::InvalidMtlsIdentity);
+    }
+
+    Ok(Some(value))
 }
 
 fn constant_time_equals(a: &[u8], b: &[u8]) -> bool {
