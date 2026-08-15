@@ -4,6 +4,14 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 3 * * 1'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/codeql.yml'
   push:
     branches: [ master ]
     paths:
@@ -15,6 +23,7 @@ on:
 permissions:
   actions: read
   contents: read
+  security-events: write
 
 jobs:
   analyze:
@@ -27,7 +36,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           languages: rust
           build-mode: none
@@ -35,7 +44,9 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
         with:
-          # Non-uploading mode: run local analysis only and do not publish code-scanning alerts.
+          # GitHub default setup owns code-scanning alert uploads for this
+          # repository. Keep this advanced PR analysis local to avoid duplicate
+          # SARIF uploads being rejected by GitHub.
           upload: never
           upload-database: false
           wait-for-processing: false

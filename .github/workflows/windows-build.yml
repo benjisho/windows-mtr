@@ -33,8 +33,9 @@ jobs:
       - name: Build
         run: cargo build --release
 
-      - name: Test
-        run: cargo test
+      - name: Run network-free tests
+        shell: pwsh
+        run: ./scripts/ci/run-network-free-tests.ps1
 
       - name: Create dist directory
         run: powershell -command "New-Item -ItemType Directory -Path 'dist' -Force"
