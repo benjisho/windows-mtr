@@ -1,0 +1,1 @@
+--log-format "json compact" --unknown-flag
